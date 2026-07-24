@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
-import { mkdir, open, unlink } from 'node:fs/promises';
+import { lstat, mkdir, open, realpath, unlink } from 'node:fs/promises';
+import type { ReadStream } from 'node:fs';
 import { extname, isAbsolute, relative, resolve, sep } from 'node:path';
+import { Readable } from 'node:stream';
 import { serverConfig } from '$lib/server/config';
 import { logTrackStorageError } from './logging';
 
@@ -16,6 +18,26 @@ const UUID_V4_PATTERN =
 	/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const STORED_FILENAME_PATTERN =
 	/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(?:mp3|wav|ogg)$/;
+
+export interface OpenedAudioFile {
+	fileHandle: Awaited<ReturnType<typeof open>>;
+	fileSizeBytes: number;
+}
+
+export type OpenStoredAudioFileResult =
+	| {
+			success: true;
+			file: OpenedAudioFile;
+	  }
+	| {
+			success: false;
+			reason: 'missing' | 'not-file' | 'unavailable';
+	  };
+
+export interface AudioStreamRange {
+	start: number;
+	end: number;
+}
 
 function resolveStorageRoot(root: string): string {
 	if (!root.trim()) {
@@ -62,6 +84,15 @@ export function getValidatedAudioExtension(
 	const extension = normalizeAudioExtension(extname(originalFilename));
 
 	return extension && isAllowedAudioFormat(extension, mimeType) ? extension : null;
+}
+
+export function getSafeAudioResponseMimeType(
+	storedFilename: string,
+	mimeType: string
+): string {
+	return getValidatedAudioExtension(storedFilename, mimeType)
+		? mimeType.trim().toLowerCase()
+		: 'application/octet-stream';
 }
 
 export function generateStoredFilename(extension: string, uuid: string = randomUUID()): string {
@@ -187,5 +218,128 @@ export async function deleteStoredAudioFile(
 
 		logTrackStorageError('Unable to delete a stored audio file.', error);
 		throw error;
+	}
+}
+
+export async function openStoredAudioFile(
+	storedFilename: string,
+	root = serverConfig.audioStoragePath
+): Promise<OpenStoredAudioFileResult> {
+	let filePath: string;
+
+	try {
+		filePath = resolveStorageFilePath(root, storedFilename);
+	} catch (error) {
+		logTrackStorageError('Stored audio filename validation failed.', error);
+		return { success: false, reason: 'missing' };
+	}
+
+	try {
+		const storageRoot = resolveStorageRoot(root);
+		const [canonicalRoot, canonicalFile, linkStat] = await Promise.all([
+			realpath(storageRoot),
+			realpath(filePath),
+			lstat(filePath)
+		]);
+		const pathWithinRoot = relative(canonicalRoot, canonicalFile);
+
+		if (
+			linkStat.isSymbolicLink() ||
+			!linkStat.isFile() ||
+			pathWithinRoot === '' ||
+			pathWithinRoot === '..' ||
+			pathWithinRoot.startsWith(`..${sep}`) ||
+			isAbsolute(pathWithinRoot)
+		) {
+			return { success: false, reason: 'not-file' };
+		}
+
+		filePath = canonicalFile;
+	} catch (error) {
+		const code = readErrorCode(error);
+
+		if (code === 'ENOENT' || code === 'ENOTDIR') {
+			return { success: false, reason: 'missing' };
+		}
+
+		logTrackStorageError('Unable to verify a stored audio file.', error);
+		return { success: false, reason: 'unavailable' };
+	}
+
+	let fileHandle: Awaited<ReturnType<typeof open>>;
+
+	try {
+		fileHandle = await open(filePath, 'r');
+	} catch (error) {
+		const code = readErrorCode(error);
+
+		if (code === 'ENOENT' || code === 'ENOTDIR') {
+			return { success: false, reason: 'missing' };
+		}
+
+		logTrackStorageError('Unable to open a stored audio file.', error);
+		return { success: false, reason: 'unavailable' };
+	}
+
+	try {
+		const fileStat = await fileHandle.stat();
+
+		if (!fileStat.isFile()) {
+			await fileHandle.close();
+			return { success: false, reason: 'not-file' };
+		}
+
+		if (!Number.isSafeInteger(fileStat.size) || fileStat.size < 0) {
+			await fileHandle.close();
+			return { success: false, reason: 'unavailable' };
+		}
+
+		return {
+			success: true,
+			file: {
+				fileHandle,
+				fileSizeBytes: fileStat.size
+			}
+		};
+	} catch (error) {
+		try {
+			await fileHandle.close();
+		} catch (closeError) {
+			logTrackStorageError('Unable to close an unreadable audio file.', closeError);
+		}
+
+		logTrackStorageError('Unable to inspect a stored audio file.', error);
+		return { success: false, reason: 'unavailable' };
+	}
+}
+
+export function createAudioReadStream(
+	file: OpenedAudioFile,
+	range?: AudioStreamRange
+): ReadStream {
+	return file.fileHandle.createReadStream({
+		autoClose: true,
+		...(range ? { start: range.start, end: range.end } : {})
+	});
+}
+
+export function createAudioWebStream(
+	file: OpenedAudioFile,
+	range?: AudioStreamRange
+): ReadableStream<Uint8Array> {
+	const nodeStream = createAudioReadStream(file, range);
+
+	nodeStream.on('error', (error) => {
+		logTrackStorageError('Audio response stream failed.', error);
+	});
+
+	return Readable.toWeb(nodeStream) as ReadableStream<Uint8Array>;
+}
+
+export async function closeOpenedAudioFile(file: OpenedAudioFile): Promise<void> {
+	try {
+		await file.fileHandle.close();
+	} catch (error) {
+		logTrackStorageError('Unable to close a stored audio file.', error);
 	}
 }

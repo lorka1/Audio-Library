@@ -18,7 +18,7 @@
 	<title>Upload audio · Audio Library</title>
 	<meta
 		name="description"
-		content="Upload an audio track and save its metadata to your private Audio Library account."
+		content="Upload an audio track and publish it in the Audio Library."
 	/>
 </svelte:head>
 
@@ -26,19 +26,13 @@
 	<div class="page-container upload-page__inner">
 		<div class="upload-card">
 			<header class="upload-card__header">
-				<p class="auth-eyebrow">Private audio upload</p>
+				<p class="auth-eyebrow">Public audio upload</p>
 				<h1>Add a track to your library.</h1>
 				<p>
 					Choose an MP3, WAV, or OGG file and describe the track. The audio file is stored
-					privately and linked to your account.
+					privately, linked to your account, and published for public playback and download.
 				</p>
 			</header>
-
-			{#if data.uploadSucceeded && !form}
-				<div class="form-message form-message--success" role="status">
-					Audio track uploaded successfully.
-				</div>
-			{/if}
 
 			{#if form?.errors.general}
 				<div class="form-message form-message--error" role="alert">

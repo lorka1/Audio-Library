@@ -5,31 +5,32 @@
 </script>
 
 <svelte:head>
-	<title>Audio Library · Secure audio uploads</title>
+	<title>Audio Library · Browse and share audio tracks</title>
 </svelte:head>
 
 <section class="hero">
 	<div class="page-container hero__inner">
-		<p class="eyebrow">Secure audio uploads are ready</p>
+		<p class="eyebrow">Public audio browsing is ready</p>
 		<h1>
 			{data.user
 				? `Welcome back, ${data.user.username}.`
-				: 'Build your private audio library.'}
+				: 'Discover community audio.'}
 		</h1>
 		<p class="lead">
-			Signed-in members can upload MP3, WAV, and OGG files with server-validated metadata,
-			private file storage, and account-linked database records.
+			Browse public tracks, open a detailed listening page, seek through audio, and download
+			the original user-facing file. Signed-in members can also publish validated uploads.
 		</p>
 		<div class="hero__actions">
+			<a class="hero__link hero__link--primary" href="/tracks">Browse public tracks</a>
 			{#if data.user}
-				<a class="hero__link hero__link--primary" href="/upload">Upload an audio track</a>
+				<a class="hero__link" href="/upload">Upload an audio track</a>
 				<a class="hero__link" href="/account">View your account</a>
 			{:else}
-				<a class="hero__link hero__link--primary" href="/register">Create an account</a>
+				<a class="hero__link" href="/register">Create an account</a>
 				<a class="hero__link" href="/login">Login</a>
 			{/if}
 			<a class="hero__link" href="#foundation"
-				>Review Phase 3 <span aria-hidden="true">↓</span></a
+				>Review Phase 4 <span aria-hidden="true">↓</span></a
 			>
 		</div>
 	</div>
@@ -37,35 +38,34 @@
 
 <section class="foundation page-container" id="foundation" aria-labelledby="foundation-title">
 	<div class="section-heading">
-		<p class="eyebrow">Phase 3</p>
-		<h2 id="foundation-title">Audio uploads built for consistency</h2>
+		<p class="eyebrow">Phase 4</p>
+		<h2 id="foundation-title">Public listening with private storage</h2>
 		<p>
-			Every upload is authenticated, validated on the server, and coordinated across private
-			file storage and SQLite metadata.
+			Public metadata is intentionally separated from internal filenames and physical paths,
+			while byte-range responses make native browser seeking possible.
 		</p>
 	</div>
 
 	<div class="card-grid">
 		<article>
 			<span class="card-number">01</span>
-			<h3>Validated uploads</h3>
+			<h3>Safe public metadata</h3>
 			<p>
-				Metadata, file size, extension, and MIME type are checked before anything is stored.
+				Browse and detail pages include only explicit public fields and the owner's username.
 			</p>
 		</article>
 		<article>
 			<span class="card-number">02</span>
-			<h3>Private file storage</h3>
+			<h3>Range streaming</h3>
 			<p>
-				Audio bytes stay outside the public application and receive generated physical names.
+				Audio remains outside the static directory and is streamed through validated track IDs.
 			</p>
 		</article>
 		<article>
 			<span class="card-number">03</span>
-			<h3>Consistent records</h3>
+			<h3>Safe downloads</h3>
 			<p>
-				Each track belongs to the signed-in user, with rollback protection if metadata storage
-				fails.
+				Downloads use sanitized original filenames without revealing generated storage names.
 			</p>
 		</article>
 	</div>
@@ -73,8 +73,8 @@
 	<aside class="phase-note">
 		<span aria-hidden="true">i</span>
 		<p>
-			Playback, streaming, download, public browsing, search, editing, and deletion remain
-			outside Phase 3.
+			Search, filters, My Tracks, editing, visibility controls, and deletion remain outside
+			Phase 4.
 		</p>
 	</aside>
 </section>

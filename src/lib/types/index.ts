@@ -13,3 +13,17 @@ export interface CurrentUser {
 	email: string;
 	createdAt: Date;
 }
+
+export interface PublicTrack {
+	id: number;
+	title: string;
+	artist: string;
+	bpm: number | null;
+	musicalKey: string | null;
+	genre: string | null;
+	description: string | null;
+	fileSizeBytes: number;
+	ownerUsername: string;
+	createdAt: string;
+	updatedAt: string;
+}

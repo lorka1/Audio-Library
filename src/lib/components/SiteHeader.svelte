@@ -18,6 +18,7 @@
 		<nav aria-label="Main navigation">
 			<ul>
 				<li><a href="/">Home</a></li>
+				<li><a href="/tracks">Browse Tracks</a></li>
 				{#if user}
 					<li><a href="/upload">Upload</a></li>
 					<li><a href="/account">Account</a></li>

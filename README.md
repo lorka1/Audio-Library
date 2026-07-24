@@ -1,9 +1,9 @@
 # Audio Library
 
 Audio Library is a SvelteKit application with a local SQLite database, secure
-account sessions, and private audio storage. Phase 3 provides registration,
-login, logout, persistent authentication, a protected account page, and
-authenticated MP3, WAV, and OGG uploads with server-validated metadata.
+account sessions, private audio storage, and public track delivery. Phase 4
+adds public browsing, safe track-detail pages, native audio playback with HTTP
+byte-range seeking, and downloads that use sanitized original filenames.
 
 ## Prerequisites
 
@@ -39,6 +39,7 @@ excluded from Git, `.env.example` must be copied in every new clone.
 | `npm run check:watch` | Runs checks in watch mode |
 | `npm run test` | Runs the Vitest test suite once |
 | `npm run test:watch` | Runs Vitest in watch mode |
+| `npm run test:integration` | Runs the bounded isolated Phase 4 HTTP integration test |
 | `npm run db:generate` | Generates a SQL migration after a schema change |
 | `npm run db:migrate` | Applies all pending migrations |
 | `npm run db:studio` | Opens Drizzle Studio |
@@ -100,7 +101,8 @@ are marked Secure outside development and expire with the database session.
 `App.Locals` with safe user and session objects. Password hashes and session
 token hashes are never included in locals or layout data.
 
-The `/account` and `/upload` pages require authentication. Signed-out visitors
+The `/account` and `/upload` pages require authentication. The `/tracks`
+list, public track details, streaming, and download routes do not. Signed-out visitors
 are sent to login and returned to the protected page after successful
 authentication. Login and registration pages redirect authenticated users
 home. Logout is a POST-only operation that removes the database session and
@@ -164,11 +166,76 @@ The upload service coordinates the filesystem and SQLite in this order:
    generated storage key, and authenticated owner ID.
 5. If the database insert fails, remove the newly written file. Missing files
    during rollback are treated as already cleaned up.
-6. On success, redirect with HTTP 303 to `/upload?success=1`, which displays
-   `Audio track uploaded successfully.` and an empty form.
+6. On success, redirect with HTTP 303 to `/tracks/{publicId}?uploaded=1`.
+   Refreshing the detail page repeats only the GET request and never repeats
+   the upload.
 
 Unexpected failures return a generic message without exposing SQL, session
 data, internal filenames, or absolute storage paths.
+
+## Public tracks
+
+Anyone can open `/tracks` to see public tracks ordered newest first. Each card
+shows the title, artist, BPM, musical key, genre, owner username, and upload
+date. Optional values use `Not specified`, and an empty library displays a
+dedicated empty state. Search, filters, sorting controls, and pagination are
+not part of Phase 4.
+
+`/tracks/{publicId}` shows one public track, its safe metadata, native audio
+controls, and a download link. Invalid positive-integer IDs, missing records,
+and private records all return the same safe 404. Page data is built from an
+explicit public view model; it does not serialize database rows containing the
+internal UUID, owner ID or email, storage key, original filename, password
+hash, session information, or physical path.
+
+The numeric `public_id` is an auto-incrementing route identifier. The original
+UUID `tracks.id` remains unique and server-only, so adding public URLs does not
+change existing track identity or ownership.
+
+### Audio streaming and seeking
+
+The native player reads:
+
+```text
+GET /api/tracks/{publicId}/stream
+```
+
+The endpoint looks up only public records, derives the generated stored
+filename from the database, validates it, and opens it only inside the
+configured audio root. Files stay outside `static`, so no filename or path can
+be supplied directly in a URL.
+
+Without a `Range` header, the endpoint streams the whole file with status 200,
+the actual physical `Content-Length`, `Accept-Ranges: bytes`, and a validated
+audio `Content-Type`. A valid single byte range returns status 206 with the
+selected bytes and an exact `Content-Range`. Open-ended and suffix ranges are
+supported. Malformed, multiple, reversed, or unsatisfiable ranges return 416
+with `Content-Range: bytes */TOTAL`.
+
+Seeking works because the browser sends a new byte-range request for the
+position selected in the native `<audio>` controls. The server uses a Node
+file stream converted to a Web response stream; it does not load the complete
+audio file into application memory.
+
+### Downloads
+
+Downloads use:
+
+```text
+GET /api/tracks/{publicId}/download
+```
+
+The server streams the same private physical file and sets
+`Content-Disposition: attachment`. The header includes a quoted, injection-safe
+ASCII fallback and an RFC-compatible UTF-8 `filename*` value derived from the
+original user-facing filename. Control characters and path components are
+removed. The UUID stored filename and storage path are never used as the
+download name or returned to the client.
+
+Both media endpoints use conservative `private, no-store` caching and
+`X-Content-Type-Options: nosniff`. A missing physical file or non-regular file
+returns a safe 404. Unexpected storage failures return a generic response and
+sanitized server log metadata.
 
 ### Storage and Git
 
@@ -193,9 +260,12 @@ npm run db:generate
 npm run db:migrate
 ```
 
-Phase 2 added the unique `sessions.token_hash` column. Phase 3 adds BPM,
-musical-key, and genre metadata to `tracks`, makes artist required, and adds a
-database check for nullable BPM values in the 20–300 range. Existing migrations
+Phase 2 added the unique `sessions.token_hash` column. Phase 3 added BPM,
+musical-key, and genre metadata to `tracks`, made artist required, and added a
+database check for nullable BPM values in the 20–300 range. Migration `0003`
+changed new uploads to public visibility by default. Phase 4 migration `0004`
+adds the numeric public route ID while preserving the existing internal UUID,
+owner, metadata, visibility, and stored audio reference. Historical migrations
 remain unchanged.
 
 Inspect users, sessions, and track metadata with:
@@ -215,8 +285,9 @@ npm run db:studio
 
 2. Register or log in, open `/upload`, and submit a small test MP3, WAV, or OGG
    file with valid metadata.
-3. Confirm the success message appears and refreshing the success page does not
-   submit another upload.
+3. Confirm the browser redirects to `/tracks/{publicId}?uploaded=1`, the
+   success message appears, and refreshing the detail page does not submit
+   another upload.
 4. Inspect the private files:
 
    ```powershell
@@ -241,14 +312,17 @@ src/
     server/
       auth/                 validation, password, session, repository, and guards
       db/                   SQLite connection, Drizzle schema, and database types
-      tracks/               upload validation, private files, service, and repository
+      tracks/               public models, IDs, ranges, downloads, private files, upload, and repository
     types/                  shared client-safe TypeScript types
   routes/
     account/                protected account page
     login/                  login form and action
     logout/                 POST-only logout endpoint
     register/               registration form and action
+    tracks/                 public list and detail pages
+    api/tracks/             public-ID stream and download endpoints
     upload/                 protected multipart upload form and action
+scripts/                    bounded isolated integration controller
 storage/audio/              private runtime audio storage; contents ignored by Git
 ```
 
@@ -260,15 +334,27 @@ Run the automated unit tests with:
 npm run test
 ```
 
-The suite covers authentication validation, password hashing, session token
-hashing, upload-size configuration, audio extension/MIME mappings, generated
-stored filenames, safe storage paths, temporary file writing and cleanup,
-authenticated track insertion order, and filesystem rollback after database
-failure. Filesystem tests use temporary directories rather than
-`storage/audio`.
+The suite covers authentication, upload validation and rollback, public-model
+mapping, positive-integer track IDs, deterministic formatting, HTTP byte
+ranges, download filename encoding, generated stored filenames, path
+containment, and Node-to-Web file streaming. Filesystem tests use temporary
+directories rather than `storage/audio`.
 
-Browser-level checks for authentication, upload validation, persistence,
-rollback, no-JavaScript operation, and responsive navigation are listed in
+Run the bounded server-level Phase 4 integration checks with:
+
+```powershell
+npm run test:integration
+```
+
+The controller creates a temporary copied database and a separate temporary
+audio directory, selects an isolated port, enforces 60-second startup and
+overall timeouts, prints startup logs on failure, and always terminates its own
+Vite process in cleanup. It verifies list/detail privacy, full and partial
+streaming, 416 responses, downloads, upload redirects, and refresh behavior.
+It also verifies that the real database and `storage/audio` remain unchanged.
+
+The complete browser checklist for playback, seeking, download names,
+authentication, upload validation, and responsive navigation is in
 `MANUAL_TESTS.md`.
 
 ## Security and resource limitations
@@ -284,10 +370,10 @@ The current multipart action uses `request.formData()`, and file storage uses
 memory rather than streamed to disk. Memory requirements increase with file
 size and concurrent uploads; keep conservative request limits in production.
 
-## Phase 3 boundary
+## Phase 4 boundary
 
-Phase 3 intentionally does not include playback, an HTML audio player,
-streaming, HTTP Range requests, download, public track lists, track detail
-pages, search, BPM/key/genre filters, a My Tracks page, metadata editing, file
-replacement, deletion, automatic BPM or key analysis, comments, playlists, or
-ratings. These capabilities remain reserved for later phases.
+Phase 4 includes public browsing, public detail pages, native playback,
+single-range HTTP streaming, seeking, and download. It intentionally does not
+include search, BPM/key/genre filters, advanced sorting, pagination, My Tracks,
+metadata editing, file replacement, deletion, visibility controls, comments,
+ratings, playlists, recommendations, or automatic BPM/key analysis.

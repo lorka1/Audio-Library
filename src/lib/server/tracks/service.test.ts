@@ -5,7 +5,8 @@ import {
 	type TrackUploadDependencies
 } from './service';
 
-const TRACK_ID = '11111111-1111-4111-8111-111111111111';
+const INTERNAL_TRACK_ID = '11111111-1111-4111-8111-111111111111';
+const PUBLIC_TRACK_ID = 42;
 const STORED_FILENAME = '22222222-2222-4222-8222-222222222222.mp3';
 const NOW = new Date('2026-07-24T12:00:00.000Z');
 
@@ -32,11 +33,13 @@ function testDependencies(): TrackUploadDependencies {
 		}),
 		deleteFile: vi.fn<TrackUploadDependencies['deleteFile']>().mockResolvedValue(undefined),
 		insertTrack: vi.fn<TrackUploadDependencies['insertTrack']>().mockResolvedValue({
-			id: TRACK_ID,
+			id: PUBLIC_TRACK_ID,
 			title: 'Test Track',
 			createdAt: NOW
 		}),
-		generateId: vi.fn<TrackUploadDependencies['generateId']>().mockReturnValue(TRACK_ID),
+		generateId: vi
+			.fn<TrackUploadDependencies['generateId']>()
+			.mockReturnValue(INTERNAL_TRACK_ID),
 		now: vi.fn<TrackUploadDependencies['now']>().mockReturnValue(NOW)
 	};
 }
@@ -73,7 +76,7 @@ describe('uploadTrack', () => {
 		expect(result).toEqual({
 			success: true,
 			track: {
-				id: TRACK_ID,
+				id: PUBLIC_TRACK_ID,
 				title: 'Test Track',
 				createdAt: NOW
 			}
@@ -81,7 +84,7 @@ describe('uploadTrack', () => {
 		expect(callOrder).toEqual(['file', 'database']);
 		expect(dependencies.saveFile).toHaveBeenCalledWith(expect.any(File), '.mp3');
 		expect(dependencies.insertTrack).toHaveBeenCalledWith({
-			id: TRACK_ID,
+			id: INTERNAL_TRACK_ID,
 			ownerId: 'authenticated-owner',
 			title: 'Test Track',
 			artist: 'Test Artist',

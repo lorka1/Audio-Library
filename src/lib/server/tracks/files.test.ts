@@ -5,12 +5,16 @@ import { mkdtemp, mkdir } from 'node:fs/promises';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
 	AUDIO_FORMATS,
+	closeOpenedAudioFile,
+	createAudioWebStream,
 	deleteStoredAudioFile,
 	ensureAudioStorageDirectory,
 	generateStoredFilename,
+	getSafeAudioResponseMimeType,
 	getValidatedAudioExtension,
 	isAllowedAudioFormat,
 	normalizeAudioExtension,
+	openStoredAudioFile,
 	resolveStorageFilePath,
 	saveAudioFile
 } from './files';
@@ -73,6 +77,15 @@ describe('audio file storage helpers', () => {
 			expect(getValidatedAudioExtension('recording.MP3', 'audio/mpeg')).toBe('.mp3');
 			expect(getValidatedAudioExtension('recording.mp3', 'audio/ogg')).toBeNull();
 			expect(getValidatedAudioExtension('recording.mp3.exe', 'audio/mpeg')).toBeNull();
+		});
+
+		it('uses only validated audio MIME types in responses', () => {
+			expect(getSafeAudioResponseMimeType(`${TEST_UUID}.mp3`, 'audio/mpeg')).toBe(
+				'audio/mpeg'
+			);
+			expect(
+				getSafeAudioResponseMimeType(`${TEST_UUID}.mp3`, 'text/html\r\nX-Evil: yes')
+			).toBe('application/octet-stream');
 		});
 	});
 
@@ -247,6 +260,79 @@ describe('audio file storage helpers', () => {
 			expect(serializedLogArguments).not.toContain(temporaryRoot);
 			expect(serializedLogArguments).not.toContain(storedFilename);
 			consoleError.mockRestore();
+		});
+	});
+
+	describe('read stream support', () => {
+		it('opens a regular file and streams all bytes through a web Response', async () => {
+			const bytes = new Uint8Array([0, 1, 2, 3, 4, 5]);
+			const saved = await saveAudioFile(
+				new File([bytes], 'stream.mp3', { type: 'audio/mpeg' }),
+				'.mp3',
+				temporaryRoot
+			);
+			const opened = await openStoredAudioFile(saved.storedFilename, temporaryRoot);
+
+			expect(opened.success).toBe(true);
+
+			if (opened.success) {
+				expect(opened.file.fileSizeBytes).toBe(bytes.byteLength);
+				const response = new Response(createAudioWebStream(opened.file));
+				expect(new Uint8Array(await response.arrayBuffer())).toEqual(bytes);
+			}
+		});
+
+		it('streams an inclusive start and end range', async () => {
+			const bytes = new Uint8Array([10, 11, 12, 13, 14]);
+			const saved = await saveAudioFile(
+				new File([bytes], 'partial.ogg', { type: 'audio/ogg' }),
+				'.ogg',
+				temporaryRoot
+			);
+			const opened = await openStoredAudioFile(saved.storedFilename, temporaryRoot);
+
+			if (!opened.success) {
+				throw new Error('Expected the temporary audio file to open.');
+			}
+
+			const response = new Response(
+				createAudioWebStream(opened.file, { start: 1, end: 3 })
+			);
+			expect(new Uint8Array(await response.arrayBuffer())).toEqual(
+				new Uint8Array([11, 12, 13])
+			);
+		});
+
+		it('returns safe missing and non-file results without path data', async () => {
+			const missingFilename = `${TEST_UUID}.mp3`;
+			const missing = await openStoredAudioFile(missingFilename, temporaryRoot);
+
+			expect(missing).toEqual({ success: false, reason: 'missing' });
+			expect(JSON.stringify(missing)).not.toContain(temporaryRoot);
+			expect(JSON.stringify(missing)).not.toContain(missingFilename);
+
+			await mkdir(resolveStorageFilePath(temporaryRoot, missingFilename));
+			const directory = await openStoredAudioFile(missingFilename, temporaryRoot);
+			expect(directory).toEqual({ success: false, reason: 'not-file' });
+			expect(JSON.stringify(directory)).not.toContain(temporaryRoot);
+		});
+
+		it('allows an early-return handle to be closed before deletion', async () => {
+			const saved = await saveAudioFile(
+				new File([new Uint8Array([1, 2])], 'close.wav', { type: 'audio/wav' }),
+				'.wav',
+				temporaryRoot
+			);
+			const opened = await openStoredAudioFile(saved.storedFilename, temporaryRoot);
+
+			if (!opened.success) {
+				throw new Error('Expected the temporary audio file to open.');
+			}
+
+			await closeOpenedAudioFile(opened.file);
+			await expect(
+				deleteStoredAudioFile(saved.storedFilename, temporaryRoot)
+			).resolves.toBeUndefined();
 		});
 	});
 });

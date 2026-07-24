@@ -15,9 +15,26 @@ vi.mock('$lib/server/db', () => ({
 
 vi.mock('$lib/server/db/schema', () => ({
 	tracks: {
+		publicId: 'publicId',
 		id: 'id',
+		ownerId: 'ownerId',
 		title: 'title',
-		createdAt: 'createdAt'
+		artist: 'artist',
+		bpm: 'bpm',
+		musicalKey: 'musicalKey',
+		genre: 'genre',
+		description: 'description',
+		originalFilename: 'originalFilename',
+		storageKey: 'storageKey',
+		mimeType: 'mimeType',
+		fileSizeBytes: 'fileSizeBytes',
+		visibility: 'visibility',
+		createdAt: 'createdAt',
+		updatedAt: 'updatedAt'
+	},
+	users: {
+		id: 'userId',
+		username: 'username'
 	}
 }));
 
@@ -50,7 +67,7 @@ describe('createTrack', () => {
 		databaseMocks.insert.mockReturnValue({ values: databaseMocks.values });
 		databaseMocks.values.mockReturnValue({ returning: databaseMocks.returning });
 		databaseMocks.returning.mockResolvedValue([
-			{ id: 'track-id', title: 'Public track', createdAt: NOW }
+			{ id: 42, title: 'Public track', createdAt: NOW }
 		]);
 	});
 

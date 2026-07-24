@@ -67,7 +67,7 @@ used for any real service.
 ### UPL-003 — Valid MP3 upload
 
 - [ ] Upload a non-empty `.mp3` file reported as `audio/mpeg` with valid metadata.
-- [ ] Expected: The success message appears, a generated `.mp3` file exists under the configured private storage directory, and one matching `tracks` row exists.
+- [ ] Expected: You are redirected to the new public track detail page, the success message appears, a generated `.mp3` file exists under the configured private storage directory, and one matching `tracks` row exists.
 
 ### UPL-004 — Valid WAV upload
 
@@ -141,24 +141,141 @@ used for any real service.
 
 ### UPL-018 — Refresh after success
 
-- [ ] Complete a successful upload, then refresh `/upload?success=1`.
-- [ ] Expected: The success message remains visible, the form is empty, and no additional file or database row is created.
+- [ ] Complete a successful upload, then refresh the resulting `/tracks/{id}?uploaded=1` detail page.
+- [ ] Expected: The detail page remains available and no additional file or database row is created.
 
 ## Additional upload and responsive checks
 
 ### UPL-019 — Upload without JavaScript
 
 - [ ] Disable JavaScript in the browser, sign in, and submit a valid upload.
-- [ ] Expected: The native multipart form completes, redirects to `/upload?success=1`, and stores exactly one file and one metadata row.
+- [ ] Expected: The native multipart form completes, redirects to `/tracks/{newId}?uploaded=1`, and stores exactly one file and one metadata row.
+
+### UPL-020 — Redirect to the created track
+
+- [ ] Upload a valid track while signed in.
+- [ ] Expected: The server responds with Post/Redirect/Get and the browser ends at `/tracks/{newId}?uploaded=1`.
+
+### UPL-021 — Refresh after redirected upload
+
+- [ ] Refresh the detail page reached after UPL-020.
+- [ ] Expected: No duplicate track row or physical audio file is created.
+
+## Public track browsing
+
+### TRK-001 — Public list while signed out
+
+- [ ] Sign out and open `/tracks`.
+- [ ] Expected: The public track list is visible without authentication.
+
+### TRK-002 — Existing public track
+
+- [ ] Find `Party about you` on `/tracks`.
+- [ ] Expected: Its title, artist, public metadata, owner username, and upload date are visible.
+
+### TRK-003 — Public track detail
+
+- [ ] Open a public track from its card.
+- [ ] Expected: Safe metadata, the native audio player, a download link, and a link back to Browse Tracks are visible.
+
+### TRK-004 — Invalid track ID
+
+- [ ] Open `/tracks/not-a-number`, `/tracks/0`, and `/tracks/-1`.
+- [ ] Expected: Each request returns a safe 404 without internal details.
+
+### TRK-005 — Nonexistent track
+
+- [ ] Open a valid positive integer track ID that does not exist.
+- [ ] Expected: The page returns the same safe 404 used for an invalid or private track.
+
+### TRK-006 — Private track
+
+- [ ] In a disposable database, create a private track and open its numeric public ID directly.
+- [ ] Expected: The page returns a safe 404 and does not reveal that the private record exists.
+
+### TRK-007 — Empty public library
+
+- [ ] Use a temporary test database with no public tracks and open `/tracks`.
+- [ ] Expected: The page displays `No public tracks have been uploaded yet.`
+
+## Audio streaming and player
+
+### STR-001 — Play MP3
+
+- [ ] Open an MP3 track detail page and press Play.
+- [ ] Expected: Browser-native playback starts.
+
+### STR-002 — Seek forward
+
+- [ ] Move the native player to a later position.
+- [ ] Expected: Playback resumes from the selected position.
+
+### STR-003 — Seek network request
+
+- [ ] Keep the browser Network panel open while seeking.
+- [ ] Expected: The stream request contains a `Range` header and the response status is 206 with a correct `Content-Range`.
+
+### STR-004 — Play WAV
+
+- [ ] Open a WAV track and use the player.
+- [ ] Expected: Playback works where the current browser supports the uploaded WAV encoding.
+
+### STR-005 — Play OGG
+
+- [ ] Open an OGG track and use the player.
+- [ ] Expected: Playback works where the current browser supports the uploaded OGG encoding.
+
+### STR-006 — Invalid byte range
+
+- [ ] Request a range that starts at or beyond the physical file size.
+- [ ] Expected: The endpoint returns 416 with `Content-Range: bytes */TOTAL` and no internal details.
+
+### STR-007 — Missing physical file
+
+- [ ] In a disposable environment, temporarily move the file for a public database row and request its stream.
+- [ ] Expected: The endpoint returns a safe 404 without a filename or local path.
+
+## Audio download
+
+### DWN-001 — Ordinary original filename
+
+- [ ] Download a public track whose original filename contains ordinary ASCII characters.
+- [ ] Expected: The browser receives the original user-facing filename, not the generated UUID filename.
+
+### DWN-002 — Filename with spaces
+
+- [ ] Download a track whose original filename contains spaces.
+- [ ] Expected: The suggested download filename remains usable and preserves the spaces.
+
+### DWN-003 — Croatian filename
+
+- [ ] Download a track whose original filename contains Croatian characters.
+- [ ] Expected: The UTF-8 filename parameter preserves those characters and an ASCII fallback is also present.
+
+### DWN-004 — Download security headers
+
+- [ ] Inspect the download response headers.
+- [ ] Expected: `Content-Disposition` is `attachment`, the type and actual length are correct, caching is conservative, and `X-Content-Type-Options` is `nosniff`.
 
 ### NAV-001 — Signed-in navigation at 320 px
 
 - [ ] At a 320 px viewport width, sign in and inspect the header.
-- [ ] Expected: Home, Upload, Account, the username label, and the POST Logout control remain visible or wrap cleanly and are all operable.
+- [ ] Expected: Home, Browse Tracks, Upload, Account, the username label, and the POST Logout control remain visible or wrap cleanly and are all operable.
 - [ ] Sign out at the same width.
-- [ ] Expected: Home, Login, and Register remain operable.
+- [ ] Expected: Home, Browse Tracks, Login, and Register remain operable.
+
+### NAV-002 — Signed-out navigation
+
+- [ ] Sign out and inspect the navigation at desktop and narrow widths.
+- [ ] Expected: Home, Browse Tracks, Login, and Register are present and operable.
+
+### NAV-003 — Signed-in navigation
+
+- [ ] Sign in and inspect the navigation at desktop and narrow widths.
+- [ ] Expected: Home, Browse Tracks, Upload, Account, the username, and POST Logout are present and operable.
 
 ## Phase boundary
 
 - [ ] Confirm upload is available only to signed-in users.
-- [ ] Confirm there are no playback, audio player, streaming, HTTP Range, download, public track-list, track-detail, search, filter, My Tracks, editing, replacement, deletion, automatic analysis, comment, playlist, or rating controls.
+- [ ] Confirm public browsing, public detail, streaming, seeking, and download work without authentication.
+- [ ] Confirm there are no search, filter, My Tracks, editing, replacement, deletion, visibility-control, automatic-analysis, comment, playlist, or rating controls.

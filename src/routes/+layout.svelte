@@ -23,7 +23,7 @@
 	<footer class="site-footer">
 		<div class="page-container site-footer__inner">
 			<p>Audio Library</p>
-			<p>Phase 3 · secure audio uploads</p>
+			<p>Phase 4 · public browsing, playback, and download</p>
 		</div>
 	</footer>
 </div>

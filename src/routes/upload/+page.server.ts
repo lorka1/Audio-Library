@@ -41,7 +41,6 @@ export const load = ((event) => {
 	requireUser(event);
 
 	return {
-		uploadSucceeded: event.url.searchParams.get('success') === '1',
 		maxAudioFileSizeMb: serverConfig.maxAudioFileSizeMb
 	};
 }) satisfies PageServerLoad;
@@ -50,6 +49,7 @@ export const actions = {
 	default: async (event) => {
 		const user = requireUser(event);
 		let formData: FormData;
+		let createdTrackId: number;
 
 		try {
 			formData = await event.request.formData();
@@ -80,6 +80,8 @@ export const actions = {
 			if (!result.success) {
 				return fail(result.status, uploadFailureData(result.values, result.errors));
 			}
+
+			createdTrackId = result.track.id;
 		} catch (error) {
 			logTrackStorageError('Unexpected audio upload failure.', error);
 			return fail(
@@ -88,6 +90,6 @@ export const actions = {
 			);
 		}
 
-		redirect(303, '/upload?success=1');
+		redirect(303, `/tracks/${createdTrackId}?uploaded=1`);
 	}
 } satisfies Actions;

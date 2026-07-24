@@ -10,4 +10,3 @@ export type NewSession = InferInsertModel<typeof sessions>;
 
 export type Track = InferSelectModel<typeof tracks>;
 export type NewTrack = InferInsertModel<typeof tracks>;
-export type PublicTrack = Omit<Track, 'storageKey'>;

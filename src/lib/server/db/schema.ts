@@ -49,7 +49,8 @@ export const sessions = sqliteTable(
 export const tracks = sqliteTable(
 	'tracks',
 	{
-		id: text('id').primaryKey(),
+		publicId: integer('public_id').primaryKey({ autoIncrement: true }),
+		id: text('id').notNull(),
 		ownerId: text('owner_id')
 			.notNull()
 			.references(() => users.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
@@ -68,6 +69,7 @@ export const tracks = sqliteTable(
 		...timestamps
 	},
 	(table) => [
+		uniqueIndex('tracks_id_unique').on(table.id),
 		uniqueIndex('tracks_storage_key_unique').on(table.storageKey),
 		index('tracks_owner_created_at_idx').on(table.ownerId, table.createdAt),
 		index('tracks_created_at_idx').on(table.createdAt),
