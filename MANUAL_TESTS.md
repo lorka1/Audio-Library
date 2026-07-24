@@ -274,8 +274,140 @@ used for any real service.
 - [ ] Sign in and inspect the navigation at desktop and narrow widths.
 - [ ] Expected: Home, Browse Tracks, Upload, Account, the username, and POST Logout are present and operable.
 
+## Public track search
+
+### SRCH-001 — Exact title
+
+- [ ] Open `/tracks`, enter the exact title of a public track in Search, and apply the filters.
+- [ ] Expected: The matching public track appears and unrelated tracks do not.
+
+### SRCH-002 — Partial title
+
+- [ ] Search using a distinctive part of a public track title rather than the complete title.
+- [ ] Expected: The matching public track appears because title matching supports partial text.
+
+### SRCH-003 — Artist capitalization
+
+- [ ] Search for a public track's artist using different uppercase or lowercase letters from the stored artist name.
+- [ ] Expected: The matching public track appears because artist matching is case-insensitive.
+
+### SRCH-004 — Description text
+
+- [ ] Search for distinctive text that occurs only in a public track's description.
+- [ ] Expected: The public track whose description contains that text appears.
+
+### SRCH-005 — No search matches
+
+- [ ] Search for text that does not occur in any public track title, artist, or description.
+- [ ] Expected: The page remains available and displays `No public tracks match the selected search and filters.`
+
+### SRCH-006 — Literal LIKE characters
+
+- [ ] Search for text containing `%`, then repeat with text containing `_`.
+- [ ] Expected: Each character is treated as literal search text rather than a SQL wildcard; the page does not fail or return unrelated wildcard matches.
+
+## Public track filters
+
+### FLT-001 — Minimum BPM
+
+- [ ] Set Minimum BPM to a value shared by suitable test tracks and apply the filters.
+- [ ] Expected: Every result with a specified BPM is equal to or higher than the minimum; tracks with a lower or unspecified BPM do not appear.
+
+### FLT-002 — Maximum BPM
+
+- [ ] Clear the other controls, set Maximum BPM, and apply the filters.
+- [ ] Expected: Every result with a specified BPM is equal to or lower than the maximum; tracks with a higher or unspecified BPM do not appear.
+
+### FLT-003 — Inclusive BPM range
+
+- [ ] Set both Minimum BPM and Maximum BPM so tracks exist at the boundaries and inside the range.
+- [ ] Expected: Only public tracks inside the inclusive range appear, including tracks exactly at either boundary; tracks with an unspecified BPM do not appear.
+
+### FLT-004 — Invalid BPM
+
+- [ ] Submit an out-of-range, decimal, or nonnumeric BPM value by editing the URL if browser input constraints prevent entry.
+- [ ] Expected: The page returns normally without a server error, displays a clear BPM validation message, preserves appropriate submitted values, and does not run a misleading filtered query.
+
+### FLT-005 — Inverted BPM range
+
+- [ ] Set Minimum BPM to a value greater than Maximum BPM and apply the filters.
+- [ ] Expected: The page displays `Minimum BPM cannot be greater than maximum BPM.` and does not return a misleading result set.
+
+### FLT-006 — Musical key
+
+- [ ] Select one musical key and apply the filters.
+- [ ] Expected: Only public tracks with that exact stored musical key appear; tracks with other or unspecified keys do not.
+
+### FLT-007 — Genre
+
+- [ ] Select one genre and apply the filters.
+- [ ] Expected: Only public tracks with that exact stored genre appear; tracks with other or unspecified genres do not.
+
+### FLT-008 — Combined filters
+
+- [ ] Enter search text and set a BPM range, musical key, and genre that one public test track satisfies, then apply the filters.
+- [ ] Expected: Only public tracks matching every active condition appear; a track that fails any one condition does not.
+
+## Public track sorting
+
+### SRT-001 — Newest first
+
+- [ ] Select Newest first and apply the filters.
+- [ ] Expected: Results are ordered by newest upload first, with deterministic ordering for equal timestamps.
+
+### SRT-002 — Oldest first
+
+- [ ] Select Oldest first and apply the filters.
+- [ ] Expected: Results are ordered by oldest upload first, with deterministic ordering for equal timestamps.
+
+### SRT-003 — Title A–Z
+
+- [ ] Select Title A–Z and apply the filters using tracks whose titles begin with different uppercase and lowercase letters.
+- [ ] Expected: Results use a stable, case-insensitive alphabetical title order.
+
+### SRT-004 — BPM ascending
+
+- [ ] Select BPM low to high and apply the filters while tracks with numeric and unspecified BPM values are available.
+- [ ] Expected: Numeric BPM values appear in ascending order and tracks with an unspecified BPM appear after them.
+
+### SRT-005 — BPM descending
+
+- [ ] Select BPM high to low and apply the filters while tracks with numeric and unspecified BPM values are available.
+- [ ] Expected: Numeric BPM values appear in descending order and tracks with an unspecified BPM appear after them.
+
+## Filter URL state
+
+### URL-001 — Applied values in URL
+
+- [ ] Apply search text, minimum and maximum BPM, musical key, genre, and a non-default sort.
+- [ ] Expected: The address uses `/tracks` and contains one correctly encoded value for each active `q`, `bpmMin`, `bpmMax`, `musicalKey`, `genre`, and `sort` parameter.
+
+### URL-002 — Refresh filtered URL
+
+- [ ] Refresh the filtered URL from URL-001.
+- [ ] Expected: The same results, current control values, active-filter summary, and sort order remain visible without resubmitting anything.
+
+### URL-003 — Share filtered URL
+
+- [ ] Copy the filtered URL, sign out or open a private browser window, and open the copied URL.
+- [ ] Expected: The same public results and filter state appear without authentication.
+
+### URL-004 — Reset filters
+
+- [ ] Activate several filters, then use Reset filters.
+- [ ] Expected: The browser navigates to `/tracks` without a query string, all controls return to their defaults, and the full public list appears.
+
+## Search and filter privacy
+
+### SEC-001 — Matching private track
+
+- [ ] In a disposable environment, create a private track whose title, artist, description, BPM, musical key, and genre match the active search and filters exactly.
+- [ ] Expected: The private track never appears in results, result counts, page data, or active-filter output, and the response reveals no internal UUID, stored filename, or physical path.
+
 ## Phase boundary
 
 - [ ] Confirm upload is available only to signed-in users.
 - [ ] Confirm public browsing, public detail, streaming, seeking, and download work without authentication.
-- [ ] Confirm there are no search, filter, My Tracks, editing, replacement, deletion, visibility-control, automatic-analysis, comment, playlist, or rating controls.
+- [ ] Confirm public search covers title, artist, and description; BPM, musical-key, and genre filters can be combined; and all five server-side sort options work.
+- [ ] Confirm filter state is URL-driven, survives refresh and sharing, works without JavaScript, and can be reset to `/tracks`.
+- [ ] Confirm Phase 6 features remain absent: pagination, My Tracks, metadata editing, audio-file replacement, deletion, visibility controls, automatic analysis, comments, ratings, playlists, and recommendations.

@@ -1,4 +1,11 @@
-import { MUSIC_GENRES, MUSICAL_KEYS, type MusicGenre, type MusicalKey } from '$lib/constants/music';
+import {
+	BPM_MAX,
+	BPM_MIN,
+	MUSIC_GENRES,
+	MUSICAL_KEYS,
+	type MusicGenre,
+	type MusicalKey
+} from '$lib/constants/music';
 import {
 	getValidatedAudioExtension,
 	type AudioExtension
@@ -8,8 +15,7 @@ export const TRACK_TITLE_MAX_LENGTH = 120;
 export const TRACK_ARTIST_MAX_LENGTH = 120;
 export const TRACK_DESCRIPTION_MAX_LENGTH = 2000;
 export const ORIGINAL_FILENAME_MAX_LENGTH = 255;
-export const BPM_MIN = 20;
-export const BPM_MAX = 300;
+export { BPM_MAX, BPM_MIN };
 
 const musicalKeySet = new Set<string>(MUSICAL_KEYS);
 const musicGenreSet = new Set<string>(MUSIC_GENRES);

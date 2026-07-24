@@ -37,3 +37,7 @@ Thumbs.db
 .idea/
 .vscode/*
 !.vscode/extensions.json
+
+# Extra files
+AGENTS.md
+PROJECT_REQUIREMENTS.md

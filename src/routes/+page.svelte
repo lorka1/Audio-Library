@@ -10,18 +10,19 @@
 
 <section class="hero">
 	<div class="page-container hero__inner">
-		<p class="eyebrow">Public audio browsing is ready</p>
+		<p class="eyebrow">Public track discovery is ready</p>
 		<h1>
 			{data.user
 				? `Welcome back, ${data.user.username}.`
 				: 'Discover community audio.'}
 		</h1>
 		<p class="lead">
-			Browse public tracks, open a detailed listening page, seek through audio, and download
-			the original user-facing file. Signed-in members can also publish validated uploads.
+			Search, filter, and sort public tracks, then open a detailed listening page, seek through
+			audio, and download the original user-facing file. Signed-in members can also publish
+			validated uploads.
 		</p>
 		<div class="hero__actions">
-			<a class="hero__link hero__link--primary" href="/tracks">Browse public tracks</a>
+			<a class="hero__link hero__link--primary" href="/tracks">Search public tracks</a>
 			{#if data.user}
 				<a class="hero__link" href="/upload">Upload an audio track</a>
 				<a class="hero__link" href="/account">View your account</a>
@@ -30,7 +31,7 @@
 				<a class="hero__link" href="/login">Login</a>
 			{/if}
 			<a class="hero__link" href="#foundation"
-				>Review Phase 4 <span aria-hidden="true">↓</span></a
+				>Review the foundation <span aria-hidden="true">↓</span></a
 			>
 		</div>
 	</div>
@@ -73,8 +74,8 @@
 	<aside class="phase-note">
 		<span aria-hidden="true">i</span>
 		<p>
-			Search, filters, My Tracks, editing, visibility controls, and deletion remain outside
-			Phase 4.
+			Search, BPM/key/genre filters, and stable sorting are available on Browse Tracks. My
+			Tracks, editing, visibility controls, and deletion remain outside Phase 5.
 		</p>
 	</aside>
 </section>

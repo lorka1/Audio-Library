@@ -1,9 +1,10 @@
 # Audio Library
 
 Audio Library is a SvelteKit application with a local SQLite database, secure
-account sessions, private audio storage, and public track delivery. Phase 4
-adds public browsing, safe track-detail pages, native audio playback with HTTP
-byte-range seeking, and downloads that use sanitized original filenames.
+account sessions, private audio storage, and public track delivery. Phase 5
+adds URL-driven public search, BPM/key/genre filters, and stable sorting while
+preserving the safe track-detail, HTTP byte-range playback, and download
+behavior from Phase 4.
 
 ## Prerequisites
 
@@ -40,6 +41,7 @@ excluded from Git, `.env.example` must be copied in every new clone.
 | `npm run test` | Runs the Vitest test suite once |
 | `npm run test:watch` | Runs Vitest in watch mode |
 | `npm run test:integration` | Runs the bounded isolated Phase 4 HTTP integration test |
+| `npm run test:integration:phase5` | Runs the bounded isolated Phase 5 search/filter/sort HTTP integration test |
 | `npm run db:generate` | Generates a SQL migration after a schema change |
 | `npm run db:migrate` | Applies all pending migrations |
 | `npm run db:studio` | Opens Drizzle Studio |
@@ -175,11 +177,47 @@ data, internal filenames, or absolute storage paths.
 
 ## Public tracks
 
-Anyone can open `/tracks` to see public tracks ordered newest first. Each card
+Anyone can open `/tracks` to search, filter, and sort public tracks. Each card
 shows the title, artist, BPM, musical key, genre, owner username, and upload
-date. Optional values use `Not specified`, and an empty library displays a
-dedicated empty state. Search, filters, sorting controls, and pagination are
-not part of Phase 4.
+date. Optional values use `Not specified`. The page distinguishes an empty
+public library from a valid search or filter combination with no matches.
+
+The filter form uses a normal GET request and works without client-side
+JavaScript. Its URL is the source of truth, so filtered results can be
+refreshed, bookmarked, or shared. Supported query parameters are:
+
+| Parameter | Behavior |
+| --- | --- |
+| `q` | Trimmed partial search across title, artist, and description; maximum 100 characters |
+| `bpmMin` | Optional inclusive minimum BPM, as a canonical integer from 20 through 300 |
+| `bpmMax` | Optional inclusive maximum BPM, as a canonical integer from 20 through 300 |
+| `musicalKey` | Optional exact value from the centralized musical-key list |
+| `genre` | Optional exact value from the centralized genre list |
+| `sort` | `newest`, `oldest`, `title_asc`, `bpm_asc`, or `bpm_desc` |
+
+`newest` is the default and is normally omitted from canonical URLs. Unknown
+sort values safely fall back to `newest`. Unknown unrelated parameters are
+ignored. BPM text with decimals, signs, leading zeroes, values outside
+20–300, or a minimum greater than the maximum produces an accessible
+validation message and no misleading database query. Other valid submitted
+fields remain visible in the form.
+
+Text matching is parameterized and case-insensitive for SQLite-supported
+case folding. `%`, `_`, and backslash are escaped and treated as literal
+characters rather than SQL `LIKE` wildcards; quotes remain bound values.
+Ordinary Unicode input is retained, with non-ASCII case-insensitive behavior
+limited to what the bundled SQLite implementation supports.
+
+Minimum and maximum BPM comparisons are inclusive. Tracks with a null BPM do
+not match an active BPM filter. Without a BPM filter they remain eligible and,
+for both BPM sort directions, appear after all numeric BPM values. Every sort
+uses a fixed allowlisted SQL expression and a numeric public-ID tie-breaker so
+ordering is deterministic.
+
+Every list query independently requires `visibility = public` and selects the
+same explicit safe public fields used in Phase 4. Search terms cannot weaken
+visibility enforcement. Internal UUIDs, storage keys, physical paths, owner
+IDs/emails, and session data are not part of page data.
 
 `/tracks/{publicId}` shows one public track, its safe metadata, native audio
 controls, and a download link. Invalid positive-integer IDs, missing records,
@@ -312,7 +350,8 @@ src/
     server/
       auth/                 validation, password, session, repository, and guards
       db/                   SQLite connection, Drizzle schema, and database types
-      tracks/               public models, IDs, ranges, downloads, private files, upload, and repository
+      tracks/               public queries/models, IDs, ranges, downloads, private files, upload, and repository
+    tracks-query.ts         client-safe query types, canonical URLs, summaries, and result counts
     types/                  shared client-safe TypeScript types
   routes/
     account/                protected account page
@@ -337,8 +376,11 @@ npm run test
 The suite covers authentication, upload validation and rollback, public-model
 mapping, positive-integer track IDs, deterministic formatting, HTTP byte
 ranges, download filename encoding, generated stored filenames, path
-containment, and Node-to-Web file streaming. Filesystem tests use temporary
-directories rather than `storage/audio`.
+containment, Node-to-Web file streaming, Phase 5 query parsing, literal
+SQL-LIKE escaping, canonical query strings, result summaries, repository
+filter combinations, safe public projection, and every stable sort. Repository
+tests use an isolated in-memory SQLite database, and filesystem tests use
+temporary directories rather than `storage/audio`.
 
 Run the bounded server-level Phase 4 integration checks with:
 
@@ -352,6 +394,21 @@ overall timeouts, prints startup logs on failure, and always terminates its own
 Vite process in cleanup. It verifies list/detail privacy, full and partial
 streaming, 416 responses, downloads, upload redirects, and refresh behavior.
 It also verifies that the real database and `storage/audio` remain unchanged.
+
+Run the separately bounded Phase 5 integration checks with:
+
+```powershell
+npm run test:integration:phase5
+```
+
+This controller applies the same isolation and cleanup rules while seeding
+diverse synthetic public and private tracks. Its 26 HTTP checks cover default
+public visibility, all searchable fields, case-insensitive and literal
+wildcard matching, inclusive BPM bounds, exact key/genre matching, combined
+filters, all five sort modes, deterministic null-BPM placement, invalid-query
+rendering, form state, the `/tracks` reset URL, response privacy, and stream,
+Range, and download regression behavior. It also compares the complete real
+`Party about you` row before and after the run.
 
 The complete browser checklist for playback, seeking, download names,
 authentication, upload validation, and responsive navigation is in
@@ -370,10 +427,11 @@ The current multipart action uses `request.formData()`, and file storage uses
 memory rather than streamed to disk. Memory requirements increase with file
 size and concurrent uploads; keep conservative request limits in production.
 
-## Phase 4 boundary
+## Phase 5 boundary
 
-Phase 4 includes public browsing, public detail pages, native playback,
-single-range HTTP streaming, seeking, and download. It intentionally does not
-include search, BPM/key/genre filters, advanced sorting, pagination, My Tracks,
-metadata editing, file replacement, deletion, visibility controls, comments,
-ratings, playlists, recommendations, or automatic BPM/key analysis.
+Phase 5 includes public browsing, URL-driven text search, inclusive BPM
+filters, exact musical-key and genre filters, stable sorting, public detail
+pages, native playback, single-range HTTP streaming, seeking, and download.
+It intentionally does not include pagination, My Tracks, metadata editing,
+file replacement, deletion, visibility controls, comments, ratings,
+playlists, recommendations, or automatic BPM/key analysis.

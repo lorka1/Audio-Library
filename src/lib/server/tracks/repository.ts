@@ -1,9 +1,11 @@
 import { db } from '$lib/server/db';
 import { tracks, users } from '$lib/server/db/schema';
 import type { MusicGenre, MusicalKey } from '$lib/constants/music';
+import type { TrackSearchFilters } from '$lib/tracks-query';
 import type { PublicTrack } from '$lib/types';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, lte, or, sql, type SQL } from 'drizzle-orm';
 import { toPublicTrack, type PublicTrackRecord } from './public-model';
+import { escapeSqlLikeSearchTerm } from './query';
 
 export interface CreateTrackInput {
 	id: string;
@@ -51,6 +53,66 @@ const publicTrackSelection = {
 	updatedAt: tracks.updatedAt
 };
 
+type TrackDatabase = typeof db;
+
+function publicTrackConditions(filters: TrackSearchFilters): SQL[] {
+	const conditions: SQL[] = [eq(tracks.visibility, 'public')];
+
+	if (filters.q) {
+		const pattern = `%${escapeSqlLikeSearchTerm(filters.q)}%`;
+		const textSearch = or(
+			sql`lower(${tracks.title}) like lower(${pattern}) escape ${'\\'}`,
+			sql`lower(${tracks.artist}) like lower(${pattern}) escape ${'\\'}`,
+			sql`lower(${tracks.description}) like lower(${pattern}) escape ${'\\'}`
+		);
+
+		if (textSearch) {
+			conditions.push(textSearch);
+		}
+	}
+
+	if (filters.bpmMin !== undefined) {
+		conditions.push(gte(tracks.bpm, filters.bpmMin));
+	}
+
+	if (filters.bpmMax !== undefined) {
+		conditions.push(lte(tracks.bpm, filters.bpmMax));
+	}
+
+	if (filters.musicalKey) {
+		conditions.push(eq(tracks.musicalKey, filters.musicalKey));
+	}
+
+	if (filters.genre) {
+		conditions.push(eq(tracks.genre, filters.genre));
+	}
+
+	return conditions;
+}
+
+function publicTrackOrder(filters: TrackSearchFilters): SQL[] {
+	switch (filters.sort) {
+		case 'oldest':
+			return [asc(tracks.createdAt), asc(tracks.publicId)];
+		case 'title_asc':
+			return [asc(sql`lower(${tracks.title})`), asc(tracks.publicId)];
+		case 'bpm_asc':
+			return [
+				asc(sql`case when ${tracks.bpm} is null then 1 else 0 end`),
+				asc(tracks.bpm),
+				asc(tracks.publicId)
+			];
+		case 'bpm_desc':
+			return [
+				asc(sql`case when ${tracks.bpm} is null then 1 else 0 end`),
+				desc(tracks.bpm),
+				asc(tracks.publicId)
+			];
+		case 'newest':
+			return [desc(tracks.createdAt), desc(tracks.publicId)];
+	}
+}
+
 export async function createTrack(input: CreateTrackInput): Promise<CreatedTrack> {
 	const [track] = await db
 		.insert(tracks)
@@ -71,13 +133,16 @@ export async function createTrack(input: CreateTrackInput): Promise<CreatedTrack
 	return track;
 }
 
-export async function listPublicTracks(): Promise<PublicTrack[]> {
-	const records = await db
+export async function listPublicTracks(
+	filters: TrackSearchFilters,
+	database: TrackDatabase = db
+): Promise<PublicTrack[]> {
+	const records = await database
 		.select(publicTrackSelection)
 		.from(tracks)
 		.innerJoin(users, eq(tracks.ownerId, users.id))
-		.where(eq(tracks.visibility, 'public'))
-		.orderBy(desc(tracks.createdAt), desc(tracks.publicId));
+		.where(and(...publicTrackConditions(filters)))
+		.orderBy(...publicTrackOrder(filters));
 
 	return records.map((record) => toPublicTrack(record satisfies PublicTrackRecord));
 }
