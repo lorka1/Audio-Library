@@ -19,10 +19,12 @@
 			<ul>
 				<li><a href="/">Home</a></li>
 				{#if user}
+					<li><a href="/upload">Upload</a></li>
+					<li><a href="/account">Account</a></li>
 					<li>
-						<a class="user-link" href="/account" aria-label={`Open ${user.username}'s account`}>
+						<span class="user-label" aria-label={`Signed in as ${user.username}`}>
 							{user.username}
-						</a>
+						</span>
 					</li>
 					<li>
 						<form method="POST" action="/logout">
@@ -132,12 +134,37 @@
 		background: rgb(117 106 241 / 24%);
 	}
 
-	.user-link {
-		color: white;
+	.user-label {
+		display: block;
+		max-width: 11rem;
+		padding: 0.55rem 0.7rem;
+		overflow: hidden;
+		color: #a5b4fc;
+		font-size: 0.875rem;
+		font-weight: 700;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 
 	form {
 		margin: 0;
+	}
+
+	@media (max-width: 50rem) {
+		.site-header__inner {
+			flex-wrap: wrap;
+			gap: 0.35rem 1rem;
+			padding-block: 0.65rem;
+		}
+
+		nav {
+			flex-basis: 100%;
+			min-width: 0;
+		}
+
+		ul {
+			flex-wrap: wrap;
+		}
 	}
 
 	@media (max-width: 34rem) {
@@ -154,9 +181,14 @@
 		}
 
 		nav a,
-		.logout-button {
+		.logout-button,
+		.user-label {
 			padding-inline: 0.5rem;
 			font-size: 0.8rem;
+		}
+
+		.user-label {
+			max-width: 8rem;
 		}
 	}
 </style>

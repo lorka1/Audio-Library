@@ -92,7 +92,8 @@ main {
 }
 
 .auth-page,
-.account-page {
+.account-page,
+.upload-page {
 	padding-block: clamp(3rem, 8vw, 6rem);
 }
 
@@ -155,7 +156,9 @@ main {
 	font-weight: 700;
 }
 
-.form-field input {
+.form-field input,
+.form-field select,
+.form-field textarea {
 	width: 100%;
 	min-height: 3rem;
 	padding: 0.75rem 0.85rem;
@@ -168,22 +171,57 @@ main {
 		box-shadow 150ms ease;
 }
 
-.form-field input:hover {
+.form-field textarea {
+	min-height: 8rem;
+	resize: vertical;
+}
+
+.form-field input:hover,
+.form-field select:hover,
+.form-field textarea:hover {
 	border-color: #adb8c8;
 }
 
-.form-field input:focus {
+.form-field input:focus,
+.form-field select:focus,
+.form-field textarea:focus {
 	border-color: var(--accent);
 	outline: 0;
 	box-shadow: 0 0 0 3px rgb(91 78 232 / 14%);
 }
 
-.form-field input[aria-invalid='true'] {
+.form-field input[aria-invalid='true'],
+.form-field select[aria-invalid='true'],
+.form-field textarea[aria-invalid='true'] {
 	border-color: #c43f55;
 }
 
+.form-field .file-input {
+	padding: 0.55rem;
+	border-style: dashed;
+	background: var(--surface-muted);
+}
+
+.file-input::file-selector-button {
+	margin-right: 0.75rem;
+	padding: 0.55rem 0.75rem;
+	color: var(--accent-strong);
+	border: 1px solid #c9c4fa;
+	border-radius: 0.5rem;
+	background: white;
+	font-weight: 700;
+	cursor: pointer;
+}
+
+.optional-label {
+	color: var(--text-muted);
+	font-size: 0.78rem;
+	font-weight: 500;
+}
+
 .field-help,
-.field-error {
+.field-error,
+.file-reselection-note {
 	margin: 0;
 	font-size: 0.8rem;
 	line-height: 1.45;
@@ -195,6 +233,14 @@ main {
 
 .field-error {
 	color: #a72d43;
+}
+
+.file-reselection-note {
+	padding: 0.7rem 0.8rem;
+	color: #6d5211;
+	border: 1px solid #ead49e;
+	border-radius: 0.55rem;
+	background: #fff9e8;
 }
 
 .form-message {
@@ -209,6 +255,12 @@ main {
 	color: #8e2438;
 	border: 1px solid #efbdc6;
 	background: #fff1f3;
+}
+
+.form-message--success {
+	color: #17633d;
+	border: 1px solid #a9dec2;
+	background: #edf9f2;
 }
 
 .primary-button {
@@ -324,6 +376,47 @@ main {
 	font-size: 0.9rem;
 }
 
+.upload-page__inner {
+	max-width: 56rem;
+}
+
+.upload-card {
+	padding: clamp(1.5rem, 5vw, 2.75rem);
+	border: 1px solid var(--border);
+	border-radius: 1.25rem;
+	background: var(--surface);
+	box-shadow: 0 1.5rem 4rem rgb(24 32 51 / 9%);
+}
+
+.upload-card__header {
+	max-width: 42rem;
+	margin-bottom: 2rem;
+}
+
+.upload-card__header h1 {
+	margin: 0;
+	color: var(--text);
+	font-size: clamp(2rem, 6vw, 3rem);
+	line-height: 1.05;
+	letter-spacing: -0.045em;
+}
+
+.upload-card__header > p:last-child {
+	margin: 1rem 0 0;
+	color: var(--text-muted);
+	line-height: 1.65;
+}
+
+.upload-form-grid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 1.2rem;
+}
+
+.form-field--full {
+	grid-column: 1 / -1;
+}
+
 @media (min-width: 48rem) {
 	.page-container {
 		width: min(calc(100% - 4rem), var(--content-width));
@@ -331,6 +424,10 @@ main {
 }
 
 @media (max-width: 36rem) {
+	.upload-form-grid {
+		grid-template-columns: 1fr;
+	}
+
 	.account-card {
 		grid-template-columns: 1fr;
 	}

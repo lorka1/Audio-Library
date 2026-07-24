@@ -1,17 +1,27 @@
 import { env } from '$env/dynamic/private';
 import { isAbsolute, resolve } from 'node:path';
+import { parseAudioFileSizeLimit } from './config-values';
 
 const DEFAULT_SESSION_COOKIE_NAME = 'audio_library_session';
 const DEFAULT_SESSION_DURATION_DAYS = 7;
+const DEFAULT_AUDIO_STORAGE_PATH = 'storage/audio';
 
-function requiredPath(name: 'DATABASE_URL' | 'AUDIO_STORAGE_PATH'): string {
-	const configuredPath = env[name];
+function resolvePath(configuredPath: string): string {
+	return isAbsolute(configuredPath) ? configuredPath : resolve(process.cwd(), configuredPath);
+}
+
+function requiredDatabasePath(): string {
+	const configuredPath = env.DATABASE_URL?.trim();
 
 	if (!configuredPath) {
-		throw new Error(`Missing required environment variable ${name}.`);
+		throw new Error('Missing required environment variable DATABASE_URL.');
 	}
 
-	return isAbsolute(configuredPath) ? configuredPath : resolve(process.cwd(), configuredPath);
+	return resolvePath(configuredPath);
+}
+
+function readAudioStoragePath(): string {
+	return resolvePath(env.AUDIO_STORAGE_PATH?.trim() || DEFAULT_AUDIO_STORAGE_PATH);
 }
 
 function readSessionCookieName(): string {
@@ -38,10 +48,13 @@ function readSessionDurationDays(): number {
 }
 
 const sessionDurationDays = readSessionDurationDays();
+const audioFileSizeLimit = parseAudioFileSizeLimit(env.MAX_AUDIO_FILE_SIZE_MB);
 
 export const serverConfig = {
-	databasePath: requiredPath('DATABASE_URL'),
-	audioStoragePath: requiredPath('AUDIO_STORAGE_PATH'),
+	databasePath: requiredDatabasePath(),
+	audioStoragePath: readAudioStoragePath(),
+	maxAudioFileSizeMb: audioFileSizeLimit.megabytes,
+	maxAudioFileSizeBytes: audioFileSizeLimit.bytes,
 	sessionCookieName: readSessionCookieName(),
 	sessionDurationDays,
 	sessionDurationMs: sessionDurationDays * 24 * 60 * 60 * 1000

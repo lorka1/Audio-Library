@@ -15,6 +15,20 @@
       "when": 1784892128918,
       "tag": "0001_damp_norman_osborn",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1784910005080,
+      "tag": "0002_volatile_tyger_tiger",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1784913937046,
+      "tag": "0003_noisy_chameleon",
+      "breakpoints": true
     }
   ]
 }

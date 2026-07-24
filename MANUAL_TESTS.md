@@ -1,4 +1,4 @@
-# Manual authentication tests
+# Manual application tests
 
 Run the application with:
 
@@ -7,7 +7,8 @@ npm run db:migrate
 npm run dev
 ```
 
-Use unique synthetic account details that are not used for any real service.
+Use unique synthetic account details and disposable test audio that are not
+used for any real service.
 
 ## Registration
 
@@ -51,6 +52,113 @@ Use unique synthetic account details that are not used for any real service.
 - [ ] Remove the current session row from the local database, then refresh. The application signs you out without exposing an internal error.
 - [ ] Set a session expiry in the past, then refresh. The session is removed and the browser cookie is cleared.
 
+## Audio upload
+
+### UPL-001 — Protected route while signed out
+
+- [ ] Sign out and open `/upload`.
+- [ ] Expected: You are redirected to `/login`, with `/upload` retained as the safe return destination.
+
+### UPL-002 — Upload form while signed in
+
+- [ ] Sign in and open `/upload`.
+- [ ] Expected: The multipart upload form is available with audio file, title, artist, BPM, musical key, genre, and description fields.
+
+### UPL-003 — Valid MP3 upload
+
+- [ ] Upload a non-empty `.mp3` file reported as `audio/mpeg` with valid metadata.
+- [ ] Expected: The success message appears, a generated `.mp3` file exists under the configured private storage directory, and one matching `tracks` row exists.
+
+### UPL-004 — Valid WAV upload
+
+- [ ] Upload a non-empty `.wav` file using one supported WAV MIME type: `audio/wav`, `audio/x-wav`, `audio/wave`, or `audio/vnd.wave`.
+- [ ] Expected: The upload succeeds and matching file and metadata records exist.
+
+### UPL-005 — Valid OGG upload
+
+- [ ] Upload a non-empty `.ogg` file reported as `audio/ogg`.
+- [ ] Expected: The upload succeeds and matching file and metadata records exist.
+
+### UPL-006 — Unsupported file
+
+- [ ] Attempt to upload a TXT or PDF file.
+- [ ] Expected: The server rejects it as an unsupported audio format, and no file or track row is created.
+
+### UPL-007 — Extension and MIME mismatch
+
+- [ ] Rename a non-MP3 test file to `.mp3` while retaining a non-`audio/mpeg` MIME type and submit it.
+- [ ] Expected: The server rejects the mismatched extension/MIME pair, and nothing is stored.
+
+### UPL-008 — Empty file
+
+- [ ] Submit a zero-byte file with an otherwise supported filename and MIME type.
+- [ ] Expected: The server reports that the audio file must not be empty, and nothing is stored.
+
+### UPL-009 — File over the limit
+
+- [ ] Submit an audio file larger than `MAX_AUDIO_FILE_SIZE_MB`.
+- [ ] Expected: The upload is rejected with a clear size error, and no file or track row is created.
+
+### UPL-010 — Missing title
+
+- [ ] Submit an otherwise valid upload with a blank or whitespace-only title.
+- [ ] Expected: A title-required error appears, the other text values remain populated, the file must be selected again, and nothing is stored.
+
+### UPL-011 — BPM below the range
+
+- [ ] Submit BPM `19`.
+- [ ] Expected: The server reports that BPM must be between 20 and 300.
+
+### UPL-012 — BPM above the range
+
+- [ ] Submit BPM `301`.
+- [ ] Expected: The server reports that BPM must be between 20 and 300.
+
+### UPL-013 — Decimal BPM
+
+- [ ] Submit BPM `120.5`, bypassing browser validation if necessary.
+- [ ] Expected: The server reports that BPM must be an integer.
+
+### UPL-014 — Forged musical key
+
+- [ ] Manually submit a musical-key value that is not in the displayed list.
+- [ ] Expected: The server rejects it with a musical-key validation error.
+
+### UPL-015 — Forged genre
+
+- [ ] Manually submit a genre value that is not in the displayed list.
+- [ ] Expected: The server rejects it with a genre validation error.
+
+### UPL-016 — Safe generated physical filename
+
+- [ ] Complete a successful upload and inspect the corresponding file and `tracks.storage_key`.
+- [ ] Expected: Both use a version 4 UUID plus only the validated lowercase extension. The original filename is present only in metadata and is not part of the physical path.
+
+### UPL-017 — Database failure rollback
+
+- [ ] In a disposable development environment, simulate a database insert failure after the file write.
+- [ ] Expected: The newly written physical file is removed, no track row remains, and the page shows only `Unable to upload the audio track. Please try again.` without internal paths or database details.
+
+### UPL-018 — Refresh after success
+
+- [ ] Complete a successful upload, then refresh `/upload?success=1`.
+- [ ] Expected: The success message remains visible, the form is empty, and no additional file or database row is created.
+
+## Additional upload and responsive checks
+
+### UPL-019 — Upload without JavaScript
+
+- [ ] Disable JavaScript in the browser, sign in, and submit a valid upload.
+- [ ] Expected: The native multipart form completes, redirects to `/upload?success=1`, and stores exactly one file and one metadata row.
+
+### NAV-001 — Signed-in navigation at 320 px
+
+- [ ] At a 320 px viewport width, sign in and inspect the header.
+- [ ] Expected: Home, Upload, Account, the username label, and the POST Logout control remain visible or wrap cleanly and are all operable.
+- [ ] Sign out at the same width.
+- [ ] Expected: Home, Login, and Register remain operable.
+
 ## Phase boundary
 
-- [ ] Confirm there are no upload, playback, streaming, download, search, editing, or track-deletion controls.
+- [ ] Confirm upload is available only to signed-in users.
+- [ ] Confirm there are no playback, audio player, streaming, HTTP Range, download, public track-list, track-detail, search, filter, My Tracks, editing, replacement, deletion, automatic analysis, comment, playlist, or rating controls.

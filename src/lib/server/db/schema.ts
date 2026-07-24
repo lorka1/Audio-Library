@@ -54,14 +54,17 @@ export const tracks = sqliteTable(
 			.notNull()
 			.references(() => users.id, { onDelete: 'restrict', onUpdate: 'cascade' }),
 		title: text('title').notNull(),
-		artist: text('artist'),
+		artist: text('artist').notNull(),
+		bpm: integer('bpm'),
+		musicalKey: text('musical_key'),
+		genre: text('genre'),
 		description: text('description'),
 		originalFilename: text('original_filename').notNull(),
 		storageKey: text('storage_key').notNull(),
 		mimeType: text('mime_type').notNull(),
 		fileSizeBytes: integer('file_size_bytes').notNull(),
 		durationMs: integer('duration_ms'),
-		visibility: text('visibility', { enum: TRACK_VISIBILITIES }).notNull().default('private'),
+		visibility: text('visibility', { enum: TRACK_VISIBILITIES }).notNull().default('public'),
 		...timestamps
 	},
 	(table) => [
@@ -73,6 +76,7 @@ export const tracks = sqliteTable(
 			'tracks_duration_non_negative',
 			sql`${table.durationMs} is null or ${table.durationMs} >= 0`
 		),
+		check('tracks_bpm_valid', sql`${table.bpm} is null or ${table.bpm} between 20 and 300`),
 		check('tracks_visibility_valid', sql`${table.visibility} in ('private', 'public')`)
 	]
 );

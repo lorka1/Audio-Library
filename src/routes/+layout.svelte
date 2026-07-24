@@ -9,7 +9,7 @@
 <svelte:head>
 	<meta
 		name="description"
-		content="A secure personal library for organizing and playing audio tracks."
+		content="A secure personal library for uploading audio tracks and organizing their metadata."
 	/>
 </svelte:head>
 
@@ -23,7 +23,7 @@
 	<footer class="site-footer">
 		<div class="page-container site-footer__inner">
 			<p>Audio Library</p>
-			<p>Phase 2 · secure authentication</p>
+			<p>Phase 3 · secure audio uploads</p>
 		</div>
 	</footer>
 </div>

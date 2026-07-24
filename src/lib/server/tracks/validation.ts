@@ -1,0 +1,287 @@
+import { MUSIC_GENRES, MUSICAL_KEYS, type MusicGenre, type MusicalKey } from '$lib/constants/music';
+import {
+	getValidatedAudioExtension,
+	type AudioExtension
+} from './files';
+
+export const TRACK_TITLE_MAX_LENGTH = 120;
+export const TRACK_ARTIST_MAX_LENGTH = 120;
+export const TRACK_DESCRIPTION_MAX_LENGTH = 2000;
+export const ORIGINAL_FILENAME_MAX_LENGTH = 255;
+export const BPM_MIN = 20;
+export const BPM_MAX = 300;
+
+const musicalKeySet = new Set<string>(MUSICAL_KEYS);
+const musicGenreSet = new Set<string>(MUSIC_GENRES);
+const INTEGER_PATTERN = /^\d+$/;
+
+export interface UploadFormValues {
+	title: string;
+	artist: string;
+	bpm: string;
+	musicalKey: string;
+	genre: string;
+	description: string;
+}
+
+export type UploadErrorField = keyof UploadFormValues | 'audioFile' | 'general';
+export type UploadErrors = Partial<Record<UploadErrorField, string>>;
+
+export interface ValidatedTrackMetadata {
+	title: string;
+	artist: string;
+	bpm: number | null;
+	musicalKey: MusicalKey | null;
+	genre: MusicGenre | null;
+	description: string | null;
+}
+
+export interface ValidatedAudioFile {
+	file: File;
+	extension: AudioExtension;
+	originalFilename: string;
+	mimeType: string;
+}
+
+export type UploadValidationResult =
+	| {
+			success: true;
+			values: UploadFormValues;
+			metadata: ValidatedTrackMetadata;
+			audioFile: ValidatedAudioFile;
+	  }
+	| {
+			success: false;
+			values: UploadFormValues;
+			errors: UploadErrors;
+	  };
+
+export interface FieldValidation<T> {
+	value: T;
+	error: string | null;
+}
+
+export function readUploadFormString(formData: FormData, field: string): string {
+	const value = formData.get(field);
+	return typeof value === 'string' ? value : '';
+}
+
+export function emptyUploadFormValues(): UploadFormValues {
+	return {
+		title: '',
+		artist: '',
+		bpm: '',
+		musicalKey: '',
+		genre: '',
+		description: ''
+	};
+}
+
+export function readUploadFormValues(formData: FormData): UploadFormValues {
+	return {
+		title: readUploadFormString(formData, 'title').trim(),
+		artist: readUploadFormString(formData, 'artist').trim(),
+		bpm: readUploadFormString(formData, 'bpm').trim(),
+		musicalKey: readUploadFormString(formData, 'musicalKey').trim(),
+		genre: readUploadFormString(formData, 'genre').trim(),
+		description: readUploadFormString(formData, 'description').trim()
+	};
+}
+
+export function validateTitle(value: string): FieldValidation<string> {
+	const title = value.trim();
+
+	if (!title) {
+		return { value: title, error: 'Title is required.' };
+	}
+
+	if (title.length > TRACK_TITLE_MAX_LENGTH) {
+		return {
+			value: title,
+			error: `Title must be at most ${TRACK_TITLE_MAX_LENGTH} characters.`
+		};
+	}
+
+	return { value: title, error: null };
+}
+
+export function validateArtist(value: string): FieldValidation<string> {
+	const artist = value.trim();
+
+	if (!artist) {
+		return { value: artist, error: 'Artist is required.' };
+	}
+
+	if (artist.length > TRACK_ARTIST_MAX_LENGTH) {
+		return {
+			value: artist,
+			error: `Artist must be at most ${TRACK_ARTIST_MAX_LENGTH} characters.`
+		};
+	}
+
+	return { value: artist, error: null };
+}
+
+export function validateBpm(value: string): FieldValidation<number | null> {
+	const normalizedBpm = value.trim();
+
+	if (!normalizedBpm) {
+		return { value: null, error: null };
+	}
+
+	if (!INTEGER_PATTERN.test(normalizedBpm)) {
+		return { value: null, error: 'BPM must be an integer.' };
+	}
+
+	const bpm = Number(normalizedBpm);
+
+	if (!Number.isSafeInteger(bpm)) {
+		return { value: null, error: 'BPM must be an integer.' };
+	}
+
+	if (bpm < BPM_MIN || bpm > BPM_MAX) {
+		return { value: null, error: `BPM must be between ${BPM_MIN} and ${BPM_MAX}.` };
+	}
+
+	return { value: bpm, error: null };
+}
+
+export function validateMusicalKey(value: string): FieldValidation<MusicalKey | null> {
+	const musicalKey = value.trim();
+
+	if (!musicalKey) {
+		return { value: null, error: null };
+	}
+
+	if (!musicalKeySet.has(musicalKey)) {
+		return { value: null, error: 'Select a valid musical key.' };
+	}
+
+	return { value: musicalKey as MusicalKey, error: null };
+}
+
+export function validateGenre(value: string): FieldValidation<MusicGenre | null> {
+	const genre = value.trim();
+
+	if (!genre) {
+		return { value: null, error: null };
+	}
+
+	if (!musicGenreSet.has(genre)) {
+		return { value: null, error: 'Select a valid genre.' };
+	}
+
+	return { value: genre as MusicGenre, error: null };
+}
+
+export function validateDescription(value: string): FieldValidation<string | null> {
+	const description = value.trim();
+
+	if (!description) {
+		return { value: null, error: null };
+	}
+
+	if (description.length > TRACK_DESCRIPTION_MAX_LENGTH) {
+		return {
+			value: null,
+			error: `Description must be at most ${TRACK_DESCRIPTION_MAX_LENGTH} characters.`
+		};
+	}
+
+	return { value: description, error: null };
+}
+
+function formatMegabytes(bytes: number): string {
+	return new Intl.NumberFormat('en', { maximumFractionDigits: 2 }).format(bytes / 1024 / 1024);
+}
+
+export function audioFileTooLargeMessage(maxFileSizeBytes: number): string {
+	return `Audio file must not be larger than ${formatMegabytes(maxFileSizeBytes)} MB.`;
+}
+
+export function validateAudioFile(
+	value: FormDataEntryValue | null,
+	maxFileSizeBytes: number
+): { value: ValidatedAudioFile | null; error: string | null } {
+	if (!(value instanceof File) || !value.name.trim()) {
+		return { value: null, error: 'Audio file is required.' };
+	}
+
+	if (value.name.length > ORIGINAL_FILENAME_MAX_LENGTH || value.name.includes('\0')) {
+		return {
+			value: null,
+			error: `Audio filename must be at most ${ORIGINAL_FILENAME_MAX_LENGTH} characters.`
+		};
+	}
+
+	if (value.size === 0) {
+		return { value: null, error: 'Audio file must not be empty.' };
+	}
+
+	if (!Number.isSafeInteger(value.size) || value.size > maxFileSizeBytes) {
+		return {
+			value: null,
+			error: audioFileTooLargeMessage(maxFileSizeBytes)
+		};
+	}
+
+	const extension = getValidatedAudioExtension(value.name, value.type);
+
+	if (!extension) {
+		return {
+			value: null,
+			error: 'Unsupported audio format. Upload an MP3, WAV, or OGG file.'
+		};
+	}
+
+	return {
+		value: {
+			file: value,
+			extension,
+			originalFilename: value.name,
+			mimeType: value.type.trim().toLowerCase()
+		},
+		error: null
+	};
+}
+
+export function validateUploadFormData(
+	formData: FormData,
+	maxFileSizeBytes: number
+): UploadValidationResult {
+	const values = readUploadFormValues(formData);
+	const title = validateTitle(values.title);
+	const artist = validateArtist(values.artist);
+	const bpm = validateBpm(values.bpm);
+	const musicalKey = validateMusicalKey(values.musicalKey);
+	const genre = validateGenre(values.genre);
+	const description = validateDescription(values.description);
+	const audioFile = validateAudioFile(formData.get('audioFile'), maxFileSizeBytes);
+	const errors: UploadErrors = {};
+
+	if (title.error) errors.title = title.error;
+	if (artist.error) errors.artist = artist.error;
+	if (bpm.error) errors.bpm = bpm.error;
+	if (musicalKey.error) errors.musicalKey = musicalKey.error;
+	if (genre.error) errors.genre = genre.error;
+	if (description.error) errors.description = description.error;
+	if (audioFile.error) errors.audioFile = audioFile.error;
+
+	if (Object.keys(errors).length > 0 || !audioFile.value) {
+		return { success: false, values, errors };
+	}
+
+	return {
+		success: true,
+		values,
+		metadata: {
+			title: title.value,
+			artist: artist.value,
+			bpm: bpm.value,
+			musicalKey: musicalKey.value,
+			genre: genre.value,
+			description: description.value
+		},
+		audioFile: audioFile.value
+	};
+}

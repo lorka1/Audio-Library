@@ -5,28 +5,31 @@
 </script>
 
 <svelte:head>
-	<title>Audio Library · Secure authentication</title>
+	<title>Audio Library · Secure audio uploads</title>
 </svelte:head>
 
 <section class="hero">
 	<div class="page-container hero__inner">
-		<p class="eyebrow">Secure access is ready</p>
+		<p class="eyebrow">Secure audio uploads are ready</p>
 		<h1>
-			{data.user ? `Welcome back, ${data.user.username}.` : 'Your audio library, securely yours.'}
+			{data.user
+				? `Welcome back, ${data.user.username}.`
+				: 'Build your private audio library.'}
 		</h1>
 		<p class="lead">
-			Accounts now use server-validated credentials, securely hashed passwords, and private
-			database-backed sessions.
+			Signed-in members can upload MP3, WAV, and OGG files with server-validated metadata,
+			private file storage, and account-linked database records.
 		</p>
 		<div class="hero__actions">
 			{#if data.user}
-				<a class="hero__link hero__link--primary" href="/account">View your account</a>
+				<a class="hero__link hero__link--primary" href="/upload">Upload an audio track</a>
+				<a class="hero__link" href="/account">View your account</a>
 			{:else}
 				<a class="hero__link hero__link--primary" href="/register">Create an account</a>
 				<a class="hero__link" href="/login">Login</a>
 			{/if}
 			<a class="hero__link" href="#foundation"
-				>Review Phase 2 <span aria-hidden="true">↓</span></a
+				>Review Phase 3 <span aria-hidden="true">↓</span></a
 			>
 		</div>
 	</div>
@@ -34,37 +37,44 @@
 
 <section class="foundation page-container" id="foundation" aria-labelledby="foundation-title">
 	<div class="section-heading">
-		<p class="eyebrow">Phase 2</p>
-		<h2 id="foundation-title">Authentication without shortcuts</h2>
+		<p class="eyebrow">Phase 3</p>
+		<h2 id="foundation-title">Audio uploads built for consistency</h2>
 		<p>
-			Passwords and session tokens stay private, while every protected request is validated on
-			the server.
+			Every upload is authenticated, validated on the server, and coordinated across private
+			file storage and SQLite metadata.
 		</p>
 	</div>
 
 	<div class="card-grid">
 		<article>
 			<span class="card-number">01</span>
-			<h3>Validated accounts</h3>
-			<p>Registration and login use server-side validation and salted bcrypt password hashes.</p>
+			<h3>Validated uploads</h3>
+			<p>
+				Metadata, file size, extension, and MIME type are checked before anything is stored.
+			</p>
 		</article>
 		<article>
 			<span class="card-number">02</span>
-			<h3>Private sessions</h3>
-			<p>Only SHA-256 token hashes reach SQLite; raw tokens remain in HttpOnly cookies.</p>
+			<h3>Private file storage</h3>
+			<p>
+				Audio bytes stay outside the public application and receive generated physical names.
+			</p>
 		</article>
 		<article>
 			<span class="card-number">03</span>
-			<h3>Protected access</h3>
-			<p>Request hooks restore signed-in state and route guards protect account data.</p>
+			<h3>Consistent records</h3>
+			<p>
+				Each track belongs to the signed-in user, with rollback protection if metadata storage
+				fails.
+			</p>
 		</article>
 	</div>
 
 	<aside class="phase-note">
 		<span aria-hidden="true">i</span>
 		<p>
-			Audio upload, playback, streaming, download, search, editing, and deletion remain outside
-			Phase 2.
+			Playback, streaming, download, public browsing, search, editing, and deletion remain
+			outside Phase 3.
 		</p>
 	</aside>
 </section>
