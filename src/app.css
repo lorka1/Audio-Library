@@ -91,8 +91,252 @@ main {
 	font-size: 0.875rem;
 }
 
+.auth-page,
+.account-page {
+	padding-block: clamp(3rem, 8vw, 6rem);
+}
+
+.auth-page__inner {
+	display: grid;
+	place-items: center;
+}
+
+.auth-card {
+	width: min(100%, 34rem);
+	padding: clamp(1.5rem, 5vw, 2.5rem);
+	border: 1px solid var(--border);
+	border-radius: 1.25rem;
+	background: var(--surface);
+	box-shadow: 0 1.5rem 4rem rgb(24 32 51 / 9%);
+}
+
+.auth-card__header {
+	margin-bottom: 2rem;
+}
+
+.auth-card__header h1,
+.account-heading h1 {
+	margin: 0;
+	color: var(--text);
+	font-size: clamp(2rem, 6vw, 3rem);
+	line-height: 1.05;
+	letter-spacing: -0.045em;
+}
+
+.auth-card__header > p:last-child,
+.account-heading > p:last-child {
+	margin: 1rem 0 0;
+	color: var(--text-muted);
+	line-height: 1.65;
+}
+
+.auth-eyebrow {
+	margin: 0 0 0.75rem;
+	color: var(--accent);
+	font-size: 0.75rem;
+	font-weight: 800;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+}
+
+.form-stack {
+	display: grid;
+	gap: 1.2rem;
+}
+
+.form-field {
+	display: grid;
+	gap: 0.45rem;
+}
+
+.form-field label {
+	color: var(--text);
+	font-size: 0.9rem;
+	font-weight: 700;
+}
+
+.form-field input {
+	width: 100%;
+	min-height: 3rem;
+	padding: 0.75rem 0.85rem;
+	color: var(--text);
+	border: 1px solid #cbd3df;
+	border-radius: 0.65rem;
+	background: white;
+	transition:
+		border-color 150ms ease,
+		box-shadow 150ms ease;
+}
+
+.form-field input:hover {
+	border-color: #adb8c8;
+}
+
+.form-field input:focus {
+	border-color: var(--accent);
+	outline: 0;
+	box-shadow: 0 0 0 3px rgb(91 78 232 / 14%);
+}
+
+.form-field input[aria-invalid='true'] {
+	border-color: #c43f55;
+}
+
+.field-help,
+.field-error {
+	margin: 0;
+	font-size: 0.8rem;
+	line-height: 1.45;
+}
+
+.field-help {
+	color: var(--text-muted);
+}
+
+.field-error {
+	color: #a72d43;
+}
+
+.form-message {
+	margin-bottom: 1.25rem;
+	padding: 0.9rem 1rem;
+	border-radius: 0.65rem;
+	font-size: 0.9rem;
+	line-height: 1.5;
+}
+
+.form-message--error {
+	color: #8e2438;
+	border: 1px solid #efbdc6;
+	background: #fff1f3;
+}
+
+.primary-button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 3rem;
+	padding: 0.75rem 1rem;
+	color: white;
+	border: 0;
+	border-radius: 0.65rem;
+	background: var(--accent);
+	font-weight: 750;
+	cursor: pointer;
+	transition:
+		transform 150ms ease,
+		background-color 150ms ease;
+}
+
+.primary-button:hover {
+	transform: translateY(-1px);
+	background: var(--accent-strong);
+}
+
+.auth-switch {
+	margin: 1.5rem 0 0;
+	color: var(--text-muted);
+	text-align: center;
+	font-size: 0.9rem;
+}
+
+.auth-switch a {
+	color: var(--accent-strong);
+	font-weight: 700;
+}
+
+.account-page__inner {
+	max-width: 54rem;
+}
+
+.account-heading {
+	max-width: 42rem;
+	margin-bottom: 2rem;
+}
+
+.account-card {
+	display: grid;
+	grid-template-columns: auto 1fr;
+	gap: 1.5rem;
+	padding: clamp(1.5rem, 5vw, 2.5rem);
+	border: 1px solid var(--border);
+	border-radius: 1.25rem;
+	background: var(--surface);
+	box-shadow: 0 1.5rem 4rem rgb(24 32 51 / 7%);
+}
+
+.account-avatar {
+	display: grid;
+	place-items: center;
+	width: 4rem;
+	height: 4rem;
+	color: white;
+	border-radius: 1rem;
+	background: linear-gradient(145deg, #756af1, #4d40d7);
+	font-size: 1.5rem;
+	font-weight: 800;
+}
+
+.account-details {
+	display: grid;
+	gap: 1rem;
+	margin: 0;
+}
+
+.account-details div {
+	display: grid;
+	grid-template-columns: minmax(7rem, 0.35fr) 1fr;
+	gap: 1rem;
+	padding-bottom: 1rem;
+	border-bottom: 1px solid var(--border);
+}
+
+.account-details div:last-child {
+	padding-bottom: 0;
+	border-bottom: 0;
+}
+
+.account-details dt {
+	color: var(--text-muted);
+	font-size: 0.82rem;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+}
+
+.account-details dd {
+	margin: 0;
+	overflow-wrap: anywhere;
+	font-weight: 650;
+}
+
+.account-note {
+	margin-top: 1rem;
+	padding: 1rem 1.25rem;
+	color: var(--text-muted);
+	border: 1px solid var(--border);
+	border-radius: 0.85rem;
+	background: var(--surface-muted);
+}
+
+.account-note p {
+	margin: 0;
+	font-size: 0.9rem;
+}
+
 @media (min-width: 48rem) {
 	.page-container {
 		width: min(calc(100% - 4rem), var(--content-width));
+	}
+}
+
+@media (max-width: 36rem) {
+	.account-card {
+		grid-template-columns: 1fr;
+	}
+
+	.account-details div {
+		grid-template-columns: 1fr;
+		gap: 0.35rem;
 	}
 }

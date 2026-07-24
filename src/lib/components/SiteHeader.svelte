@@ -1,10 +1,7 @@
 <script lang="ts">
-	import type { NavigationItem } from '$lib/types';
+	import type { CurrentUser } from '$lib/types';
 
-	const navigation: NavigationItem[] = [
-		{ label: 'Home', href: '/' },
-		{ label: 'Project foundation', href: '/#foundation' }
-	];
+	let { user }: { user: CurrentUser | null } = $props();
 </script>
 
 <header class="site-header">
@@ -20,9 +17,22 @@
 
 		<nav aria-label="Main navigation">
 			<ul>
-				{#each navigation as item}
-					<li><a href={item.href}>{item.label}</a></li>
-				{/each}
+				<li><a href="/">Home</a></li>
+				{#if user}
+					<li>
+						<a class="user-link" href="/account" aria-label={`Open ${user.username}'s account`}>
+							{user.username}
+						</a>
+					</li>
+					<li>
+						<form method="POST" action="/logout">
+							<button class="logout-button" type="submit">Logout</button>
+						</form>
+					</li>
+				{:else}
+					<li><a href="/login">Login</a></li>
+					<li><a class="register-link" href="/register">Register</a></li>
+				{/if}
 			</ul>
 		</nav>
 	</div>
@@ -93,27 +103,60 @@
 		list-style: none;
 	}
 
-	nav a {
+	nav a,
+	.logout-button {
 		display: inline-flex;
+		align-items: center;
 		padding: 0.55rem 0.7rem;
 		color: #cbd5e1;
+		border: 0;
 		border-radius: 0.5rem;
+		background: transparent;
 		font-size: 0.875rem;
 		font-weight: 600;
 		text-decoration: none;
+		cursor: pointer;
 		transition:
 			color 150ms ease,
 			background-color 150ms ease;
 	}
 
-	nav a:hover {
+	nav a:hover,
+	.logout-button:hover {
 		color: white;
 		background: rgb(255 255 255 / 8%);
 	}
 
+	.register-link {
+		color: white;
+		background: rgb(117 106 241 / 24%);
+	}
+
+	.user-link {
+		color: white;
+	}
+
+	form {
+		margin: 0;
+	}
+
 	@media (max-width: 34rem) {
-		nav li:last-child {
+		.site-header__inner {
+			min-height: 4rem;
+		}
+
+		.brand > span:last-child {
 			display: none;
+		}
+
+		ul {
+			gap: 0;
+		}
+
+		nav a,
+		.logout-button {
+			padding-inline: 0.5rem;
+			font-size: 0.8rem;
 		}
 	}
 </style>

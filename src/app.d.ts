@@ -1,7 +1,12 @@
+import type { CurrentUser } from '$lib/types';
+import type { AuthSession } from '$lib/server/auth/types';
+
 declare global {
 	namespace App {
-		// Locals, PageData, PageState, Error, and Platform will be extended
-		// when they are needed in later project phases.
+		interface Locals {
+			user: CurrentUser | null;
+			session: AuthSession | null;
+		}
 	}
 }
 

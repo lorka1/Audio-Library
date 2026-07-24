@@ -30,6 +30,7 @@ export const sessions = sqliteTable(
 	'sessions',
 	{
 		id: text('id').primaryKey(),
+		tokenHash: text('token_hash').notNull(),
 		userId: text('user_id')
 			.notNull()
 			.references(() => users.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
@@ -39,6 +40,7 @@ export const sessions = sqliteTable(
 			.default(sql`(unixepoch())`)
 	},
 	(table) => [
+		uniqueIndex('sessions_token_hash_unique').on(table.tokenHash),
 		index('sessions_user_id_idx').on(table.userId),
 		index('sessions_expires_at_idx').on(table.expiresAt)
 	]

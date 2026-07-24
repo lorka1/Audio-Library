@@ -6,3 +6,10 @@ export interface NavigationItem {
 	label: string;
 	href: string;
 }
+
+export interface CurrentUser {
+	id: string;
+	username: string;
+	email: string;
+	createdAt: Date;
+}

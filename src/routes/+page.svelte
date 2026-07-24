@@ -1,54 +1,70 @@
+<script lang="ts">
+	import type { PageProps } from './$types';
+
+	let { data }: PageProps = $props();
+</script>
+
 <svelte:head>
-	<title>Audio Library · Phase 1</title>
+	<title>Audio Library · Secure authentication</title>
 </svelte:head>
 
 <section class="hero">
 	<div class="page-container hero__inner">
-		<p class="eyebrow">Project foundation ready</p>
-		<h1>Your audio library starts with a solid foundation.</h1>
+		<p class="eyebrow">Secure access is ready</p>
+		<h1>
+			{data.user ? `Welcome back, ${data.user.username}.` : 'Your audio library, securely yours.'}
+		</h1>
 		<p class="lead">
-			The SvelteKit application, TypeScript models, and SQLite data layer are in place for the
-			next development phases.
+			Accounts now use server-validated credentials, securely hashed passwords, and private
+			database-backed sessions.
 		</p>
-		<a class="hero__link" href="#foundation"
-			>Review the foundation <span aria-hidden="true">↓</span></a
-		>
+		<div class="hero__actions">
+			{#if data.user}
+				<a class="hero__link hero__link--primary" href="/account">View your account</a>
+			{:else}
+				<a class="hero__link hero__link--primary" href="/register">Create an account</a>
+				<a class="hero__link" href="/login">Login</a>
+			{/if}
+			<a class="hero__link" href="#foundation"
+				>Review Phase 2 <span aria-hidden="true">↓</span></a
+			>
+		</div>
 	</div>
 </section>
 
 <section class="foundation page-container" id="foundation" aria-labelledby="foundation-title">
 	<div class="section-heading">
-		<p class="eyebrow">Phase 1</p>
-		<h2 id="foundation-title">What is currently included</h2>
+		<p class="eyebrow">Phase 2</p>
+		<h2 id="foundation-title">Authentication without shortcuts</h2>
 		<p>
-			The infrastructure is ready, while end-user features are intentionally outside this
-			phase.
+			Passwords and session tokens stay private, while every protected request is validated on
+			the server.
 		</p>
 	</div>
 
 	<div class="card-grid">
 		<article>
 			<span class="card-number">01</span>
-			<h3>Application scaffold</h3>
-			<p>Stable SvelteKit, TypeScript, a global layout, and responsive navigation.</p>
+			<h3>Validated accounts</h3>
+			<p>Registration and login use server-side validation and salted bcrypt password hashes.</p>
 		</article>
 		<article>
 			<span class="card-number">02</span>
-			<h3>Data layer</h3>
-			<p>SQLite and Drizzle ORM schemas for users, sessions, and audio tracks.</p>
+			<h3>Private sessions</h3>
+			<p>Only SHA-256 token hashes reach SQLite; raw tokens remain in HttpOnly cookies.</p>
 		</article>
 		<article>
 			<span class="card-number">03</span>
-			<h3>Local storage</h3>
-			<p>Configured environment variables and a prepared private audio directory.</p>
+			<h3>Protected access</h3>
+			<p>Request hooks restore signed-in state and route guards protect account data.</p>
 		</article>
 	</div>
 
 	<aside class="phase-note">
 		<span aria-hidden="true">i</span>
 		<p>
-			Registration, sign-in, and audio file workflows are not part of Phase 1 and are not
-			available yet.
+			Audio upload, playback, streaming, download, search, editing, and deletion remain outside
+			Phase 2.
 		</p>
 	</aside>
 </section>
@@ -111,9 +127,24 @@
 			background-color 150ms ease;
 	}
 
+	.hero__actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.75rem;
+	}
+
+	.hero__link--primary {
+		border-color: transparent;
+		background: var(--accent);
+	}
+
 	.hero__link:hover {
 		transform: translateY(-2px);
 		background: rgb(255 255 255 / 12%);
+	}
+
+	.hero__link--primary:hover {
+		background: var(--accent-strong);
 	}
 
 	.foundation {

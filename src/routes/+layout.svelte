@@ -1,9 +1,9 @@
 <script lang="ts">
-	import type { Snippet } from 'svelte';
 	import { SiteHeader } from '$lib';
+	import type { LayoutProps } from './$types';
 	import '../app.css';
 
-	let { children }: { children: Snippet } = $props();
+	let { data, children }: LayoutProps = $props();
 </script>
 
 <svelte:head>
@@ -14,7 +14,7 @@
 </svelte:head>
 
 <div class="site-shell">
-	<SiteHeader />
+	<SiteHeader user={data.user} />
 
 	<main>
 		{@render children()}
@@ -23,7 +23,7 @@
 	<footer class="site-footer">
 		<div class="page-container site-footer__inner">
 			<p>Audio Library</p>
-			<p>Phase 1 · project foundation</p>
+			<p>Phase 2 · secure authentication</p>
 		</div>
 	</footer>
 </div>
