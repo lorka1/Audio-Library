@@ -1,7 +1,7 @@
 <script lang="ts">
-	import type { CurrentUser } from '$lib/types';
+	import type { NavigationUser } from '$lib/types';
 
-	let { user }: { user: CurrentUser | null } = $props();
+	let { user }: { user: NavigationUser | null } = $props();
 </script>
 
 <header class="site-header">

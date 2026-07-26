@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
-import { appendFileSync, existsSync, rmSync } from 'node:fs';
+import { appendFileSync, existsSync } from 'node:fs';
 import { Agent as HttpAgent, request as httpRequest } from 'node:http';
 import {
 	copyFile,
@@ -8,6 +8,7 @@ import {
 	mkdtemp,
 	readFile,
 	readdir,
+	rm,
 	stat,
 	writeFile
 } from 'node:fs/promises';
@@ -35,7 +36,7 @@ const LOG_TAIL_LIMIT = 64 * 1024;
 loadEnvironment({ path: join(PROJECT_ROOT, '.env'), quiet: true });
 
 let child;
-let childExitPromise;
+let childClosePromise;
 let temporaryRoot;
 let temporaryClient;
 let testPort;
@@ -48,6 +49,8 @@ let realStateForCleanup;
 
 const overallController = new AbortController();
 const httpAgent = new HttpAgent({ keepAlive: false });
+const activeHttpRequests = new Set();
+const activeHttpResponses = new Set();
 
 function assert(condition, message) {
 	if (!condition) {
@@ -213,18 +216,50 @@ function delay(milliseconds) {
 	return new Promise((resolveDelay) => setTimeout(resolveDelay, milliseconds));
 }
 
-async function waitForChildExit(milliseconds) {
+async function waitForChildClose(milliseconds) {
 	let timeout;
 
 	try {
 		return await Promise.race([
-			childExitPromise.then(() => true),
+			childClosePromise.then(() => true),
 			new Promise((resolveWait) => {
 				timeout = setTimeout(() => resolveWait(false), milliseconds);
 			})
 		]);
 	} finally {
 		clearTimeout(timeout);
+	}
+}
+
+function terminateWindowsChildTree(pid) {
+	const result = spawnSync(
+		'taskkill.exe',
+		['/PID', String(pid), '/T', '/F'],
+		{
+			stdio: 'ignore',
+			timeout: SHUTDOWN_TIMEOUT_MS,
+			windowsHide: true
+		}
+	);
+
+	if (result.error) {
+		const code =
+			typeof result.error.code === 'string' ? ` code ${result.error.code}` : '';
+		throw Object.assign(
+			new Error(
+				`Windows could not terminate the owned Vite process tree (${result.error.name}${code}).`
+			),
+			{ code: 'TASKKILL_ERROR' }
+		);
+	}
+
+	if (result.status !== 0 && isProcessAlive(pid)) {
+		throw Object.assign(
+			new Error(
+				`Windows taskkill returned status ${result.status ?? 'unknown'} for the owned Vite process tree.`
+			),
+			{ code: `TASKKILL_STATUS_${result.status ?? 'UNKNOWN'}` }
+		);
 	}
 }
 
@@ -287,10 +322,12 @@ async function request(baseUrl, path, options = {}) {
 		const chunks = [];
 		let completed = false;
 		let clientRequest;
+		let clientResponse;
 		const timeout = setTimeout(() => {
 			const timeoutError = new Error(
 				`HTTP request to ${url.pathname} exceeded 10 seconds.`
 			);
+			clientResponse?.destroy(timeoutError);
 			clientRequest?.destroy(timeoutError);
 			finish(timeoutError);
 		}, REQUEST_TIMEOUT_MS);
@@ -303,6 +340,8 @@ async function request(baseUrl, path, options = {}) {
 			completed = true;
 			clearTimeout(timeout);
 			overallController.signal.removeEventListener('abort', onAbort);
+			activeHttpRequests.delete(clientRequest);
+			activeHttpResponses.delete(clientResponse);
 
 			if (error) {
 				reject(error);
@@ -312,6 +351,7 @@ async function request(baseUrl, path, options = {}) {
 		}
 
 		function onAbort() {
+			clientResponse?.destroy(overallController.signal.reason);
 			clientRequest?.destroy(overallController.signal.reason);
 			finish(overallController.signal.reason ?? new Error('HTTP request aborted.'));
 		}
@@ -329,12 +369,28 @@ async function request(baseUrl, path, options = {}) {
 				port: url.port,
 				protocol: url.protocol
 			},
-			(clientResponse) => {
+			(incomingResponse) => {
+				clientResponse = incomingResponse;
+				activeHttpResponses.add(clientResponse);
 				clientResponse.on('data', (chunk) => chunks.push(chunk));
-				clientResponse.once('error', (error) => finish(error));
+				clientResponse.once('aborted', () => {
+					finish(new Error(`HTTP response from ${url.pathname} was aborted.`));
+				});
+				clientResponse.once('error', (error) => {
+					clientResponse.destroy();
+					finish(error);
+				});
+				clientResponse.once('close', () => {
+					if (!completed && !clientResponse.complete) {
+						finish(
+							new Error(`HTTP response from ${url.pathname} closed prematurely.`)
+						);
+					}
+				});
 				clientResponse.once('end', () => {
 					const body = Buffer.concat(chunks);
 					finish(null, {
+						bodyBytes: body,
 						headers: normalizeHeaders(clientResponse.headers),
 						status: clientResponse.statusCode ?? 0,
 						arrayBuffer: async () =>
@@ -349,6 +405,7 @@ async function request(baseUrl, path, options = {}) {
 		);
 
 		overallController.signal.addEventListener('abort', onAbort, { once: true });
+		activeHttpRequests.add(clientRequest);
 		clientRequest.once('error', (error) => finish(error));
 		clientRequest.end(options.body);
 	});
@@ -425,6 +482,111 @@ async function canConnect(port) {
 	});
 }
 
+async function waitForPortRelease(port, milliseconds = SHUTDOWN_TIMEOUT_MS) {
+	const deadline = Date.now() + milliseconds;
+
+	do {
+		if (!(await canConnect(port))) {
+			return;
+		}
+
+		await delay(150);
+	} while (Date.now() < deadline);
+
+	throw new Error(`The integration port ${port} is still accepting connections.`);
+}
+
+function cancelActiveHttpOperations() {
+	const cancellationError = new Error(
+		'Phase 6 integration cleanup cancelled an active HTTP operation.'
+	);
+
+	for (const response of activeHttpResponses) {
+		response.destroy(cancellationError);
+	}
+
+	for (const clientRequest of activeHttpRequests) {
+		clientRequest.destroy(cancellationError);
+	}
+
+	activeHttpResponses.clear();
+	activeHttpRequests.clear();
+}
+
+function readErrorCode(error) {
+	if (typeof error !== 'object' || error === null || !('code' in error)) {
+		return undefined;
+	}
+
+	const code = error.code;
+	return typeof code === 'string' || typeof code === 'number' ? code : undefined;
+}
+
+async function remainingTemporaryEntryCategories(root) {
+	try {
+		const entries = await readdir(root, { withFileTypes: true });
+		const categories = entries.map((entry) => {
+			if (entry.name === 'app.db' || entry.name.startsWith('app.db-')) {
+				return 'database file';
+			}
+
+			if (entry.name === 'audio' && entry.isDirectory()) {
+				return 'audio directory';
+			}
+
+			if (entry.name === 'vite.out.log' || entry.name === 'vite.err.log') {
+				return 'Vite log';
+			}
+
+			return entry.isDirectory() ? 'temporary directory' : 'temporary file';
+		});
+
+		return [...new Set(categories)].join(', ') || 'none';
+	} catch (error) {
+		return readErrorCode(error) === 'ENOENT' ? 'none' : 'unavailable';
+	}
+}
+
+async function removeTemporaryDirectoryWithRetry(root) {
+	const attempts = process.platform === 'win32' ? 12 : 3;
+	let lastError;
+
+	for (let attempt = 1; attempt <= attempts; attempt += 1) {
+		try {
+			await rm(root, {
+				recursive: true,
+				force: true,
+				maxRetries: process.platform === 'win32' ? 2 : 0,
+				retryDelay: 100
+			});
+
+			if (!existsSync(root)) {
+				return;
+			}
+
+			lastError = new Error('The temporary directory still exists.');
+		} catch (error) {
+			lastError = error;
+		}
+
+		const errorCode = readErrorCode(lastError) ?? 'unknown';
+		const retainedEntries = await remainingTemporaryEntryCategories(root);
+		console.error(
+			`[cleanup] temporary-directory retry ${attempt}/${attempts} (code ${errorCode}; retained: ${retainedEntries})`
+		);
+
+		if (attempt < attempts) {
+			await delay(250);
+		}
+	}
+
+	const errorCode = readErrorCode(lastError) ?? 'unknown';
+	const retainedEntries = await remainingTemporaryEntryCategories(root);
+	throw new Error(
+		`The integration temporary directory could not be removed after ${attempts} attempts (code ${errorCode}; retained: ${retainedEntries}).`
+	);
+}
+
 function isProcessAlive(pid) {
 	if (!pid) {
 		return false;
@@ -439,37 +601,39 @@ function isProcessAlive(pid) {
 }
 
 async function stopChildProcess() {
-	if (
-		!child?.pid ||
-		child.exitCode !== null ||
-		child.signalCode !== null
-	) {
+	if (!child?.pid) {
 		return;
 	}
 
-	if (process.platform === 'win32') {
-		spawnSync('taskkill.exe', ['/PID', String(child.pid), '/T', '/F'], {
-			stdio: 'ignore',
-			timeout: SHUTDOWN_TIMEOUT_MS,
-			windowsHide: true
-		});
-	} else {
-		try {
-			process.kill(-child.pid, 'SIGTERM');
-		} catch {
-			child.kill('SIGTERM');
-		}
-	}
-
-	await waitForChildExit(SHUTDOWN_TIMEOUT_MS);
+	let terminationError;
 
 	if (child.exitCode === null && child.signalCode === null) {
 		if (process.platform === 'win32') {
-			spawnSync('taskkill.exe', ['/PID', String(child.pid), '/T', '/F'], {
-				stdio: 'ignore',
-				timeout: SHUTDOWN_TIMEOUT_MS,
-				windowsHide: true
-			});
+			try {
+				terminateWindowsChildTree(child.pid);
+			} catch (error) {
+				terminationError = error;
+				child.kill();
+			}
+		} else {
+			try {
+				process.kill(-child.pid, 'SIGTERM');
+			} catch {
+				child.kill('SIGTERM');
+			}
+		}
+	}
+
+	let closed = await waitForChildClose(SHUTDOWN_TIMEOUT_MS);
+
+	if (!closed && isProcessAlive(child.pid)) {
+		if (process.platform === 'win32') {
+			try {
+				terminateWindowsChildTree(child.pid);
+			} catch (error) {
+				terminationError ??= error;
+				child.kill();
+			}
 		} else {
 			try {
 				process.kill(-child.pid, 'SIGKILL');
@@ -478,21 +642,17 @@ async function stopChildProcess() {
 			}
 		}
 
-		await waitForChildExit(SHUTDOWN_TIMEOUT_MS);
+		closed = await waitForChildClose(SHUTDOWN_TIMEOUT_MS);
 	}
 
 	assert(
-		child.exitCode !== null ||
-			child.signalCode !== null ||
-			!isProcessAlive(child.pid),
+		closed && !isProcessAlive(child.pid),
 		`The integration Vite process ${child.pid} did not stop.`
 	);
-}
 
-function recordHeaders(response) {
-	return [...response.headers.entries()]
-		.map(([name, value]) => `${name}: ${value}`)
-		.join('\n');
+	if (terminationError) {
+		throw terminationError;
+	}
 }
 
 function assertBytes(actual, expected, context) {
@@ -502,24 +662,138 @@ function assertBytes(actual, expected, context) {
 	);
 }
 
-function assertNoSecrets(text, secrets, context) {
-	for (const secretValue of secrets) {
-		const secret = String(secretValue ?? '');
+function responseBodyParts(path, response, bodyBytes, bodyKind) {
+	if (bodyKind === 'media body') {
+		return [{ location: 'media body', content: bodyBytes }];
+	}
 
-		if (!secret) {
-			continue;
+	if (path.endsWith('/__data.json')) {
+		return [{ location: 'serialized page data', content: bodyBytes }];
+	}
+
+	const contentType = response.headers.get('content-type') ?? '';
+
+	if (contentType.toLowerCase().includes('text/html')) {
+		const text = bodyBytes.toString('utf8');
+		const scriptPattern = /<script\b[^>]*>[\s\S]*?<\/script>/gi;
+		const serializedParts = [...text.matchAll(scriptPattern)].map((match) => ({
+			location: 'serialized page data embedded in HTML',
+			content: match[0]
+		}));
+		const markup = text.replace(
+			/<script\b[^>]*>[\s\S]*?<\/script>/gi,
+			''
+		);
+
+		return [
+			...serializedParts,
+			{ location: 'HTML', content: markup }
+		];
+	}
+
+	return [{ location: 'response body', content: bodyBytes }];
+}
+
+function createResponseArtifact({
+	requestNumber,
+	checkReference,
+	method,
+	path,
+	response,
+	bodyKind
+}) {
+	const parts = [];
+
+	for (const [name, value] of response.headers.entries()) {
+		parts.push({
+			location:
+				name.toLowerCase() === 'location'
+					? 'redirect Location'
+					: `response header (${name.toLowerCase()})`,
+			content: value
+		});
+	}
+
+	parts.push(
+		...responseBodyParts(
+			path,
+			response,
+			response.bodyBytes,
+			bodyKind
+		)
+	);
+
+	return {
+		requestNumber,
+		checkReference,
+		method,
+		path,
+		status: response.status,
+		parts
+	};
+}
+
+function forbiddenVariants(value) {
+	const candidates = [
+		['raw', value],
+		['slash-normalized', value.replaceAll('\\', '/')],
+		['percent-encoded', encodeURIComponent(value)],
+		['URI-encoded', encodeURI(value)]
+	];
+	const seen = new Set();
+
+	return candidates.filter(([, variant]) => {
+		if (!variant || seen.has(variant)) {
+			return false;
 		}
 
-		for (const variant of new Set([
-			secret,
-			secret.replaceAll('\\', '/'),
-			encodeURIComponent(secret),
-			encodeURI(secret)
-		])) {
-			assert(
-				!text.includes(variant),
-				`${context} exposed an internal identifier or filesystem path.`
-			);
+		seen.add(variant);
+		return true;
+	});
+}
+
+function contentIncludes(content, value) {
+	return Buffer.isBuffer(content)
+		? content.includes(Buffer.from(value, 'utf8'))
+		: content.includes(value);
+}
+
+function safeFingerprint(value) {
+	return createHash('sha256').update(value, 'utf8').digest('hex').slice(0, 12);
+}
+
+function assertNoForbiddenValues(artifacts, forbiddenValues) {
+	for (const artifact of artifacts) {
+		for (const forbidden of forbiddenValues) {
+			const value = String(forbidden.value ?? '');
+
+			for (const [encoding, variant] of forbiddenVariants(value)) {
+				const part = artifact.parts.find((candidate) =>
+					contentIncludes(candidate.content, variant)
+				);
+
+				if (!part) {
+					continue;
+				}
+
+				console.error(
+					`[privacy] request #${artifact.requestNumber} (check ${artifact.checkReference})`
+				);
+				console.error(
+					`[privacy] ${artifact.method} ${artifact.path} -> ${artifact.status}`
+				);
+				console.error(`[privacy] match location: ${part.location}`);
+				console.error(
+					`[privacy] forbidden category: ${forbidden.category} (${forbidden.subject})`
+				);
+				console.error(
+					`[privacy] matched value: <redacted length=${value.length} sha256:${safeFingerprint(value)}> encoding=${encoding}`
+				);
+
+				throw new Error(
+					'Phase 6 response privacy check failed; see the redacted diagnostic above.'
+				);
+			}
 		}
 	}
 }
@@ -749,15 +1023,15 @@ async function seedTemporaryData(temporaryDatabase, temporaryAudioRoot) {
 		bytes,
 		marker,
 		partyBefore,
-		internalSecrets: [
-			...Object.values(users).flatMap((user) => [
-				user.id,
-				user.email,
-				user.token
+		forbiddenValues: [
+			...Object.entries(users).flatMap(([subject, user]) => [
+				{ category: 'owner ID', subject, value: user.id },
+				{ category: 'owner email', subject, value: user.email },
+				{ category: 'session token', subject, value: user.token }
 			]),
-			...Object.values(tracks).flatMap((track) => [
-				track.internalId,
-				track.storedFilename
+			...Object.entries(tracks).flatMap(([subject, track]) => [
+				{ category: 'internal track UUID', subject, value: track.internalId },
+				{ category: 'storage filename/storage key', subject, value: track.storedFilename }
 			])
 		]
 	};
@@ -770,17 +1044,27 @@ async function runHttpChecks(
 	temporaryAudioRoot
 ) {
 	const responseArtifacts = [];
+	let requestNumber = 0;
 	const ownerCookie = `${cookieName}=${seed.users.owner.token}`;
 	const otherCookie = `${cookieName}=${seed.users.other.token}`;
 
-	async function responseText(path, options) {
+	async function responseText(checkReference, path, options = {}) {
 		const response = await request(baseUrl, path, options);
 		const text = await response.text();
-		responseArtifacts.push(path, recordHeaders(response), text);
+		requestNumber += 1;
+		responseArtifacts.push(
+			createResponseArtifact({
+				requestNumber,
+				checkReference,
+				method: options.method ?? 'GET',
+				path,
+				response
+			})
+		);
 		return { response, text };
 	}
 
-	const signedOut = await responseText('/my-tracks');
+	const signedOut = await responseText('1', '/my-tracks');
 	assert(
 		signedOut.response.status === 303 &&
 			(signedOut.response.headers.get('location') ?? '').startsWith(
@@ -790,7 +1074,7 @@ async function runHttpChecks(
 	);
 	console.log('[check 1/31] signed-out /my-tracks redirects to login');
 
-	const myTracks = await responseText('/my-tracks', {
+	const myTracks = await responseText('2-5', '/my-tracks', {
 		headers: { Cookie: ownerCookie }
 	});
 	assert(myTracks.response.status === 200, 'Owner could not open /my-tracks.');
@@ -824,6 +1108,7 @@ async function runHttpChecks(
 	console.log('[check 5/31] private owned track appears without a public detail link');
 
 	const ownerEdit = await responseText(
+		'6',
 		`/my-tracks/${seed.tracks.ownerPublic.publicId}/edit`,
 		{ headers: { Cookie: ownerCookie } }
 	);
@@ -835,6 +1120,7 @@ async function runHttpChecks(
 	console.log('[check 6/31] owner can open their edit page');
 
 	const nonOwnerEdit = await responseText(
+		'7',
 		`/my-tracks/${seed.tracks.ownerPublic.publicId}/edit`,
 		{ headers: { Cookie: otherCookie } }
 	);
@@ -847,6 +1133,7 @@ async function runHttpChecks(
 	const beforeUpdate = await trackRow(seed.tracks.ownerPublic.publicId);
 	const updatedTitle = `Updated ${seed.marker}`;
 	const validUpdate = await responseText(
+		'8',
 		`/my-tracks/${seed.tracks.ownerPublic.publicId}/edit`,
 		{
 			method: 'POST',
@@ -920,6 +1207,7 @@ async function runHttpChecks(
 	console.log('[check 14/31] physical audio bytes are unchanged after editing');
 
 	const invalidUpdate = await responseText(
+		'15',
 		`/my-tracks/${seed.tracks.ownerPublic.publicId}/edit`,
 		{
 			method: 'POST',
@@ -957,6 +1245,7 @@ async function runHttpChecks(
 	console.log('[check 16/31] forged owner and immutable fields have no effect');
 
 	const deleteConfirmation = await responseText(
+		'17',
 		`/my-tracks/${seed.tracks.ownerDelete.publicId}/delete`,
 		{ headers: { Cookie: ownerCookie } }
 	);
@@ -969,6 +1258,7 @@ async function runHttpChecks(
 	console.log('[check 17/31] owner can open deletion confirmation');
 
 	const nonOwnerDeleteConfirmation = await responseText(
+		'18',
 		`/my-tracks/${seed.tracks.ownerDelete.publicId}/delete`,
 		{ headers: { Cookie: otherCookie } }
 	);
@@ -988,6 +1278,7 @@ async function runHttpChecks(
 	console.log('[check 19/31] GET confirmation does not delete');
 
 	const nonOwnerDeletePost = await responseText(
+		'20',
 		`/my-tracks/${seed.tracks.ownerDelete.publicId}/delete`,
 		{
 			method: 'POST',
@@ -1003,6 +1294,7 @@ async function runHttpChecks(
 	console.log('[check 20/31] non-owner POST cannot delete');
 
 	const ownerDeletePost = await responseText(
+		'21',
 		`/my-tracks/${seed.tracks.ownerDelete.publicId}/delete`,
 		{
 			method: 'POST',
@@ -1043,6 +1335,7 @@ async function runHttpChecks(
 	console.log("[check 24/31] another user's file remains unchanged");
 
 	const missingDeletePost = await responseText(
+		'25',
 		`/my-tracks/${seed.tracks.ownerMissing.publicId}/delete`,
 		{
 			method: 'POST',
@@ -1058,10 +1351,10 @@ async function runHttpChecks(
 	console.log('[check 25/31] missing-file deletion safely removes the owned row');
 
 	const updateTimestamp = (await trackRow(seed.tracks.ownerPublic.publicId))?.updated_at;
-	const updateRedirectFirst = await responseText('/my-tracks?updated=1', {
+	const updateRedirectFirst = await responseText('26', '/my-tracks?updated=1', {
 		headers: { Cookie: ownerCookie }
 	});
-	const updateRedirectSecond = await responseText('/my-tracks?updated=1', {
+	const updateRedirectSecond = await responseText('26', '/my-tracks?updated=1', {
 		headers: { Cookie: ownerCookie }
 	});
 	assert(
@@ -1074,10 +1367,10 @@ async function runHttpChecks(
 	);
 	console.log('[check 26/31] successful edit redirect is idempotent');
 
-	const deleteRedirectFirst = await responseText('/my-tracks?deleted=1', {
+	const deleteRedirectFirst = await responseText('27', '/my-tracks?deleted=1', {
 		headers: { Cookie: ownerCookie }
 	});
-	const deleteRedirectSecond = await responseText('/my-tracks?deleted=1', {
+	const deleteRedirectSecond = await responseText('27', '/my-tracks?deleted=1', {
 		headers: { Cookie: ownerCookie }
 	});
 	assert(
@@ -1090,6 +1383,7 @@ async function runHttpChecks(
 	console.log('[check 27/31] successful delete redirect is idempotent');
 
 	const search = await responseText(
+		'28',
 		`/tracks?q=${encodeURIComponent(seed.marker)}`
 	);
 	assert(
@@ -1105,7 +1399,17 @@ async function runHttpChecks(
 		`/api/tracks/${seed.tracks.ownerPublic.publicId}/stream`
 	);
 	const streamBytes = new Uint8Array(await stream.arrayBuffer());
-	responseArtifacts.push(recordHeaders(stream));
+	requestNumber += 1;
+	responseArtifacts.push(
+		createResponseArtifact({
+			requestNumber,
+			checkReference: '29',
+			method: 'GET',
+			path: `/api/tracks/${seed.tracks.ownerPublic.publicId}/stream`,
+			response: stream,
+			bodyKind: 'media body'
+		})
+	);
 	assert(stream.status === 200, 'Public stream regression did not return 200.');
 	assertBytes(streamBytes, seed.bytes.public, 'Public stream');
 	console.log('[check 29/31] stream still returns correct bytes');
@@ -1115,15 +1419,26 @@ async function runHttpChecks(
 		`/api/tracks/${seed.tracks.ownerPublic.publicId}/download`
 	);
 	const downloadBytes = new Uint8Array(await download.arrayBuffer());
-	responseArtifacts.push(recordHeaders(download));
+	requestNumber += 1;
+	responseArtifacts.push(
+		createResponseArtifact({
+			requestNumber,
+			checkReference: '30',
+			method: 'GET',
+			path: `/api/tracks/${seed.tracks.ownerPublic.publicId}/download`,
+			response: download,
+			bodyKind: 'media body'
+		})
+	);
 	assert(download.status === 200, 'Public download regression did not return 200.');
 	assertBytes(downloadBytes, seed.bytes.public, 'Public download');
 	console.log('[check 30/31] download still returns correct bytes');
 
-	const myTracksData = await responseText('/my-tracks/__data.json', {
+	const myTracksData = await responseText('31', '/my-tracks/__data.json', {
 		headers: { Cookie: ownerCookie }
 	});
 	const editData = await responseText(
+		'31',
 		`/my-tracks/${seed.tracks.ownerPublic.publicId}/edit/__data.json`,
 		{ headers: { Cookie: ownerCookie } }
 	);
@@ -1132,16 +1447,39 @@ async function runHttpChecks(
 			editData.response.status === 200,
 		'Owner-management page data was unavailable.'
 	);
-	assertNoSecrets(
-		responseArtifacts.join('\n'),
+	assertNoForbiddenValues(
+		responseArtifacts,
 		[
-			...seed.internalSecrets,
-			temporaryRoot,
-			temporaryAudioRoot,
-			resolveConfiguredPath(process.env.DATABASE_URL, 'data/app.db'),
-			resolveConfiguredPath(process.env.AUDIO_STORAGE_PATH, 'storage/audio')
-		],
-		'Phase 6 HTML, page data, redirect, or media response'
+			...seed.forbiddenValues,
+			{
+				category: 'temporary directory path',
+				subject: 'integration root',
+				value: temporaryRoot
+			},
+			{
+				category: 'temporary database path',
+				subject: 'integration database',
+				value: join(temporaryRoot, 'app.db')
+			},
+			{
+				category: 'temporary audio-storage path',
+				subject: 'integration audio root',
+				value: temporaryAudioRoot
+			},
+			{
+				category: 'real database path',
+				subject: 'development database',
+				value: resolveConfiguredPath(process.env.DATABASE_URL, 'data/app.db')
+			},
+			{
+				category: 'real audio-storage path',
+				subject: 'development audio root',
+				value: resolveConfiguredPath(
+					process.env.AUDIO_STORAGE_PATH,
+					'storage/audio'
+				)
+			}
+		]
 	);
 	console.log('[check 31/31] responses expose no internal IDs, stored filenames, or paths');
 }
@@ -1208,8 +1546,8 @@ async function runIntegration() {
 			windowsHide: true
 		}
 	);
-	childExitPromise = new Promise((resolveExit) => {
-		child.once('exit', (code, signal) => resolveExit({ code, signal }));
+	childClosePromise = new Promise((resolveClose) => {
+		child.once('close', (code, signal) => resolveClose({ code, signal }));
 	});
 	child.stdout.on('data', (chunk) => {
 		const text = chunk.toString();
@@ -1260,13 +1598,24 @@ async function cleanup(realState) {
 
 	function recordCleanupError(step, error) {
 		cleanupErrors.push(error);
+		const errorCode = readErrorCode(error);
 		console.error(
-			`[cleanup] ${step} failed (${error instanceof Error ? error.name : 'UnknownError'}).`
+			`[cleanup] ${step} failed (${error instanceof Error ? error.name : 'UnknownError'}${
+				errorCode === undefined ? '' : `; code ${errorCode}`
+			}).`
 		);
 	}
 
 	try {
+		cancelActiveHttpOperations();
+		httpAgent.destroy();
+	} catch (error) {
+		recordCleanupError('HTTP response/request cancellation', error);
+	}
+
+	try {
 		temporaryClient?.close();
+		temporaryClient = undefined;
 	} catch (error) {
 		recordCleanupError('temporary database connection close', error);
 	}
@@ -1290,23 +1639,17 @@ async function cleanup(realState) {
 		child?.unref();
 	}
 
-	try {
-		httpAgent.destroy();
-	} catch (error) {
-		recordCleanupError('HTTP client connection close', error);
-	}
-
+	let portReleased = true;
 	if (testPort) {
 		try {
-			assert(
-				!(await canConnect(testPort)),
-				`The integration port ${testPort} is still accepting connections.`
-			);
+			await waitForPortRelease(testPort);
 		} catch (error) {
+			portReleased = false;
 			recordCleanupError(`port ${testPort} postcondition`, error);
 		}
 	}
 
+	let childStopped = true;
 	if (child?.pid) {
 		try {
 			assert(
@@ -1314,6 +1657,7 @@ async function cleanup(realState) {
 				`The integration Vite process ${child.pid} is still alive.`
 			);
 		} catch (error) {
+			childStopped = false;
 			recordCleanupError(`process ${child.pid} postcondition`, error);
 		}
 	}
@@ -1334,23 +1678,30 @@ async function cleanup(realState) {
 	}
 
 	if (temporaryRoot && existsSync(temporaryRoot)) {
-		try {
-			assert(
-				isSafeTemporaryRoot(temporaryRoot),
-				'Refusing to remove an unvalidated temporary directory.'
+		if (!childStopped || !portReleased) {
+			recordCleanupError(
+				'temporary-directory removal safety gate',
+				Object.assign(
+					new Error(
+						'Temporary removal was skipped because the owned process or port was still active.'
+					),
+					{ code: 'ACTIVE_TEST_SERVER' }
+				)
 			);
-			rmSync(temporaryRoot, {
-				recursive: true,
-				force: true,
-				maxRetries: 20,
-				retryDelay: 250
-			});
-			assert(
-				!existsSync(temporaryRoot),
-				'The integration temporary directory was not removed.'
-			);
-		} catch (error) {
-			recordCleanupError('temporary-directory postcondition', error);
+		} else {
+			try {
+				assert(
+					isSafeTemporaryRoot(temporaryRoot),
+					'Refusing to remove an unvalidated temporary directory.'
+				);
+				await removeTemporaryDirectoryWithRetry(temporaryRoot);
+				assert(
+					!existsSync(temporaryRoot),
+					'The integration temporary directory was not removed.'
+				);
+			} catch (error) {
+				recordCleanupError('temporary-directory postcondition', error);
+			}
 		}
 	}
 

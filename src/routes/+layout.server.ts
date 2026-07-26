@@ -1,7 +1,8 @@
 import type { LayoutServerLoad } from './$types';
+import { toNavigationUser } from '$lib/navigation-user';
 
 export const load = (({ locals }) => {
 	return {
-		user: locals.user
+		user: toNavigationUser(locals.user)
 	};
 }) satisfies LayoutServerLoad;

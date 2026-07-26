@@ -14,6 +14,10 @@ export interface CurrentUser {
 	createdAt: Date;
 }
 
+export interface NavigationUser {
+	username: string;
+}
+
 export interface PublicTrack {
 	id: number;
 	title: string;

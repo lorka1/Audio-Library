@@ -150,8 +150,11 @@ const seedTracks: SeedTrack[] = [
 	}
 ];
 
-async function seedRepositoryDatabase(): Promise<void> {
-	await testClient.execute(`
+async function seedRepositoryDatabase(
+	client: Client = testClient,
+	tracksToSeed: SeedTrack[] = seedTracks
+): Promise<void> {
+	await client.execute(`
 		create table users (
 			id text primary key not null,
 			email text not null,
@@ -161,7 +164,7 @@ async function seedRepositoryDatabase(): Promise<void> {
 			updated_at integer not null
 		)
 	`);
-	await testClient.execute(`
+	await client.execute(`
 		create table tracks (
 			public_id integer primary key autoincrement not null,
 			id text not null unique,
@@ -182,13 +185,13 @@ async function seedRepositoryDatabase(): Promise<void> {
 			updated_at integer not null
 		)
 	`);
-	await testClient.execute({
+	await client.execute({
 		sql: 'insert into users (id, email, username, password_hash, created_at, updated_at) values (?, ?, ?, ?, ?, ?)',
 		args: [OWNER_ID, 'owner@example.test', 'repository_owner', 'not-a-real-hash', 1_000, 1_000]
 	});
 
-	for (const [index, track] of seedTracks.entries()) {
-		await testClient.execute({
+	for (const [index, track] of tracksToSeed.entries()) {
+		await client.execute({
 			sql: `insert into tracks (
 				id, owner_id, title, artist, bpm, musical_key, genre, description,
 				original_filename, storage_key, mime_type, file_size_bytes,
@@ -258,6 +261,47 @@ describe('createTrack', () => {
 });
 
 describe('listPublicTracks search and filters', () => {
+	it('returns exactly the one public track whose searchable fields contain asd', async () => {
+		const regressionClient = createClient({ url: ':memory:' });
+
+		try {
+			const regressionDatabase = openTestDatabase(regressionClient);
+			await seedRepositoryDatabase(regressionClient, [
+				{
+					id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1',
+					title: 'asd',
+					artist: 'Target Artist',
+					bpm: null,
+					musicalKey: null,
+					genre: null,
+					description: null,
+					visibility: 'public',
+					createdAt: 1_000
+				},
+				{
+					id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2',
+					title: 'Party about you',
+					artist: 'lori',
+					bpm: null,
+					musicalKey: null,
+					genre: null,
+					description: 'A description without the search term.',
+					visibility: 'public',
+					createdAt: 2_000
+				}
+			]);
+
+			const records = await listPublicTracks(
+				filters({ q: 'asd' }),
+				regressionDatabase
+			);
+
+			expect(titles(records)).toEqual(['asd']);
+		} finally {
+			regressionClient.close();
+		}
+	});
+
 	it.each([
 		['title', filters({ q: 'pulse' }), ['alpha pulse']],
 		['artist', filters({ q: 'beta crew' }), ['alpha pulse']],
