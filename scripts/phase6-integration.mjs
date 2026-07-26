@@ -758,6 +758,43 @@ async function trackRow(publicId) {
 	return result.rows[0] ?? null;
 }
 
+function normalizeDatabaseRows(rows) {
+	return rows.map((row) =>
+		Object.fromEntries(
+			Object.entries(row).map(([key, value]) => [
+				key,
+				typeof value === 'bigint' ? value.toString() : value
+			])
+		)
+	);
+}
+
+async function captureDatabaseState(exclusions = {}) {
+	const excludedUserIds = new Set(
+		(exclusions.userIds ?? []).map((value) => String(value))
+	);
+	const excludedTrackIds = new Set(
+		(exclusions.trackIds ?? []).map((value) => String(value))
+	);
+	const [users, sessions, tracks] = await Promise.all([
+		temporaryClient.execute('select * from users order by id'),
+		temporaryClient.execute('select * from sessions order by id'),
+		temporaryClient.execute('select * from tracks order by id')
+	]);
+
+	return {
+		users: normalizeDatabaseRows(users.rows).filter(
+			(row) => !excludedUserIds.has(String(row.id))
+		),
+		sessions: normalizeDatabaseRows(sessions.rows).filter(
+			(row) => !excludedUserIds.has(String(row.user_id))
+		),
+		tracks: normalizeDatabaseRows(tracks.rows).filter(
+			(row) => !excludedTrackIds.has(String(row.id))
+		)
+	};
+}
+
 async function seedTemporaryData(temporaryDatabase, temporaryAudioRoot) {
 	temporaryClient = createClient({
 		url: pathToFileURL(temporaryDatabase).href
@@ -769,15 +806,7 @@ async function seedTemporaryData(temporaryDatabase, temporaryAudioRoot) {
 		'The temporary database copy failed SQLite quick_check.'
 	);
 
-	const partyResult = await temporaryClient.execute(
-		"select * from tracks where title = 'Party about you' order by public_id"
-	);
-	const partyBefore = partyResult.rows;
-	assert(
-		partyBefore.length > 0 &&
-			partyBefore.every((track) => track.visibility === 'public'),
-		'The copied database does not contain the required public "Party about you" track.'
-	);
+	const databaseStateBefore = await captureDatabaseState();
 
 	const suffix = `${Date.now()}_${randomBytes(4).toString('hex')}`;
 	const nowSeconds = Math.floor(Date.now() / 1000);
@@ -961,7 +990,7 @@ async function seedTemporaryData(temporaryDatabase, temporaryAudioRoot) {
 		tracks,
 		bytes,
 		marker,
-		partyBefore,
+		databaseStateBefore,
 		forbiddenValues: [
 			...Object.entries(users).flatMap(([subject, user]) => [
 				{ category: 'owner ID', subject, value: user.id },
@@ -1515,12 +1544,13 @@ async function runIntegration() {
 		temporaryAudioRoot
 	);
 
-	const partyAfter = await temporaryClient.execute(
-		"select * from tracks where title = 'Party about you' order by public_id"
-	);
+	const databaseStateAfter = await captureDatabaseState({
+		userIds: Object.values(seed.users).map((user) => user.id),
+		trackIds: Object.values(seed.tracks).map((track) => track.internalId)
+	});
 	assert(
-		snapshotsEqual(seed.partyBefore, partyAfter.rows),
-		'The "Party about you" record changed in the temporary database copy.'
+		snapshotsEqual(seed.databaseStateBefore, databaseStateAfter),
+		'A pre-existing row changed in the temporary database copy.'
 	);
 
 	const realStateDuring = await realStateSnapshot(realDatabase, realAudioRoot);
@@ -1528,9 +1558,7 @@ async function runIntegration() {
 		snapshotsEqual(realStateBefore, realStateDuring),
 		'The real database or audio storage changed during isolated integration tests.'
 	);
-	console.log(
-		'[isolation] "Party about you" remains public, identically owned, and byte-unchanged'
-	);
+	console.log('[isolation] pre-existing database rows remained unchanged');
 	console.log('[isolation] real database and storage/audio remained unchanged');
 }
 

@@ -27,7 +27,7 @@ used for any real service.
 - [ ] Complete every workflow by keyboard; verify the skip link, visible focus, labels, error announcements, success announcements, and text status cues.
 - [ ] Open invalid, missing, private, and unauthorized URLs and simulate an unexpected error in a disposable environment; confirm clean pages with no internal details.
 - [ ] From a clean checkout, run install, environment copy, fresh migration, check, test, build, bounded production probes, and cleanup.
-- [ ] Inspect Git tracking and rendered page data: no `.env`, database, audio, quarantine file, dependency/build output, internal UUID, owner ID, unrelated email, storage key, or path may be exposed.
+- [ ] Inspect Git tracking and rendered page data: no `.env`, database, audio, quarantine file, dependency/build output, internal UUID, owner ID, unrelated email, storage key, or path may be exposed. Email may be returned only on the authenticated user's own account page.
 
 ## Registration
 
@@ -189,7 +189,7 @@ used for any real service.
 
 ### TRK-002 — Existing public track
 
-- [ ] Find `Party about you` on `/tracks`.
+- [ ] Find any existing public track on `/tracks`.
 - [ ] Expected: Its title, artist, public metadata, owner username, and upload date are visible.
 
 ### TRK-003 — Public track detail

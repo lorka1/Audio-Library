@@ -12,34 +12,25 @@ function normalizeRows(rows) {
 	);
 }
 
-function capturePartyState(database) {
-	return normalizeRows(
-		database
-			.prepare(
-				`select
-					public_id,
-					id,
-					owner_id,
-					title,
-					artist,
-					bpm,
-					musical_key,
-					genre,
-					description,
-					original_filename,
-					storage_key,
-					mime_type,
-					file_size_bytes,
-					duration_ms,
-					visibility,
-					created_at,
-					updated_at
-				from tracks
-				where title = ?
-				order by public_id`
-			)
-			.all('Party about you')
+function captureDatabaseState(database, exclusions = {}) {
+	const excludedUserIds = new Set(
+		(exclusions.userIds ?? []).map((value) => String(value))
 	);
+	const excludedTrackIds = new Set(
+		(exclusions.trackIds ?? []).map((value) => String(value))
+	);
+
+	return {
+		users: normalizeRows(
+			database.prepare('select * from users order by id').all()
+		).filter((row) => !excludedUserIds.has(String(row.id))),
+		sessions: normalizeRows(
+			database.prepare('select * from sessions order by id').all()
+		).filter((row) => !excludedUserIds.has(String(row.user_id))),
+		tracks: normalizeRows(
+			database.prepare('select * from tracks order by id').all()
+		).filter((row) => !excludedTrackIds.has(String(row.id)))
+	};
 }
 
 function seedDatabase(database, request) {
@@ -49,14 +40,7 @@ function seedDatabase(database, request) {
 		throw new Error('Temporary database quick_check failed.');
 	}
 
-	const partyBefore = capturePartyState(database);
-
-	if (
-		partyBefore.length === 0 ||
-		partyBefore.some((track) => track.visibility !== 'public')
-	) {
-		throw new Error('The required public track is unavailable.');
-	}
+	const databaseStateBefore = captureDatabaseState(database);
 
 	const insertUser = database.prepare(
 		'insert into users (id, email, username, password_hash, created_at, updated_at) values (?, ?, ?, ?, ?, ?)'
@@ -141,7 +125,7 @@ function seedDatabase(database, request) {
 		.flatMap((row) => [row.id, row.email]);
 
 	return {
-		partyBefore,
+		databaseStateBefore,
 		publicIds,
 		internalSecrets: [...trackSecrets, ...userSecrets]
 	};
@@ -160,8 +144,13 @@ try {
 	const response =
 		request.action === 'seed'
 			? seedDatabase(database, request)
-			: request.action === 'capture-party'
-				? { party: capturePartyState(database) }
+			: request.action === 'capture-database-state'
+				? {
+						databaseState: captureDatabaseState(
+							database,
+							request.exclusions
+						)
+					}
 				: (() => {
 						throw new Error('Unsupported database helper action.');
 					})();

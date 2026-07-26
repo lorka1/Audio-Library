@@ -134,6 +134,7 @@ separate projection containing the authenticated user's own username, email,
 and join date, without the internal user UUID. Public and owner-management
 page data never includes internal track UUIDs, owner IDs or emails, storage
 keys, session data, or physical paths.
+Email may be returned only on the authenticated user's own account page.
 
 ## Upload and private storage
 
@@ -312,17 +313,22 @@ The three HTTP controllers start exactly one owned Vite process on an isolated
 port, use copied database and separate audio storage, enforce bounded startup
 and overall timeouts, fully read media responses, and verify process, port,
 temporary-directory, and real-runtime postconditions during cleanup. The
-search and owner-management controllers are maintainer regression suites and
-expect the established baseline public fixture in the configured development
-database; they test only a temporary copy.
+search and owner-management controllers are maintainer regression suites that
+seed only synthetic fixtures into a temporary database copy. They compare
+normalized snapshots of every pre-existing user, session, and track row, plus
+hash-based snapshots of the real database and audio storage, without depending
+on any real title, artist, username, or other row value.
 
-The clean-clone verification uses a temporary Git index and copies only the
-current release-candidate source manifest. It excludes ignored `.env`,
-database, audio, dependency, build, and instruction files; runs `npm ci`;
-copies `.env.example` to `.env`; applies migrations to a new empty SQLite
-database; runs checks, tests, and the production build; probes `/` and
-`/tracks` through the built Node server; and removes its process, port
-listener, and temporary directory.
+The clean-clone verification uses Git only for read-only enumeration. It copies
+the working-tree versions of tracked files that still exist and untracked,
+non-ignored release files into a temporary candidate without copying a `.git`
+directory. It never runs `git add` and does not modify the source repository
+index or object database. The verifier excludes ignored `.env`, database,
+audio, dependency, build, and instruction files; runs `npm ci`; copies
+`.env.example` to `.env`; applies migrations to a new empty SQLite database;
+runs checks, tests, and the production build; probes `/` and `/tracks` through
+the built Node server; and removes its process, port listener, and temporary
+directory.
 
 Run the complete browser checklist in [MANUAL_TESTS.md](MANUAL_TESTS.md).
 

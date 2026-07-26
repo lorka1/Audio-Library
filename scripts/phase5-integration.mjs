@@ -1051,10 +1051,11 @@ async function seedTemporaryData(temporaryDatabase, temporaryAudioRoot) {
 		tracks: Object.values(tracksByKey)
 	});
 	assert(
-		Array.isArray(databaseState.partyBefore) &&
-			databaseState.partyBefore.length > 0 &&
-			databaseState.partyBefore.every((track) => track.visibility === 'public'),
-		'The copied database does not contain the required public "Party about you" track.'
+		databaseState.databaseStateBefore &&
+			Array.isArray(databaseState.databaseStateBefore.users) &&
+			Array.isArray(databaseState.databaseStateBefore.sessions) &&
+			Array.isArray(databaseState.databaseStateBefore.tracks),
+		'The copied database baseline could not be captured.'
 	);
 
 	await writeFile(
@@ -1086,7 +1087,7 @@ async function seedTemporaryData(temporaryDatabase, temporaryAudioRoot) {
 		userId,
 		email,
 		publicBytes,
-		partyBefore: databaseState.partyBefore,
+		databaseStateBefore: databaseState.databaseStateBefore,
 		internalSecrets: databaseState.internalSecrets,
 		tracks: tracksByKey
 	};
@@ -1609,16 +1610,23 @@ async function runIntegration() {
 	throwIfAborted();
 
 	const verificationState = await runDatabaseHelper({
-		action: 'capture-party',
-		databasePath: temporaryDatabase
+		action: 'capture-database-state',
+		databasePath: temporaryDatabase,
+		exclusions: {
+			userIds: [seed.userId],
+			trackIds: Object.values(seed.tracks).map((track) => track.internalId)
+		}
 	});
 	throwIfAborted();
 
 	assert(
-		snapshotsEqual(seed.partyBefore, verificationState.party),
-		'The "Party about you" record changed in the temporary database copy.'
+		snapshotsEqual(
+			seed.databaseStateBefore,
+			verificationState.databaseState
+		),
+		'A pre-existing row changed in the temporary database copy.'
 	);
-	console.log('[isolation] "Party about you" remains present, public, and unchanged');
+	console.log('[isolation] pre-existing database rows remained unchanged');
 
 	const realStateDuring = await realStateSnapshot(realDatabase, realAudioRoot);
 	throwIfAborted();

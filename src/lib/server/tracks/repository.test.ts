@@ -280,8 +280,8 @@ describe('listPublicTracks search and filters', () => {
 				},
 				{
 					id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2',
-					title: 'Party about you',
-					artist: 'lori',
+					title: 'Release Fixture Track',
+					artist: 'Fixture Artist',
 					bpm: null,
 					musicalKey: null,
 					genre: null,
