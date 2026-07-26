@@ -226,7 +226,7 @@ function snapshotsEqual(left, right) {
 	return JSON.stringify(left) === JSON.stringify(right);
 }
 
-function gitCommand(indexPath, args, encoding = 'utf8') {
+function gitCommand(args, encoding = 'utf8') {
 	throwIfAborted();
 
 	const result = spawnSync(
@@ -240,10 +240,6 @@ function gitCommand(indexPath, args, encoding = 'utf8') {
 		],
 		{
 			encoding,
-			env: {
-				...process.env,
-				GIT_INDEX_FILE: indexPath
-			},
 			maxBuffer: 16 * 1024 * 1024,
 			shell: false,
 			stdio: ['ignore', 'pipe', 'pipe'],
@@ -274,12 +270,16 @@ function gitCommand(indexPath, args, encoding = 'utf8') {
 	return result.stdout;
 }
 
-function isInstructionPath(repositoryPath) {
+function isLocalOnlyPath(repositoryPath) {
 	const normalized = repositoryPath.replaceAll('\\', '/');
 	const lower = normalized.toLowerCase();
 	const name = lower.split('/').at(-1);
 
-	return name === 'agents.md' || name === 'project_requirements.md';
+	return (
+		name === 'agents.md' ||
+		name === 'project_requirements.md' ||
+		lower === 'tatus'
+	);
 }
 
 function isForbiddenCandidatePath(repositoryPath) {
@@ -292,7 +292,17 @@ function isForbiddenCandidatePath(repositoryPath) {
 		segments.includes('.git') ||
 		segments.includes('node_modules') ||
 		segments.includes('.svelte-kit') ||
-		segments.includes('build')
+		segments.includes('build') ||
+		segments.includes('.release-runtime') ||
+		segments.includes('quarantine') ||
+		segments.includes('.quarantine') ||
+		segments.some(
+			(segment) =>
+				segment.startsWith('audio-library-phase4-integration-') ||
+				segment.startsWith('audio-library-phase5-integration-') ||
+				segment.startsWith('audio-library-phase6-integration-') ||
+				segment.startsWith('audio-library-clean-clone-')
+		)
 	) {
 		return true;
 	}
@@ -330,35 +340,56 @@ function isForbiddenCandidatePath(repositoryPath) {
 	);
 }
 
-async function releaseCandidatePaths(indexPath) {
-	gitCommand(indexPath, ['read-tree', 'HEAD']);
-	gitCommand(indexPath, ['add', '-A', '--', '.']);
-	const output = gitCommand(indexPath, ['ls-files', '-z'], null);
-	const candidates = output
+function parseGitPathList(output) {
+	return output
 		.toString('utf8')
 		.split('\0')
 		.filter(Boolean);
-	const instructionPaths = candidates.filter(isInstructionPath);
+}
+
+async function releaseCandidatePaths() {
+	const trackedPaths = parseGitPathList(
+		gitCommand(['ls-files', '--cached', '-z'], null)
+	).filter((repositoryPath) =>
+		existsSync(containedPath(PROJECT_ROOT, repositoryPath))
+	);
+	const untrackedPaths = parseGitPathList(
+		gitCommand(['ls-files', '--others', '--exclude-standard', '-z'], null)
+	).filter((repositoryPath) =>
+		existsSync(containedPath(PROJECT_ROOT, repositoryPath))
+	);
+	const candidates = [...trackedPaths, ...untrackedPaths];
+	const localOnlyPaths = candidates.filter(isLocalOnlyPath);
 	const forbiddenPaths = candidates.filter(isForbiddenCandidatePath);
-	const included = candidates.filter(
+	const includedTrackedPaths = trackedPaths.filter(
 		(repositoryPath) =>
-			!isInstructionPath(repositoryPath) &&
+			!isLocalOnlyPath(repositoryPath) &&
 			!isForbiddenCandidatePath(repositoryPath)
 	);
+	const includedUntrackedPaths = untrackedPaths.filter(
+		(repositoryPath) =>
+			!isLocalOnlyPath(repositoryPath) &&
+			!isForbiddenCandidatePath(repositoryPath)
+	);
+	const included = [...includedTrackedPaths, ...includedUntrackedPaths];
 
-	assert(included.length > 0, 'The alternate Git index contained no release source.');
+	assert(included.length > 0, 'Git enumeration found no release source.');
 	assert(
 		forbiddenPaths.length === 0,
 		`The release candidate contains ${forbiddenPaths.length} forbidden runtime, dependency, build, environment, or database path(s).`
 	);
 
-	if (instructionPaths.length > 0) {
+	if (localOnlyPaths.length > 0) {
 		console.log(
-			`[candidate] excluded ${instructionPaths.length} local instruction file(s)`
+			`[candidate] excluded ${localOnlyPaths.length} local-only instruction or accidental file(s)`
 		);
 	}
 
-	return included;
+	return {
+		allPaths: included,
+		trackedPaths: includedTrackedPaths,
+		untrackedPaths: includedUntrackedPaths
+	};
 }
 
 function containedPath(root, repositoryPath) {
@@ -369,7 +400,7 @@ function containedPath(root, repositoryPath) {
 		pathFromRoot !== '..' &&
 			!pathFromRoot.startsWith(`..${sep}`) &&
 			!isAbsolute(pathFromRoot),
-		'The alternate Git index contained a path outside the project root.'
+		'Git enumeration contained a path outside the project root.'
 	);
 
 	return resolvedPath;
@@ -395,6 +426,7 @@ async function copyReleaseCandidate(repositoryPaths, destinationRoot) {
 	for (const requiredPath of [
 		'package.json',
 		'package-lock.json',
+		'.env.example',
 		'drizzle.config.ts',
 		'svelte.config.js'
 	]) {
@@ -1084,15 +1116,29 @@ async function runReleaseVerification() {
 		'The generated clean-clone root is outside the validated temporary parent.'
 	);
 	sourceRoot = join(temporaryRoot, 'source');
-	const alternateIndex = join(temporaryRoot, 'candidate.index');
 	await mkdir(sourceRoot, { recursive: true });
 	completeStep(1);
 
 	beginStep(2, 'copying tracked files');
-	const repositoryPaths = await releaseCandidatePaths(alternateIndex);
-	await copyReleaseCandidate(repositoryPaths, sourceRoot);
+	const releaseCandidate = await releaseCandidatePaths();
+	await copyReleaseCandidate(releaseCandidate.allPaths, sourceRoot);
 	console.log(
-		`[candidate] copied ${repositoryPaths.length} release file(s) through an alternate Git index`
+		`[candidate] tracked existing files copied: ${releaseCandidate.trackedPaths.length}`
+	);
+	console.log(
+		`[candidate] untracked non-ignored files copied: ${releaseCandidate.untrackedPaths.length}`
+	);
+	console.log(
+		`[candidate] no .git directory exists: ${!existsSync(join(sourceRoot, '.git'))}`
+	);
+	console.log(
+		`[candidate] package.json exists: ${existsSync(join(sourceRoot, 'package.json'))}`
+	);
+	console.log(
+		`[candidate] package-lock.json exists: ${existsSync(join(sourceRoot, 'package-lock.json'))}`
+	);
+	console.log(
+		`[candidate] .env.example exists: ${existsSync(join(sourceRoot, '.env.example'))}`
 	);
 	completeStep(2);
 

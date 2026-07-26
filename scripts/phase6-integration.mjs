@@ -1,5 +1,5 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
-import { spawn, spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { appendFileSync, existsSync } from 'node:fs';
 import { Agent as HttpAgent, request as httpRequest } from 'node:http';
 import {
@@ -37,6 +37,7 @@ loadEnvironment({ path: join(PROJECT_ROOT, '.env'), quiet: true });
 
 let child;
 let childClosePromise;
+let childClosed = false;
 let temporaryRoot;
 let temporaryClient;
 let testPort;
@@ -46,6 +47,7 @@ let stdoutTail = '';
 let stderrTail = '';
 let startupComplete = false;
 let realStateForCleanup;
+let cleanupPromise;
 
 const overallController = new AbortController();
 const httpAgent = new HttpAgent({ keepAlive: false });
@@ -228,38 +230,6 @@ async function waitForChildClose(milliseconds) {
 		]);
 	} finally {
 		clearTimeout(timeout);
-	}
-}
-
-function terminateWindowsChildTree(pid) {
-	const result = spawnSync(
-		'taskkill.exe',
-		['/PID', String(pid), '/T', '/F'],
-		{
-			stdio: 'ignore',
-			timeout: SHUTDOWN_TIMEOUT_MS,
-			windowsHide: true
-		}
-	);
-
-	if (result.error) {
-		const code =
-			typeof result.error.code === 'string' ? ` code ${result.error.code}` : '';
-		throw Object.assign(
-			new Error(
-				`Windows could not terminate the owned Vite process tree (${result.error.name}${code}).`
-			),
-			{ code: 'TASKKILL_ERROR' }
-		);
-	}
-
-	if (result.status !== 0 && isProcessAlive(pid)) {
-		throw Object.assign(
-			new Error(
-				`Windows taskkill returned status ${result.status ?? 'unknown'} for the owned Vite process tree.`
-			),
-			{ code: `TASKKILL_STATUS_${result.status ?? 'UNKNOWN'}` }
-		);
 	}
 }
 
@@ -605,43 +575,16 @@ async function stopChildProcess() {
 		return;
 	}
 
-	let terminationError;
-
-	if (child.exitCode === null && child.signalCode === null) {
-		if (process.platform === 'win32') {
-			try {
-				terminateWindowsChildTree(child.pid);
-			} catch (error) {
-				terminationError = error;
-				child.kill();
-			}
-		} else {
-			try {
-				process.kill(-child.pid, 'SIGTERM');
-			} catch {
-				child.kill('SIGTERM');
-			}
-		}
+	if (isProcessAlive(child.pid)) {
+		child.kill('SIGTERM');
 	}
 
 	let closed = await waitForChildClose(SHUTDOWN_TIMEOUT_MS);
 
-	if (!closed && isProcessAlive(child.pid)) {
-		if (process.platform === 'win32') {
-			try {
-				terminateWindowsChildTree(child.pid);
-			} catch (error) {
-				terminationError ??= error;
-				child.kill();
-			}
-		} else {
-			try {
-				process.kill(-child.pid, 'SIGKILL');
-			} catch {
-				child.kill('SIGKILL');
-			}
-		}
-
+	if (!closed || isProcessAlive(child.pid)) {
+		child.kill('SIGKILL');
+		child.stdout?.destroy();
+		child.stderr?.destroy();
 		closed = await waitForChildClose(SHUTDOWN_TIMEOUT_MS);
 	}
 
@@ -649,10 +592,6 @@ async function stopChildProcess() {
 		closed && !isProcessAlive(child.pid),
 		`The integration Vite process ${child.pid} did not stop.`
 	);
-
-	if (terminationError) {
-		throw terminationError;
-	}
 }
 
 function assertBytes(actual, expected, context) {
@@ -1540,14 +1479,17 @@ async function runIntegration() {
 				AUDIO_STORAGE_PATH: temporaryAudioRoot,
 				SESSION_COOKIE_NAME: cookieName
 			},
-			detached: true,
+			detached: false,
 			shell: false,
 			stdio: ['ignore', 'pipe', 'pipe'],
 			windowsHide: true
 		}
 	);
 	childClosePromise = new Promise((resolveClose) => {
-		child.once('close', (code, signal) => resolveClose({ code, signal }));
+		child.once('close', (code, signal) => {
+			childClosed = true;
+			resolveClose({ code, signal });
+		});
 	});
 	child.stdout.on('data', (chunk) => {
 		const text = chunk.toString();
@@ -1592,7 +1534,15 @@ async function runIntegration() {
 	console.log('[isolation] real database and storage/audio remained unchanged');
 }
 
-async function cleanup(realState) {
+function cleanup(realState) {
+	if (!cleanupPromise) {
+		cleanupPromise = performCleanup(realState);
+	}
+
+	return cleanupPromise;
+}
+
+async function performCleanup(realState) {
 	const cleanupErrors = [];
 	overallController.abort();
 
@@ -1635,8 +1585,28 @@ async function cleanup(realState) {
 				recordCleanupError('Vite output stream close', result.reason);
 			}
 		}
+	}
 
-		child?.unref();
+	try {
+		assert(
+			[child?.stdout, child?.stderr].every(
+				(stream) => !stream || stream.closed || stream.destroyed
+			),
+			'An owned Vite output stream remained open.'
+		);
+	} catch (error) {
+		recordCleanupError('Vite output stream postcondition', error);
+	}
+
+	try {
+		assert(
+			activeHttpRequests.size === 0 &&
+				activeHttpResponses.size === 0 &&
+				temporaryClient === undefined,
+			'An HTTP or database handle remained open.'
+		);
+	} catch (error) {
+		recordCleanupError('HTTP/database handle postcondition', error);
 	}
 
 	let portReleased = true;
@@ -1653,7 +1623,7 @@ async function cleanup(realState) {
 	if (child?.pid) {
 		try {
 			assert(
-				!isProcessAlive(child.pid),
+				childClosed && !isProcessAlive(child.pid),
 				`The integration Vite process ${child.pid} is still alive.`
 			);
 		} catch (error) {

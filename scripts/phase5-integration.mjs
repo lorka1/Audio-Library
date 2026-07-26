@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
-import { spawn, spawnSync } from 'node:child_process';
-import { appendFileSync, existsSync, rmSync } from 'node:fs';
+import { spawn } from 'node:child_process';
+import { appendFileSync, existsSync } from 'node:fs';
 import { Agent as HttpAgent, request as httpRequest } from 'node:http';
 import {
 	copyFile,
@@ -28,15 +28,16 @@ const PROJECT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const DATABASE_HELPER_PATH = resolve(PROJECT_ROOT, 'scripts/phase5-db-helper.mjs');
 const TEMP_PREFIX = 'audio-library-phase5-integration-';
 const STARTUP_TIMEOUT_MS = 60_000;
-const OVERALL_TIMEOUT_MS = 120_000;
+const OVERALL_TIMEOUT_MS = 150_000;
 const REQUEST_TIMEOUT_MS = 10_000;
-const SHUTDOWN_TIMEOUT_MS = 8_000;
+const SHUTDOWN_TIMEOUT_MS = 4_000;
+const TEMP_REMOVE_TIMEOUT_MS = 8_000;
 const LOG_TAIL_LIMIT = 64 * 1024;
 
 loadEnvironment({ path: join(PROJECT_ROOT, '.env'), quiet: true });
 
 let child;
-let childExitPromise;
+let childClosePromise;
 let temporaryRoot;
 let testPort;
 let stdoutPath;
@@ -45,11 +46,19 @@ let stdoutTail = '';
 let stderrTail = '';
 let startupComplete = false;
 let realStateForCleanup;
+let cleanupPromise;
+let watchdogExpired = false;
+let lastProgressStep = '[setup] controller initialization';
+let failureProgressStep;
+let databaseHelperProcess;
+let databaseHelperClosePromise;
 
 const overallController = new AbortController();
 const httpAgent = new HttpAgent({ keepAlive: false });
 const activeHttpRequests = new Set();
 const activeHttpResponses = new Set();
+const activeRequestControllers = new Set();
+const activeTimers = new Set();
 
 function assert(condition, message) {
 	if (!condition) {
@@ -64,11 +73,73 @@ function updateTail(current, chunk) {
 		: updated.slice(updated.length - LOG_TAIL_LIMIT);
 }
 
+function logProgress(message) {
+	lastProgressStep = message;
+	console.log(message);
+}
+
+function safeDiagnostic(value) {
+	let diagnostic = String(value ?? '');
+
+	for (const path of [temporaryRoot, PROJECT_ROOT].filter(Boolean)) {
+		diagnostic = diagnostic
+			.replaceAll(path, '<redacted-path>')
+			.replaceAll(path.replaceAll('\\', '/'), '<redacted-path>');
+	}
+
+	return diagnostic
+		.replace(
+			/\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}(?:\.[a-z0-9]+)?\b/gi,
+			'<redacted-internal-value>'
+		)
+		.replace(/\b[A-Za-z]:\\[^\r\n]*/g, '<redacted-path>')
+		.replace(/\/(?:home|tmp|Users)\/[^\r\n]*/g, '<redacted-path>')
+		.trim();
+}
+
 function printServerLogs() {
-	console.error('--- vite.out.log ---');
-	console.error(stdoutTail || '<empty>');
-	console.error('--- vite.err.log ---');
-	console.error(stderrTail || '<empty>');
+	console.error('--- Vite stdout (safe tail) ---');
+	console.error(safeDiagnostic(stdoutTail) || '<empty>');
+	console.error('--- Vite stderr (safe tail) ---');
+	console.error(safeDiagnostic(stderrTail) || '<empty>');
+}
+
+function printActiveResources(context) {
+	const resources = process
+		.getActiveResourcesInfo()
+		.map((resource) => String(resource))
+		.sort();
+	console.error(
+		`[resources] ${context}: ${resources.length > 0 ? resources.join(', ') : '<none>'}`
+	);
+}
+
+function trackedTimeout(callback, milliseconds) {
+	const timer = setTimeout(() => {
+		activeTimers.delete(timer);
+		callback();
+	}, milliseconds);
+	activeTimers.add(timer);
+	return timer;
+}
+
+function clearTrackedTimeout(timer) {
+	if (timer) {
+		clearTimeout(timer);
+		activeTimers.delete(timer);
+	}
+}
+
+function abortReason() {
+	return overallController.signal.reason instanceof Error
+		? overallController.signal.reason
+		: new Error('Phase 5 integration was aborted.');
+}
+
+function throwIfAborted() {
+	if (overallController.signal.aborted) {
+		throw abortReason();
+	}
 }
 
 function resolveConfiguredPath(value, fallback) {
@@ -186,47 +257,125 @@ async function copyDatabaseSnapshot(realDatabase, temporaryDatabase) {
 }
 
 async function reservePort() {
+	throwIfAborted();
+
 	return new Promise((resolvePort, reject) => {
 		const server = createServer();
+		let completed = false;
+		const timeout = trackedTimeout(() => {
+			if (server.listening) {
+				server.close();
+			}
+			finish(new Error('Isolated port reservation exceeded 5 seconds.'));
+		}, 5_000);
 
-		server.once('error', reject);
+		function finish(error, port) {
+			if (completed) {
+				return;
+			}
+
+			completed = true;
+			clearTrackedTimeout(timeout);
+			overallController.signal.removeEventListener('abort', onAbort);
+			server.removeListener('error', onError);
+
+			if (error) {
+				reject(error);
+			} else {
+				resolvePort(port);
+			}
+		}
+
+		function onAbort() {
+			if (server.listening) {
+				server.close();
+			}
+			finish(abortReason());
+		}
+
+		function onError(error) {
+			finish(error);
+		}
+
+		server.once('error', onError);
+		overallController.signal.addEventListener('abort', onAbort, { once: true });
 		server.listen(0, '127.0.0.1', () => {
 			const address = server.address();
 
 			if (!address || typeof address === 'string') {
 				server.close();
-				reject(new Error('Unable to reserve an isolated integration port.'));
+				finish(new Error('Unable to reserve an isolated integration port.'));
 				return;
 			}
 
 			const port = address.port;
 			server.close((error) => {
 				if (error) {
-					reject(error);
+					finish(error);
 				} else {
-					resolvePort(port);
+					finish(undefined, port);
 				}
 			});
 		});
+
+		if (overallController.signal.aborted) {
+			onAbort();
+		}
 	});
 }
 
-function delay(milliseconds) {
-	return new Promise((resolveDelay) => setTimeout(resolveDelay, milliseconds));
+function delay(milliseconds, { abortable = true } = {}) {
+	return new Promise((resolveDelay, rejectDelay) => {
+		let completed = false;
+		const timer = trackedTimeout(() => finish(), milliseconds);
+
+		function finish(error) {
+			if (completed) {
+				return;
+			}
+
+			completed = true;
+			clearTrackedTimeout(timer);
+			overallController.signal.removeEventListener('abort', onAbort);
+
+			if (error) {
+				rejectDelay(error);
+			} else {
+				resolveDelay();
+			}
+		}
+
+		function onAbort() {
+			finish(
+				overallController.signal.reason ??
+					new Error('Phase 5 integration was aborted.')
+			);
+		}
+
+		if (abortable) {
+			overallController.signal.addEventListener('abort', onAbort, {
+				once: true
+			});
+
+			if (overallController.signal.aborted) {
+				onAbort();
+			}
+		}
+	});
 }
 
-async function waitForChildExit(milliseconds) {
+async function waitForChildClose(milliseconds) {
 	let timeout;
 
 	try {
 		return await Promise.race([
-			childExitPromise.then(() => true),
+			childClosePromise.then(() => true),
 			new Promise((resolveWait) => {
-				timeout = setTimeout(() => resolveWait(false), milliseconds);
+				timeout = trackedTimeout(() => resolveWait(false), milliseconds);
 			})
 		]);
 	} finally {
-		clearTimeout(timeout);
+		clearTrackedTimeout(timeout);
 	}
 }
 
@@ -236,12 +385,12 @@ function closeChildStream(stream, label) {
 	}
 
 	return new Promise((resolveClose, rejectClose) => {
-		const timeout = setTimeout(() => {
+		const timeout = trackedTimeout(() => {
 			finish(new Error(`The Vite ${label} stream did not close.`));
 		}, SHUTDOWN_TIMEOUT_MS);
 
 		function finish(error) {
-			clearTimeout(timeout);
+			clearTrackedTimeout(timeout);
 			stream.removeListener('close', onClose);
 			stream.removeListener('error', onError);
 
@@ -283,6 +432,7 @@ function normalizeHeaders(headers) {
 }
 
 async function request(baseUrl, path, options = {}) {
+	throwIfAborted();
 	const url = new URL(path, baseUrl);
 
 	return new Promise((resolveResponse, reject) => {
@@ -290,10 +440,13 @@ async function request(baseUrl, path, options = {}) {
 		let completed = false;
 		let clientRequest;
 		let clientResponse;
-		const timeout = setTimeout(() => {
+		const requestController = new AbortController();
+		activeRequestControllers.add(requestController);
+		const timeout = trackedTimeout(() => {
 			const error = new Error(
 				`HTTP request to ${url.pathname} exceeded 10 seconds.`
 			);
+			requestController.abort(error);
 			clientResponse?.destroy(error);
 			clientRequest?.destroy(error);
 			finish(error);
@@ -305,10 +458,11 @@ async function request(baseUrl, path, options = {}) {
 			}
 
 			completed = true;
-			clearTimeout(timeout);
+			clearTrackedTimeout(timeout);
 			overallController.signal.removeEventListener('abort', onAbort);
 			activeHttpRequests.delete(clientRequest);
 			activeHttpResponses.delete(clientResponse);
+			activeRequestControllers.delete(requestController);
 
 			if (error) {
 				reject(error);
@@ -320,6 +474,7 @@ async function request(baseUrl, path, options = {}) {
 		function onAbort() {
 			const error =
 				overallController.signal.reason ?? new Error('HTTP request aborted.');
+			requestController.abort(error);
 			clientResponse?.destroy(error);
 			clientRequest?.destroy(error);
 			finish(error);
@@ -335,28 +490,39 @@ async function request(baseUrl, path, options = {}) {
 			method: options.method ?? 'GET',
 			path: `${url.pathname}${url.search}`,
 			port: url.port,
-			protocol: url.protocol
+			protocol: url.protocol,
+			signal: requestController.signal
 		};
 
-		clientRequest = httpRequest(requestOptions, (incomingResponse) => {
-			clientResponse = incomingResponse;
-			activeHttpResponses.add(clientResponse);
-			clientResponse.on('data', (chunk) => chunks.push(chunk));
-			clientResponse.once('error', (error) => finish(error));
-			clientResponse.once('end', () => {
-				const body = Buffer.concat(chunks);
-				finish(null, {
-					headers: normalizeHeaders(clientResponse.headers),
-					status: clientResponse.statusCode ?? 0,
-					arrayBuffer: async () =>
-						body.buffer.slice(
-							body.byteOffset,
-							body.byteOffset + body.byteLength
-						),
-					text: async () => body.toString('utf8')
+		try {
+			clientRequest = httpRequest(requestOptions, (incomingResponse) => {
+				clientResponse = incomingResponse;
+				activeHttpResponses.add(clientResponse);
+				clientResponse.on('data', (chunk) => chunks.push(chunk));
+				clientResponse.once('aborted', () =>
+					finish(
+						new Error(`HTTP response from ${url.pathname} was aborted.`)
+					)
+				);
+				clientResponse.once('error', (error) => finish(error));
+				clientResponse.once('end', () => {
+					const body = Buffer.concat(chunks);
+					finish(null, {
+						headers: normalizeHeaders(clientResponse.headers),
+						status: clientResponse.statusCode ?? 0,
+						arrayBuffer: async () =>
+							body.buffer.slice(
+								body.byteOffset,
+								body.byteOffset + body.byteLength
+							),
+						text: async () => body.toString('utf8')
+					});
 				});
 			});
-		});
+		} catch (error) {
+			finish(error);
+			return;
+		}
 
 		activeHttpRequests.add(clientRequest);
 		overallController.signal.addEventListener('abort', onAbort, { once: true });
@@ -368,6 +534,10 @@ async function request(baseUrl, path, options = {}) {
 function cancelActiveHttpOperations() {
 	const error = new Error('Phase 5 cleanup cancelled an active HTTP operation.');
 
+	for (const controller of activeRequestControllers) {
+		controller.abort(error);
+	}
+
 	for (const response of activeHttpResponses) {
 		response.destroy(error);
 	}
@@ -378,6 +548,7 @@ function cancelActiveHttpOperations() {
 
 	activeHttpResponses.clear();
 	activeHttpRequests.clear();
+	activeRequestControllers.clear();
 	httpAgent.destroy();
 }
 
@@ -402,8 +573,8 @@ async function waitForStartup(baseUrl) {
 		const elapsedSecond = Math.floor((Date.now() - startedAt) / 1000);
 
 		if (elapsedSecond !== lastProgressSecond && elapsedSecond % 2 === 0) {
-			console.log(
-				`[startup] waiting for Vite on port ${testPort} (${elapsedSecond}s)`
+			logProgress(
+				`[startup] waiting for Vite (${elapsedSecond}s elapsed)`
 			);
 			lastProgressSecond = elapsedSecond;
 		}
@@ -414,7 +585,7 @@ async function waitForStartup(baseUrl) {
 			if (response.status === 200) {
 				await response.text();
 				startupComplete = true;
-				console.log(
+				logProgress(
 					`[startup] Vite is ready after ${((Date.now() - startedAt) / 1000).toFixed(1)}s`
 				);
 				return;
@@ -452,6 +623,20 @@ async function canConnect(port) {
 	});
 }
 
+async function waitForPortRelease(port) {
+	const deadline = Date.now() + SHUTDOWN_TIMEOUT_MS;
+
+	do {
+		if (!(await canConnect(port))) {
+			return;
+		}
+
+		await delay(150, { abortable: false });
+	} while (Date.now() < deadline);
+
+	throw new Error('The Phase 5 integration port remained active after shutdown.');
+}
+
 function isProcessAlive(pid) {
 	if (!pid) {
 		return false;
@@ -466,53 +651,53 @@ function isProcessAlive(pid) {
 }
 
 async function stopChildProcess() {
-	if (
-		!child?.pid ||
-		child.exitCode !== null ||
-		child.signalCode !== null
-	) {
+	if (!child?.pid) {
 		return;
 	}
 
-	if (process.platform === 'win32') {
-		spawnSync('taskkill.exe', ['/PID', String(child.pid), '/T', '/F'], {
-			stdio: 'ignore',
-			timeout: SHUTDOWN_TIMEOUT_MS,
-			windowsHide: true
-		});
-	} else {
-		try {
-			process.kill(-child.pid, 'SIGTERM');
-		} catch {
-			child.kill('SIGTERM');
-		}
+	if (isProcessAlive(child.pid)) {
+		child.kill('SIGTERM');
 	}
 
-	await waitForChildExit(SHUTDOWN_TIMEOUT_MS);
+	child.stdout?.destroy();
+	child.stderr?.destroy();
+	let closed = await waitForChildClose(SHUTDOWN_TIMEOUT_MS);
 
-	if (child.exitCode === null && child.signalCode === null) {
-		if (process.platform === 'win32') {
-			spawnSync('taskkill.exe', ['/PID', String(child.pid), '/T', '/F'], {
-				stdio: 'ignore',
-				timeout: SHUTDOWN_TIMEOUT_MS,
-				windowsHide: true
-			});
-		} else {
-			try {
-				process.kill(-child.pid, 'SIGKILL');
-			} catch {
-				child.kill('SIGKILL');
-			}
-		}
-
-		await waitForChildExit(SHUTDOWN_TIMEOUT_MS);
+	if (!closed || isProcessAlive(child.pid)) {
+		child.kill('SIGKILL');
+		child.stdout?.destroy();
+		child.stderr?.destroy();
+		closed = await waitForChildClose(SHUTDOWN_TIMEOUT_MS);
 	}
 
 	assert(
-		child.exitCode !== null ||
-			child.signalCode !== null ||
-			!isProcessAlive(child.pid),
+		closed && !isProcessAlive(child.pid),
 		`The integration Vite process ${child.pid} did not stop.`
+	);
+}
+
+async function stopDatabaseHelperProcess() {
+	if (!databaseHelperProcess?.pid) {
+		return;
+	}
+
+	if (isProcessAlive(databaseHelperProcess.pid)) {
+		databaseHelperProcess.kill('SIGKILL');
+	}
+
+	databaseHelperProcess.stdout?.destroy();
+	databaseHelperProcess.stderr?.destroy();
+	let timeout;
+	const closed = await Promise.race([
+		databaseHelperClosePromise.then(() => true),
+		new Promise((resolveWait) => {
+			timeout = trackedTimeout(() => resolveWait(false), SHUTDOWN_TIMEOUT_MS);
+		})
+	]).finally(() => clearTrackedTimeout(timeout));
+
+	assert(
+		closed && !isProcessAlive(databaseHelperProcess.pid),
+		'The owned database helper did not stop.'
 	);
 }
 
@@ -634,37 +819,115 @@ function assertNoSecrets(text, secrets, context, secretKind = 'internal value') 
 }
 
 async function runDatabaseHelper(request) {
+	throwIfAborted();
 	const nonce = randomBytes(8).toString('hex');
 	const requestPath = join(temporaryRoot, `database-helper-${nonce}.request.json`);
 	const responsePath = join(temporaryRoot, `database-helper-${nonce}.response.json`);
 
 	await writeFile(requestPath, JSON.stringify(request), { flag: 'wx' });
+	throwIfAborted();
 
 	try {
-		const result = spawnSync(
+		const helper = spawn(
 			process.execPath,
 			['--no-warnings', DATABASE_HELPER_PATH, requestPath, responsePath],
 			{
 				cwd: PROJECT_ROOT,
-				encoding: 'utf8',
 				shell: false,
 				stdio: ['ignore', 'pipe', 'pipe'],
-				timeout: 30_000,
 				windowsHide: true
 			}
 		);
+		databaseHelperProcess = helper;
+		databaseHelperClosePromise = new Promise((resolveClose) => {
+			helper.once('close', (code, signal) => resolveClose({ code, signal }));
+		});
+		let helperError;
+		let stderr = '';
+		let stdout = '';
+		let timeout;
+		let forcedSettlementTimer;
+		let onAbort;
+
+		helper.stdout.on('data', (chunk) => {
+			stdout = updateTail(stdout, chunk.toString());
+		});
+		helper.stderr.on('data', (chunk) => {
+			stderr = updateTail(stderr, chunk.toString());
+		});
+		helper.once('error', (error) => {
+			helperError = error;
+		});
+
+		const outcome = await new Promise((resolveOutcome, rejectOutcome) => {
+			let settled = false;
+
+			function finish(error, result) {
+				if (settled) {
+					return;
+				}
+
+				settled = true;
+				clearTrackedTimeout(timeout);
+				clearTrackedTimeout(forcedSettlementTimer);
+				overallController.signal.removeEventListener('abort', onAbort);
+
+				if (error) {
+					rejectOutcome(error);
+				} else {
+					resolveOutcome(result);
+				}
+			}
+
+			function interrupt(error) {
+				helperError ??= error;
+				helper.kill('SIGKILL');
+				helper.stdout?.destroy();
+				helper.stderr?.destroy();
+				forcedSettlementTimer = trackedTimeout(
+					() => finish(error),
+					SHUTDOWN_TIMEOUT_MS
+				);
+			}
+
+			onAbort = () => interrupt(abortReason());
+			overallController.signal.addEventListener('abort', onAbort, {
+				once: true
+			});
+			timeout = trackedTimeout(
+				() =>
+					interrupt(
+						new Error('The isolated database helper exceeded 30 seconds.')
+					),
+				30_000
+			);
+			databaseHelperClosePromise.then((result) =>
+				finish(helperError, result)
+			);
+
+			if (overallController.signal.aborted) {
+				onAbort();
+			}
+		});
 
 		assert(
-			!result.error && result.status === 0,
+			!helperError && outcome.code === 0,
 			'The isolated temporary-database helper failed.'
 		);
+		databaseHelperProcess = undefined;
+		databaseHelperClosePromise = undefined;
 
 		return JSON.parse(await readFile(responsePath, 'utf8'));
 	} finally {
-		await Promise.all([
-			rm(requestPath, { force: true }),
-			rm(responsePath, { force: true })
-		]);
+		if (
+			!databaseHelperProcess?.pid ||
+			!isProcessAlive(databaseHelperProcess.pid)
+		) {
+			await Promise.all([
+				rm(requestPath, { force: true }),
+				rm(responsePath, { force: true })
+			]);
+		}
 	}
 }
 
@@ -851,7 +1114,7 @@ async function runHttpChecks(baseUrl, seed, temporaryAudioRoot) {
 
 	const defaultHtml = await trackPage();
 	assertIncludesAll(defaultHtml, publicTitles, 'The default public track list');
-	console.log('[check 1/26] /tracks returns every synthetic public track by default');
+	logProgress('[check 1/26] /tracks returns every synthetic public track by default');
 
 	const tokenHtml = await trackPage({ q: seed.token });
 	assertIncludesAll(tokenHtml, publicTitles, 'The token-filtered public track list');
@@ -860,7 +1123,7 @@ async function runHttpChecks(baseUrl, seed, temporaryAudioRoot) {
 		[seed.tracks.private.title],
 		'Public track results'
 	);
-	console.log('[check 2/26] matching private tracks never appear');
+	logProgress('[check 2/26] matching private tracks never appear');
 
 	const titleHtml = await trackPage({ q: `Alpha ${seed.token}` });
 	assertIncludesAll(titleHtml, [seed.tracks.alpha.title], 'Title search');
@@ -869,7 +1132,7 @@ async function runHttpChecks(baseUrl, seed, temporaryAudioRoot) {
 		publicTitles.filter((title) => title !== seed.tracks.alpha.title),
 		'Title search'
 	);
-	console.log('[check 3/26] q matches a partial title');
+	logProgress('[check 3/26] q matches a partial title');
 
 	const artistHtml = await trackPage({ q: seed.artistMarker.toLowerCase() });
 	assertIncludesAll(artistHtml, [seed.tracks.bravo.title], 'Artist search');
@@ -878,7 +1141,7 @@ async function runHttpChecks(baseUrl, seed, temporaryAudioRoot) {
 		publicTitles.filter((title) => title !== seed.tracks.bravo.title),
 		'Artist search'
 	);
-	console.log('[check 4/26] q matches an artist');
+	logProgress('[check 4/26] q matches an artist');
 
 	const descriptionHtml = await trackPage({ q: seed.descriptionMarker });
 	assertIncludesAll(
@@ -891,7 +1154,7 @@ async function runHttpChecks(baseUrl, seed, temporaryAudioRoot) {
 		publicTitles.filter((title) => title !== seed.tracks.charlie.title),
 		'Description search'
 	);
-	console.log('[check 5/26] q matches a description');
+	logProgress('[check 5/26] q matches a description');
 
 	const caseInsensitiveHtml = await trackPage({ q: seed.caseText.toLowerCase() });
 	assertIncludesAll(
@@ -899,7 +1162,7 @@ async function runHttpChecks(baseUrl, seed, temporaryAudioRoot) {
 		[seed.tracks.charlie.title],
 		'Case-insensitive search'
 	);
-	console.log('[check 6/26] q matching is case-insensitive');
+	logProgress('[check 6/26] q matching is case-insensitive');
 
 	const literalWildcardHtml = await trackPage({ q: '%_' });
 	assertIncludesAll(
@@ -912,7 +1175,7 @@ async function runHttpChecks(baseUrl, seed, temporaryAudioRoot) {
 		publicTitles.filter((title) => title !== seed.tracks.alpha.title),
 		'Literal wildcard search'
 	);
-	console.log('[check 7/26] percent and underscore are searched literally');
+	logProgress('[check 7/26] percent and underscore are searched literally');
 
 	const minimumHtml = await trackPage({ q: seed.token, bpmMin: '125' });
 	assertIncludesAll(
@@ -925,7 +1188,7 @@ async function runHttpChecks(baseUrl, seed, temporaryAudioRoot) {
 		[seed.tracks.alpha.title, seed.tracks.delta.title, seed.tracks.echo.title],
 		'Minimum BPM filter'
 	);
-	console.log('[check 8/26] bpmMin is inclusive and excludes null BPM');
+	logProgress('[check 8/26] bpmMin is inclusive and excludes null BPM');
 
 	const maximumHtml = await trackPage({ q: seed.token, bpmMax: '120' });
 	assertIncludesAll(
@@ -938,7 +1201,7 @@ async function runHttpChecks(baseUrl, seed, temporaryAudioRoot) {
 		[seed.tracks.bravo.title, seed.tracks.charlie.title, seed.tracks.delta.title],
 		'Maximum BPM filter'
 	);
-	console.log('[check 9/26] bpmMax is inclusive and excludes null BPM');
+	logProgress('[check 9/26] bpmMax is inclusive and excludes null BPM');
 
 	const rangeHtml = await trackPage({
 		q: seed.token,
@@ -955,7 +1218,7 @@ async function runHttpChecks(baseUrl, seed, temporaryAudioRoot) {
 		[seed.tracks.alpha.title, seed.tracks.charlie.title, seed.tracks.delta.title],
 		'BPM range filter'
 	);
-	console.log('[check 10/26] the inclusive BPM range works');
+	logProgress('[check 10/26] the inclusive BPM range works');
 
 	const musicalKeyHtml = await trackPage({
 		q: seed.token,
@@ -971,7 +1234,7 @@ async function runHttpChecks(baseUrl, seed, temporaryAudioRoot) {
 		[seed.tracks.alpha.title, seed.tracks.charlie.title, seed.tracks.delta.title],
 		'Musical-key filter'
 	);
-	console.log('[check 11/26] musicalKey uses an exact stored-value match');
+	logProgress('[check 11/26] musicalKey uses an exact stored-value match');
 
 	const genreHtml = await trackPage({ q: seed.token, genre: 'House' });
 	assertIncludesAll(
@@ -984,7 +1247,7 @@ async function runHttpChecks(baseUrl, seed, temporaryAudioRoot) {
 		[seed.tracks.alpha.title, seed.tracks.charlie.title, seed.tracks.delta.title],
 		'Genre filter'
 	);
-	console.log('[check 12/26] genre uses an exact stored-value match');
+	logProgress('[check 12/26] genre uses an exact stored-value match');
 
 	const combinedHtml = await trackPage({
 		q: seed.combinedMarker,
@@ -999,7 +1262,7 @@ async function runHttpChecks(baseUrl, seed, temporaryAudioRoot) {
 		[...publicTitles.filter((title) => title !== seed.tracks.echo.title), seed.tracks.private.title],
 		'Combined filters'
 	);
-	console.log('[check 13/26] q, BPM, musical key, and genre combine with AND');
+	logProgress('[check 13/26] q, BPM, musical key, and genre combine with AND');
 
 	const newestHtml = await trackPage({ q: seed.token, sort: 'newest' });
 	assertOrdered(
@@ -1013,7 +1276,7 @@ async function runHttpChecks(baseUrl, seed, temporaryAudioRoot) {
 		],
 		'Newest sorting'
 	);
-	console.log('[check 14/26] newest sorting is deterministic');
+	logProgress('[check 14/26] newest sorting is deterministic');
 
 	const oldestHtml = await trackPage({ q: seed.token, sort: 'oldest' });
 	assertOrdered(
@@ -1027,7 +1290,7 @@ async function runHttpChecks(baseUrl, seed, temporaryAudioRoot) {
 		],
 		'Oldest sorting'
 	);
-	console.log('[check 15/26] oldest sorting is deterministic');
+	logProgress('[check 15/26] oldest sorting is deterministic');
 
 	const titleSortHtml = await trackPage({ q: seed.token, sort: 'title_asc' });
 	assertOrdered(
@@ -1041,7 +1304,7 @@ async function runHttpChecks(baseUrl, seed, temporaryAudioRoot) {
 		],
 		'Title sorting'
 	);
-	console.log('[check 16/26] title_asc is case-insensitive and deterministic');
+	logProgress('[check 16/26] title_asc is case-insensitive and deterministic');
 
 	const bpmAscendingHtml = await trackPage({ q: seed.token, sort: 'bpm_asc' });
 	assertOrdered(
@@ -1055,7 +1318,7 @@ async function runHttpChecks(baseUrl, seed, temporaryAudioRoot) {
 		],
 		'Ascending BPM sorting'
 	);
-	console.log('[check 17/26] bpm_asc uses numeric order');
+	logProgress('[check 17/26] bpm_asc uses numeric order');
 
 	const bpmDescendingHtml = await trackPage({ q: seed.token, sort: 'bpm_desc' });
 	assertOrdered(
@@ -1069,7 +1332,7 @@ async function runHttpChecks(baseUrl, seed, temporaryAudioRoot) {
 		],
 		'Descending BPM sorting'
 	);
-	console.log('[check 18/26] bpm_desc uses numeric order');
+	logProgress('[check 18/26] bpm_desc uses numeric order');
 
 	assert(
 		bpmAscendingHtml.indexOf(seed.tracks.delta.title) >
@@ -1078,7 +1341,7 @@ async function runHttpChecks(baseUrl, seed, temporaryAudioRoot) {
 				bpmDescendingHtml.indexOf(seed.tracks.alpha.title),
 		'Null BPM was not placed after numeric BPM in both directions.'
 	);
-	console.log('[check 19/26] null BPM placement is deterministic and last');
+	logProgress('[check 19/26] null BPM placement is deterministic and last');
 
 	const invalidBpmHtml = await trackPage({ q: seed.token, bpmMin: '12.5' });
 	assert(
@@ -1088,7 +1351,7 @@ async function runHttpChecks(baseUrl, seed, temporaryAudioRoot) {
 		'Invalid minimum BPM did not render its validation message.'
 	);
 	assertExcludesAll(invalidBpmHtml, publicTitles, 'Invalid minimum BPM results');
-	console.log('[check 20/26] invalid BPM renders validation instead of a 500');
+	logProgress('[check 20/26] invalid BPM renders validation instead of a 500');
 
 	const invalidKeyHtml = await trackPage({
 		q: seed.token,
@@ -1099,7 +1362,7 @@ async function runHttpChecks(baseUrl, seed, temporaryAudioRoot) {
 		'Invalid musical key did not render its validation message.'
 	);
 	assertExcludesAll(invalidKeyHtml, publicTitles, 'Invalid musical-key results');
-	console.log('[check 21/26] invalid musical key renders validation instead of a 500');
+	logProgress('[check 21/26] invalid musical key renders validation instead of a 500');
 
 	const invalidRangeHtml = await trackPage({
 		q: seed.token,
@@ -1113,7 +1376,7 @@ async function runHttpChecks(baseUrl, seed, temporaryAudioRoot) {
 		'An inverted BPM range did not render its validation message.'
 	);
 	assertExcludesAll(invalidRangeHtml, publicTitles, 'Invalid BPM-range results');
-	console.log('[check 22/26] an inverted BPM range renders validation');
+	logProgress('[check 22/26] an inverted BPM range renders validation');
 
 	const preservedValues = {
 		q: seed.combinedMarker,
@@ -1137,10 +1400,10 @@ async function runHttpChecks(baseUrl, seed, temporaryAudioRoot) {
 			hasSelectedOption(preservedHtml, 'sort', preservedValues.sort),
 		'The rendered GET form did not preserve every submitted filter value.'
 	);
-	console.log('[check 23/26] submitted values remain visible in the rendered form');
+	logProgress('[check 23/26] submitted values remain visible in the rendered form');
 
 	assert(hasResetLink(preservedHtml), 'The filter form did not provide a Reset filters link to /tracks.');
-	console.log('[check 24/26] Reset filters links exactly to /tracks');
+	logProgress('[check 24/26] Reset filters links exactly to /tracks');
 
 	const listDataResponse = await request(
 		baseUrl,
@@ -1193,7 +1456,7 @@ async function runHttpChecks(baseUrl, seed, temporaryAudioRoot) {
 		'Public HTML, page data, or response headers',
 		'a filesystem path'
 	);
-	console.log('[check 25/26] responses expose no internal IDs, stored filenames, or paths');
+	logProgress('[check 25/26] responses expose no internal IDs, stored filenames, or paths');
 
 	const fullStream = await request(
 		baseUrl,
@@ -1251,10 +1514,11 @@ async function runHttpChecks(baseUrl, seed, temporaryAudioRoot) {
 		],
 		'Stream or download headers'
 	);
-	console.log('[check 26/26] result-track streaming, Range playback, and download still work');
+	logProgress('[check 26/26] result-track streaming, Range playback, and download still work');
 }
 
 async function runIntegration() {
+	logProgress('[setup] capturing real-data baseline');
 	const realDatabase = resolveConfiguredPath(
 		process.env.DATABASE_URL,
 		'data/app.db'
@@ -1264,6 +1528,7 @@ async function runIntegration() {
 		'storage/audio'
 	);
 	const realStateBefore = await realStateSnapshot(realDatabase, realAudioRoot);
+	throwIfAborted();
 	realStateForCleanup = {
 		realDatabase,
 		realAudioRoot,
@@ -1271,6 +1536,7 @@ async function runIntegration() {
 	};
 
 	temporaryRoot = await mkdtemp(join(resolve(tmpdir()), TEMP_PREFIX));
+	throwIfAborted();
 	assert(
 		isSafeTemporaryRoot(temporaryRoot),
 		'The generated integration root is outside the validated temporary parent.'
@@ -1282,14 +1548,16 @@ async function runIntegration() {
 	stderrPath = join(temporaryRoot, 'vite.err.log');
 	await Promise.all([writeFile(stdoutPath, ''), writeFile(stderrPath, '')]);
 	await copyDatabaseSnapshot(realDatabase, temporaryDatabase);
+	throwIfAborted();
 
 	const seed = await seedTemporaryData(temporaryDatabase, temporaryAudioRoot);
+	throwIfAborted();
 	testPort = await reservePort();
+	throwIfAborted();
 	const baseUrl = `http://127.0.0.1:${testPort}`;
 	const cookieName = `phase5_integration_${randomBytes(4).toString('hex')}`;
 
-	console.log(`[setup] isolated port: ${testPort}`);
-	console.log('[setup] temporary database copy and audio storage are ready');
+	logProgress('[setup] isolated database, audio storage, and port are ready');
 
 	child = spawn(
 		process.execPath,
@@ -1310,14 +1578,14 @@ async function runIntegration() {
 				AUDIO_STORAGE_PATH: temporaryAudioRoot,
 				SESSION_COOKIE_NAME: cookieName
 			},
-			detached: true,
+			detached: false,
 			shell: false,
 			stdio: ['ignore', 'pipe', 'pipe'],
 			windowsHide: true
 		}
 	);
-	childExitPromise = new Promise((resolveExit) => {
-		child.once('exit', (code, signal) => resolveExit({ code, signal }));
+	childClosePromise = new Promise((resolveClose) => {
+		child.once('close', (code, signal) => resolveClose({ code, signal }));
 	});
 	child.stdout.on('data', (chunk) => {
 		const text = chunk.toString();
@@ -1335,13 +1603,16 @@ async function runIntegration() {
 		appendFileSync(stderrPath, text);
 	});
 
+	logProgress('[startup] waiting for the directly launched Vite child');
 	await waitForStartup(baseUrl);
 	await runHttpChecks(baseUrl, seed, temporaryAudioRoot);
+	throwIfAborted();
 
 	const verificationState = await runDatabaseHelper({
 		action: 'capture-party',
 		databasePath: temporaryDatabase
 	});
+	throwIfAborted();
 
 	assert(
 		snapshotsEqual(seed.partyBefore, verificationState.party),
@@ -1350,6 +1621,7 @@ async function runIntegration() {
 	console.log('[isolation] "Party about you" remains present, public, and unchanged');
 
 	const realStateDuring = await realStateSnapshot(realDatabase, realAudioRoot);
+	throwIfAborted();
 	assert(
 		snapshotsEqual(realStateBefore, realStateDuring),
 		'The real database or audio storage changed during isolated integration tests.'
@@ -1357,9 +1629,67 @@ async function runIntegration() {
 	console.log('[isolation] real database and storage/audio remained unchanged');
 }
 
-async function cleanup(realState) {
+async function removeTemporaryDirectoryWithRetry() {
+	if (!temporaryRoot || !existsSync(temporaryRoot)) {
+		return;
+	}
+
+	const attempts = 12;
+	const deadline = Date.now() + TEMP_REMOVE_TIMEOUT_MS;
+	let lastError;
+
+	for (let attempt = 1; attempt <= attempts && Date.now() < deadline; attempt += 1) {
+		try {
+			await rm(temporaryRoot, {
+				recursive: true,
+				force: true,
+				maxRetries: 1,
+				retryDelay: 100
+			});
+
+			if (!existsSync(temporaryRoot)) {
+				return;
+			}
+
+			lastError = new Error('The temporary directory still exists.');
+		} catch (error) {
+			lastError = error;
+		}
+
+		console.error(
+			`[cleanup 6/7] temporary-directory retry ${attempt}/${attempts} (${
+				lastError && typeof lastError === 'object' && 'code' in lastError
+					? `code ${String(lastError.code)}`
+					: 'unknown error'
+			})`
+		);
+
+		if (attempt < attempts && Date.now() < deadline) {
+			await delay(250, { abortable: false });
+		}
+	}
+
+	throw new Error(
+		`The temporary directory was not removed within ${TEMP_REMOVE_TIMEOUT_MS / 1000} seconds.`
+	);
+}
+
+function cleanup(realState) {
+	if (!cleanupPromise) {
+		cleanupPromise = performCleanup(realState);
+	}
+
+	return cleanupPromise;
+}
+
+async function performCleanup(realState) {
 	const cleanupErrors = [];
-	overallController.abort();
+
+	if (!overallController.signal.aborted) {
+		overallController.abort(
+			new Error('Phase 5 integration entered final cleanup.')
+		);
+	}
 
 	function recordCleanupError(step, error) {
 		cleanupErrors.push(error);
@@ -1368,63 +1698,75 @@ async function cleanup(realState) {
 		);
 	}
 
-	console.log('[cleanup] stopping the owned Vite process');
+	logProgress('[cleanup 1/7] aborting HTTP requests and response bodies');
+	try {
+		cancelActiveHttpOperations();
+		assert(
+			activeHttpRequests.size === 0 &&
+				activeHttpResponses.size === 0 &&
+				activeRequestControllers.size === 0,
+			'An HTTP resource remained active after cancellation.'
+		);
+	} catch (error) {
+		recordCleanupError('HTTP cancellation', error);
+	}
+
+	logProgress('[cleanup 2/7] terminating the exact Vite child');
 	try {
 		await stopChildProcess();
 	} catch (error) {
 		recordCleanupError('owned Vite process stop', error);
-	} finally {
-		const streamResults = await Promise.allSettled([
-			closeChildStream(child?.stdout, 'stdout'),
-			closeChildStream(child?.stderr, 'stderr')
-		]);
-
-		for (const result of streamResults) {
-			if (result.status === 'rejected') {
-				recordCleanupError('Vite output stream close', result.reason);
-			}
-		}
-
-		child?.unref();
 	}
-	console.log('[cleanup] owned Vite process stop completed');
-
-	console.log('[cleanup] closing HTTP client connections');
 	try {
-		cancelActiveHttpOperations();
+		await stopDatabaseHelperProcess();
 	} catch (error) {
-		recordCleanupError('HTTP client connection close', error);
+		recordCleanupError('owned database-helper process stop', error);
 	}
-	console.log('[cleanup] HTTP client connection close completed');
+
+	logProgress('[cleanup 3/7] closing Vite stdout and stderr');
+	const streamResults = await Promise.allSettled([
+		closeChildStream(child?.stdout, 'stdout'),
+		closeChildStream(child?.stderr, 'stderr'),
+		closeChildStream(databaseHelperProcess?.stdout, 'database-helper stdout'),
+		closeChildStream(databaseHelperProcess?.stderr, 'database-helper stderr')
+	]);
+
+	for (const result of streamResults) {
+		if (result.status === 'rejected') {
+			recordCleanupError('Vite output stream close', result.reason);
+		}
+	}
+
+	logProgress('[cleanup 4/7] verifying child exit and port release');
+	let processStopped = true;
+	let portReleased = true;
+
+	if (child?.pid && isProcessAlive(child.pid)) {
+		processStopped = false;
+		recordCleanupError(
+			'process postcondition',
+			new Error('The exact Vite child remained active.')
+		);
+	}
+	if (databaseHelperProcess?.pid && isProcessAlive(databaseHelperProcess.pid)) {
+		processStopped = false;
+		recordCleanupError(
+			'database-helper process postcondition',
+			new Error('The owned database helper remained active.')
+		);
+	}
 
 	if (testPort) {
-		console.log(`[cleanup] checking port ${testPort}`);
 		try {
-			assert(
-				!(await canConnect(testPort)),
-				`The integration port ${testPort} is still accepting connections.`
-			);
+			await waitForPortRelease(testPort);
 		} catch (error) {
-			recordCleanupError(`port ${testPort} postcondition`, error);
+			portReleased = false;
+			recordCleanupError('port postcondition', error);
 		}
-		console.log(`[cleanup] port ${testPort} check completed`);
 	}
 
-	if (child?.pid) {
-		console.log(`[cleanup] checking process ${child.pid}`);
-		try {
-			assert(
-				!isProcessAlive(child.pid),
-				`The integration Vite process ${child.pid} is still alive.`
-			);
-		} catch (error) {
-			recordCleanupError(`process ${child.pid} postcondition`, error);
-		}
-		console.log(`[cleanup] process ${child.pid} check completed`);
-	}
-
+	logProgress('[cleanup 5/7] verifying real database and audio storage');
 	if (realState) {
-		console.log('[cleanup] checking real database and audio storage');
 		try {
 			const realStateAfter = await realStateSnapshot(
 				realState.realDatabase,
@@ -1437,91 +1779,112 @@ async function cleanup(realState) {
 		} catch (error) {
 			recordCleanupError('real-state postcondition', error);
 		}
-		console.log('[cleanup] real database and audio storage check completed');
 	}
 
+	logProgress('[cleanup 6/7] removing the validated temporary directory');
 	if (temporaryRoot && existsSync(temporaryRoot)) {
-		console.log('[cleanup] removing the validated temporary directory');
-		try {
-			assert(
-				isSafeTemporaryRoot(temporaryRoot),
-				'Refusing to remove an unvalidated temporary directory.'
+		if (!processStopped || !portReleased) {
+			recordCleanupError(
+				'temporary-directory safety gate',
+				new Error(
+					'Temporary removal was skipped because the exact child or test port remained active.'
+				)
 			);
-			rmSync(temporaryRoot, {
-				recursive: true,
-				force: true,
-				maxRetries: 20,
-				retryDelay: 250
-			});
-			assert(
-				!existsSync(temporaryRoot),
-				'The integration temporary directory was not removed.'
-			);
-		} catch (error) {
-			recordCleanupError('temporary-directory postcondition', error);
+		} else {
+			try {
+				assert(
+					isSafeTemporaryRoot(temporaryRoot),
+					'Refusing to remove an unvalidated temporary directory.'
+				);
+				await removeTemporaryDirectoryWithRetry();
+				assert(
+					!existsSync(temporaryRoot),
+					'The integration temporary directory was not removed.'
+				);
+			} catch (error) {
+				recordCleanupError('temporary-directory postcondition', error);
+			}
 		}
-		console.log('[cleanup] temporary directory removal completed');
 	}
+
+	logProgress('[cleanup 7/7] clearing timers and inspecting active resource types');
+	for (const timer of [...activeTimers]) {
+		clearTrackedTimeout(timer);
+	}
+	printActiveResources('after Phase 5 cleanup');
 
 	if (cleanupErrors.length > 0) {
 		throw new AggregateError(cleanupErrors, 'Phase 5 integration cleanup failed.');
 	}
 
-	console.log('[cleanup] Vite stopped, port released, and temporary directory removed');
+	logProgress('[cleanup complete] HTTP, Vite, streams, port, timers, and temporary data closed');
 }
 
 let primaryError;
 let integrationPassed = false;
-const overallTimer = setTimeout(() => {
-	overallController.abort(
-		new Error('The Phase 5 integration test exceeded its 120-second timeout.')
+const overallTimer = trackedTimeout(() => {
+	watchdogExpired = true;
+	failureProgressStep ??= lastProgressStep;
+	const error = new Error(
+		`The Phase 5 watchdog expired after ${OVERALL_TIMEOUT_MS / 1000} seconds.`
 	);
+	primaryError ??= error;
+	console.error(`[watchdog] last progress: ${failureProgressStep}`);
+	printActiveResources('when the Phase 5 watchdog expired');
+	overallController.abort(error);
+	void cleanup(realStateForCleanup).catch((cleanupError) => {
+		console.error(
+			`[cleanup failure] ${safeDiagnostic(
+				cleanupError instanceof Error
+					? cleanupError.message
+					: String(cleanupError)
+			)}`
+		);
+	});
 }, OVERALL_TIMEOUT_MS);
 
 try {
-	await Promise.race([
-		runIntegration(),
-		new Promise((_, reject) => {
-			overallController.signal.addEventListener(
-				'abort',
-				() => reject(overallController.signal.reason),
-				{ once: true }
-			);
-		})
-	]);
+	await runIntegration();
 	integrationPassed = true;
 } catch (error) {
-	primaryError = error;
+	failureProgressStep ??= lastProgressStep;
+	primaryError ??= error;
 	console.error(
-		`[failure] ${error instanceof Error ? error.message : String(error)}`
+		`[failure] ${safeDiagnostic(
+			error instanceof Error ? error.message : String(error)
+		)}`
 	);
 
-	if (!startupComplete) {
+	if (!startupComplete || watchdogExpired) {
 		printServerLogs();
 	}
 } finally {
-	clearTimeout(overallTimer);
+	clearTrackedTimeout(overallTimer);
 
 	try {
 		await cleanup(realStateForCleanup);
 	} catch (cleanupError) {
 		console.error(
 			`[cleanup failure] ${
-				cleanupError instanceof Error
-					? cleanupError.message
-					: String(cleanupError)
+				safeDiagnostic(
+					cleanupError instanceof Error
+						? cleanupError.message
+						: String(cleanupError)
+				)
 			}`
 		);
 
-		if (!primaryError) {
-			primaryError = cleanupError;
-		}
+		primaryError ??= cleanupError;
 	}
 }
 
 if (primaryError) {
+	console.error(`[exit] code 1; last test progress: ${failureProgressStep}`);
+	printActiveResources('immediately before Phase 5 exit');
 	process.exitCode = 1;
 } else if (integrationPassed) {
 	console.log('PHASE5_INTEGRATION_CHECKS_PASSED=26');
+	console.log('[exit] code 0');
+	printActiveResources('immediately before Phase 5 exit');
 	process.exitCode = 0;
 }
