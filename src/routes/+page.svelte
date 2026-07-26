@@ -25,6 +25,7 @@
 			<a class="hero__link hero__link--primary" href="/tracks">Search public tracks</a>
 			{#if data.user}
 				<a class="hero__link" href="/upload">Upload an audio track</a>
+				<a class="hero__link" href="/my-tracks">Manage your tracks</a>
 				<a class="hero__link" href="/account">View your account</a>
 			{:else}
 				<a class="hero__link" href="/register">Create an account</a>
@@ -39,11 +40,11 @@
 
 <section class="foundation page-container" id="foundation" aria-labelledby="foundation-title">
 	<div class="section-heading">
-		<p class="eyebrow">Phase 4</p>
-		<h2 id="foundation-title">Public listening with private storage</h2>
+		<p class="eyebrow">Phase 6</p>
+		<h2 id="foundation-title">Public listening with owner-safe management</h2>
 		<p>
-			Public metadata is intentionally separated from internal filenames and physical paths,
-			while byte-range responses make native browser seeking possible.
+			Owners can update metadata or safely delete their tracks while internal identifiers,
+			storage names, physical paths, and authorization rules remain server-only.
 		</p>
 	</div>
 
@@ -74,8 +75,8 @@
 	<aside class="phase-note">
 		<span aria-hidden="true">i</span>
 		<p>
-			Search, BPM/key/genre filters, and stable sorting are available on Browse Tracks. My
-			Tracks, editing, visibility controls, and deletion remain outside Phase 5.
+			My Tracks now supports owner-only metadata editing and confirmed deletion. Audio-file
+			replacement, visibility controls, pagination, and social features remain outside Phase 6.
 		</p>
 	</aside>
 </section>

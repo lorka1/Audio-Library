@@ -1,10 +1,10 @@
 # Audio Library
 
 Audio Library is a SvelteKit application with a local SQLite database, secure
-account sessions, private audio storage, and public track delivery. Phase 5
-adds URL-driven public search, BPM/key/genre filters, and stable sorting while
-preserving the safe track-detail, HTTP byte-range playback, and download
-behavior from Phase 4.
+account sessions, private audio storage, and public track delivery. Phase 6
+adds an authenticated My Tracks area, owner-only metadata editing, and
+confirmed safe deletion while preserving the public search, filtering,
+streaming, and download behavior from Phases 4 and 5.
 
 ## Prerequisites
 
@@ -42,6 +42,7 @@ excluded from Git, `.env.example` must be copied in every new clone.
 | `npm run test:watch` | Runs Vitest in watch mode |
 | `npm run test:integration` | Runs the bounded isolated Phase 4 HTTP integration test |
 | `npm run test:integration:phase5` | Runs the bounded isolated Phase 5 search/filter/sort HTTP integration test |
+| `npm run test:integration:phase6` | Runs the bounded isolated Phase 6 owner-management HTTP integration test |
 | `npm run db:generate` | Generates a SQL migration after a schema change |
 | `npm run db:migrate` | Applies all pending migrations |
 | `npm run db:studio` | Opens Drizzle Studio |
@@ -103,12 +104,12 @@ are marked Secure outside development and expire with the database session.
 `App.Locals` with safe user and session objects. Password hashes and session
 token hashes are never included in locals or layout data.
 
-The `/account` and `/upload` pages require authentication. The `/tracks`
-list, public track details, streaming, and download routes do not. Signed-out visitors
-are sent to login and returned to the protected page after successful
-authentication. Login and registration pages redirect authenticated users
-home. Logout is a POST-only operation that removes the database session and
-clears the cookie.
+The `/account`, `/upload`, and all `/my-tracks` pages require authentication.
+The `/tracks` list, public track details, streaming, and download routes do
+not. Signed-out visitors are sent to login and returned to the protected page
+after successful authentication. Login and registration pages redirect
+authenticated users home. Logout is a POST-only operation that removes the
+database session and clears the cookie.
 
 ## Audio uploads
 
@@ -275,6 +276,64 @@ Both media endpoints use conservative `private, no-store` caching and
 returns a safe 404. Unexpected storage failures return a generic response and
 sanitized server log metadata.
 
+## My Tracks and owner management
+
+Signed-in users can open `/my-tracks` to see only tracks owned by their
+authenticated account. The page includes both public and private tracks,
+orders them newest first, and labels visibility as read-only. Public tracks
+link to their public detail page; private tracks do not. An account with no
+uploads receives a clean empty state and a link to `/upload`.
+
+Owner-management page data uses an explicit safe model containing only the
+numeric public ID and display metadata needed by the UI. It never includes the
+internal track UUID, owner ID or email, generated storage key, physical path,
+or session data. The repository receives the owner ID only from
+`event.locals.user.id`. Owner-management loads and the actual `UPDATE` and
+`DELETE` statements match both `publicId` and that authenticated owner ID.
+Invalid, missing, and non-owned management URLs therefore use the same safe
+404 response.
+
+### Metadata editing
+
+`/my-tracks/{publicId}/edit` provides a native SvelteKit form action that works
+without client-side JavaScript. Owners may edit title, artist, BPM, musical
+key, genre, and description.
+
+The audio file, original and stored filenames, visibility, ownership, public
+ID, internal UUID, creation time, MIME type, and byte size are not editable.
+The form reuses upload metadata validation without requiring another audio
+file. Invalid submissions preserve safe form values, display field-level
+errors, and do not update the row or touch the file.
+
+A successful owner-scoped update changes only editable metadata and
+`updatedAt`, then redirects with HTTP 303 to `/my-tracks?updated=1`. The query
+flag is allowlisted, and refreshing that URL performs only a GET.
+
+### Confirmed deletion and consistency
+
+`/my-tracks/{publicId}/delete` is an explicit owner-only confirmation page.
+Opening it with GET never deletes anything. Permanent deletion requires its
+POST form and redirects with HTTP 303 to `/my-tracks?deleted=1` after success.
+
+Deletion validates the server-only generated filename, enforces lexical and
+canonical containment inside the configured storage root, and rejects
+symbolic links and non-files. When a regular file exists, the service renames
+it to a server-generated quarantine name in the same storage directory,
+performs an owner-scoped row deletion, and then unlinks the quarantined file.
+If the database operation fails, it attempts to restore the original file.
+A file that is already missing is treated as already cleaned up, so the owned
+row can still be removed.
+
+SQLite and the filesystem do not provide a shared transaction, so deletion
+does not claim perfect atomicity. If the final unlink fails after the row was
+deleted, the service attempts to restore the file to its original generated
+name, removes no unrelated data, returns a generic failure, and logs only
+sanitized error metadata. In that rare case an unreferenced owner audio file
+may remain for operator cleanup, but no database row points to missing audio
+and no temporary quarantine name is exposed. If restoring after a database or
+unlink failure also fails, the response remains generic and the sanitized
+server log records the recovery failure.
+
 ### Storage and Git
 
 `storage/audio/.gitkeep` keeps the empty directory structure in the repository.
@@ -304,7 +363,8 @@ database check for nullable BPM values in the 20–300 range. Migration `0003`
 changed new uploads to public visibility by default. Phase 4 migration `0004`
 adds the numeric public route ID while preserving the existing internal UUID,
 owner, metadata, visibility, and stored audio reference. Historical migrations
-remain unchanged.
+remain unchanged. Phase 6 uses the existing metadata, ownership, visibility,
+and timestamp columns, so it adds no migration.
 
 Inspect users, sessions, and track metadata with:
 
@@ -359,6 +419,7 @@ src/
     logout/                 POST-only logout endpoint
     register/               registration form and action
     tracks/                 public list and detail pages
+    my-tracks/              owner list, metadata edit, and deletion confirmation
     api/tracks/             public-ID stream and download endpoints
     upload/                 protected multipart upload form and action
 scripts/                    bounded isolated integration controller
@@ -378,9 +439,13 @@ mapping, positive-integer track IDs, deterministic formatting, HTTP byte
 ranges, download filename encoding, generated stored filenames, path
 containment, Node-to-Web file streaming, Phase 5 query parsing, literal
 SQL-LIKE escaping, canonical query strings, result summaries, repository
-filter combinations, safe public projection, and every stable sort. Repository
-tests use an isolated in-memory SQLite database, and filesystem tests use
-temporary directories rather than `storage/audio`.
+filter combinations, safe public projection, and every stable sort. Phase 6
+coverage adds owner-safe projections, owner-scoped reads and mutations,
+metadata validation, immutable-field preservation, quarantine/restore/finalize
+behavior, missing files, unsafe paths, non-files, symbolic links, database
+rollback, final-unlink failure, concurrent deletion, and sanitized failures.
+Repository tests use isolated in-memory SQLite databases, and filesystem tests
+use temporary directories rather than `storage/audio`.
 
 Run the bounded server-level Phase 4 integration checks with:
 
@@ -410,6 +475,33 @@ rendering, form state, the `/tracks` reset URL, response privacy, and stream,
 Range, and download regression behavior. It also compares the complete real
 `Party about you` row before and after the run.
 
+Run the bounded Phase 6 owner-management integration checks with:
+
+```powershell
+npm run test:integration:phase6
+```
+
+The Phase 6 controller uses two synthetic users, a copied temporary database,
+separate temporary audio storage, and a random port. Its 31 numbered HTTP
+checks cover My Tracks authentication and isolation, public/private owner
+display, owner-only edit and delete routes, immutable fields and audio bytes,
+invalid and forged updates, explicit POST deletion, missing-file deletion,
+Post/Redirect/Get refresh behavior, response privacy, and public search,
+stream, and download regressions. Startup is bounded to 60 seconds, the whole
+run to 120 seconds, and each request to 10 seconds. Cleanup closes the database
+client and HTTP agent, terminates exactly the Vite child it started, closes
+both output streams, verifies its listener and process are gone, and removes
+its temporary directory. The controller also compares the real database and
+audio storage before and after the run and verifies the complete copied
+`Party about you` record is unchanged.
+
+For a manual two-user authorization check, upload tracks with two disposable
+accounts. While signed in as the first account, confirm `/my-tracks` excludes
+the second account's tracks and that direct edit and delete URLs for those
+tracks return the same safe 404 as a nonexistent track. Confirm a forged POST
+cannot update or delete the second account's row or file. See
+`MANUAL_TESTS.md` for the complete Phase 6 checklist.
+
 The complete browser checklist for playback, seeking, download names,
 authentication, upload validation, and responsive navigation is in
 `MANUAL_TESTS.md`.
@@ -427,11 +519,11 @@ The current multipart action uses `request.formData()`, and file storage uses
 memory rather than streamed to disk. Memory requirements increase with file
 size and concurrent uploads; keep conservative request limits in production.
 
-## Phase 5 boundary
+## Phase 6 boundary
 
-Phase 5 includes public browsing, URL-driven text search, inclusive BPM
-filters, exact musical-key and genre filters, stable sorting, public detail
-pages, native playback, single-range HTTP streaming, seeking, and download.
-It intentionally does not include pagination, My Tracks, metadata editing,
-file replacement, deletion, visibility controls, comments, ratings,
-playlists, recommendations, or automatic BPM/key analysis.
+Phase 6 includes authenticated My Tracks, public and private owner listings,
+owner-only metadata editing, explicit POST deletion, safe file quarantine and
+rollback, and owner actions on public detail pages. It intentionally does not
+include audio-file replacement, visibility controls, pagination, playlists,
+comments, ratings, recommendations, automatic BPM or key detection,
+transcoding, waveform generation, or administrator functionality.

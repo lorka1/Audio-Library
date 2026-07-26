@@ -19,9 +19,9 @@ export { BPM_MAX, BPM_MIN };
 
 const musicalKeySet = new Set<string>(MUSICAL_KEYS);
 const musicGenreSet = new Set<string>(MUSIC_GENRES);
-const INTEGER_PATTERN = /^\d+$/;
+const INTEGER_PATTERN = /^(?:0|[1-9]\d*)$/;
 
-export interface UploadFormValues {
+export interface TrackMetadataFormValues {
 	title: string;
 	artist: string;
 	bpm: string;
@@ -30,7 +30,10 @@ export interface UploadFormValues {
 	description: string;
 }
 
-export type UploadErrorField = keyof UploadFormValues | 'audioFile' | 'general';
+export type UploadFormValues = TrackMetadataFormValues;
+export type TrackMetadataErrorField = keyof TrackMetadataFormValues | 'general';
+export type TrackMetadataErrors = Partial<Record<TrackMetadataErrorField, string>>;
+export type UploadErrorField = keyof TrackMetadataFormValues | 'audioFile' | 'general';
 export type UploadErrors = Partial<Record<UploadErrorField, string>>;
 
 export interface ValidatedTrackMetadata {
@@ -62,6 +65,18 @@ export type UploadValidationResult =
 			errors: UploadErrors;
 	  };
 
+export type TrackMetadataValidationResult =
+	| {
+			success: true;
+			values: TrackMetadataFormValues;
+			metadata: ValidatedTrackMetadata;
+	  }
+	| {
+			success: false;
+			values: TrackMetadataFormValues;
+			errors: TrackMetadataErrors;
+	  };
+
 export interface FieldValidation<T> {
 	value: T;
 	error: string | null;
@@ -72,7 +87,7 @@ export function readUploadFormString(formData: FormData, field: string): string 
 	return typeof value === 'string' ? value : '';
 }
 
-export function emptyUploadFormValues(): UploadFormValues {
+export function emptyTrackMetadataFormValues(): TrackMetadataFormValues {
 	return {
 		title: '',
 		artist: '',
@@ -83,7 +98,11 @@ export function emptyUploadFormValues(): UploadFormValues {
 	};
 }
 
-export function readUploadFormValues(formData: FormData): UploadFormValues {
+export const emptyUploadFormValues = emptyTrackMetadataFormValues;
+
+export function readTrackMetadataFormValues(
+	formData: FormData
+): TrackMetadataFormValues {
 	return {
 		title: readUploadFormString(formData, 'title').trim(),
 		artist: readUploadFormString(formData, 'artist').trim(),
@@ -93,6 +112,8 @@ export function readUploadFormValues(formData: FormData): UploadFormValues {
 		description: readUploadFormString(formData, 'description').trim()
 	};
 }
+
+export const readUploadFormValues = readTrackMetadataFormValues;
 
 export function validateTitle(value: string): FieldValidation<string> {
 	const title = value.trim();
@@ -251,19 +272,17 @@ export function validateAudioFile(
 	};
 }
 
-export function validateUploadFormData(
-	formData: FormData,
-	maxFileSizeBytes: number
-): UploadValidationResult {
-	const values = readUploadFormValues(formData);
+export function validateTrackMetadataFormData(
+	formData: FormData
+): TrackMetadataValidationResult {
+	const values = readTrackMetadataFormValues(formData);
 	const title = validateTitle(values.title);
 	const artist = validateArtist(values.artist);
 	const bpm = validateBpm(values.bpm);
 	const musicalKey = validateMusicalKey(values.musicalKey);
 	const genre = validateGenre(values.genre);
 	const description = validateDescription(values.description);
-	const audioFile = validateAudioFile(formData.get('audioFile'), maxFileSizeBytes);
-	const errors: UploadErrors = {};
+	const errors: TrackMetadataErrors = {};
 
 	if (title.error) errors.title = title.error;
 	if (artist.error) errors.artist = artist.error;
@@ -271,9 +290,8 @@ export function validateUploadFormData(
 	if (musicalKey.error) errors.musicalKey = musicalKey.error;
 	if (genre.error) errors.genre = genre.error;
 	if (description.error) errors.description = description.error;
-	if (audioFile.error) errors.audioFile = audioFile.error;
 
-	if (Object.keys(errors).length > 0 || !audioFile.value) {
+	if (Object.keys(errors).length > 0) {
 		return { success: false, values, errors };
 	}
 
@@ -287,7 +305,31 @@ export function validateUploadFormData(
 			musicalKey: musicalKey.value,
 			genre: genre.value,
 			description: description.value
-		},
+		}
+	};
+}
+
+export function validateUploadFormData(
+	formData: FormData,
+	maxFileSizeBytes: number
+): UploadValidationResult {
+	const metadataValidation = validateTrackMetadataFormData(formData);
+	const values = metadataValidation.values;
+	const audioFile = validateAudioFile(formData.get('audioFile'), maxFileSizeBytes);
+	const errors: UploadErrors = metadataValidation.success
+		? {}
+		: { ...metadataValidation.errors };
+
+	if (audioFile.error) errors.audioFile = audioFile.error;
+
+	if (!metadataValidation.success || !audioFile.value) {
+		return { success: false, values, errors };
+	}
+
+	return {
+		success: true,
+		values,
+		metadata: metadataValidation.metadata,
 		audioFile: audioFile.value
 	};
 }

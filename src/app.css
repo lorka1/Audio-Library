@@ -95,7 +95,8 @@ main {
 .account-page,
 .upload-page,
 .tracks-page,
-.track-detail-page {
+.track-detail-page,
+.management-page {
 	padding-block: clamp(3rem, 8vw, 6rem);
 }
 
@@ -286,6 +287,35 @@ main {
 .primary-button:hover {
 	transform: translateY(-1px);
 	background: var(--accent-strong);
+}
+
+.secondary-button,
+.danger-link-button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 3rem;
+	padding: 0.75rem 1rem;
+	border: 1px solid #c9c4fa;
+	border-radius: 0.65rem;
+	font-weight: 750;
+	text-decoration: none;
+}
+
+.secondary-button {
+	color: var(--accent-strong);
+	background: #f3f1ff;
+}
+
+.danger-link-button {
+	color: #a72d43;
+	border-color: #efbdc6;
+	background: #fff1f3;
+}
+
+.secondary-button:hover,
+.danger-link-button:hover {
+	filter: brightness(0.98);
 }
 
 .auth-switch {

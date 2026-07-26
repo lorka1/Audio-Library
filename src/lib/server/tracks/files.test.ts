@@ -1,4 +1,4 @@
-import { readFile, readdir, rm, stat } from 'node:fs/promises';
+import { readFile, readdir, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { mkdtemp, mkdir } from 'node:fs/promises';
@@ -7,6 +7,7 @@ import {
 	AUDIO_FORMATS,
 	closeOpenedAudioFile,
 	createAudioWebStream,
+	deleteQuarantinedAudioFile,
 	deleteStoredAudioFile,
 	ensureAudioStorageDirectory,
 	generateStoredFilename,
@@ -15,7 +16,9 @@ import {
 	isAllowedAudioFormat,
 	normalizeAudioExtension,
 	openStoredAudioFile,
+	quarantineStoredAudioFile,
 	resolveStorageFilePath,
+	restoreQuarantinedAudioFile,
 	saveAudioFile
 } from './files';
 
@@ -260,6 +263,106 @@ describe('audio file storage helpers', () => {
 			expect(serializedLogArguments).not.toContain(temporaryRoot);
 			expect(serializedLogArguments).not.toContain(storedFilename);
 			consoleError.mockRestore();
+		});
+
+		it('quarantines and restores a regular file inside the same storage root', async () => {
+			const storedFilename = generateStoredFilename('.mp3', TEST_UUID);
+			const originalPath = resolveStorageFilePath(temporaryRoot, storedFilename);
+			const bytes = new Uint8Array([1, 2, 3, 4]);
+			await writeFile(originalPath, bytes);
+
+			const quarantined = await quarantineStoredAudioFile(
+				storedFilename,
+				temporaryRoot
+			);
+
+			expect(quarantined.success).toBe(true);
+			if (!quarantined.success || quarantined.state !== 'quarantined') {
+				throw new Error('Expected the stored audio file to be quarantined.');
+			}
+
+			expect(await readdir(temporaryRoot)).toEqual([
+				expect.stringMatching(/^\.delete-[0-9a-f-]+\.tmp$/)
+			]);
+			await restoreQuarantinedAudioFile(quarantined.file);
+			expect(new Uint8Array(await readFile(originalPath))).toEqual(bytes);
+			expect(await readdir(temporaryRoot)).toEqual([storedFilename]);
+		});
+
+		it('permanently removes a quarantined file without leaving a temporary name', async () => {
+			const storedFilename = generateStoredFilename('.ogg', TEST_UUID);
+			await writeFile(
+				resolveStorageFilePath(temporaryRoot, storedFilename),
+				new Uint8Array([1, 2])
+			);
+			const quarantined = await quarantineStoredAudioFile(
+				storedFilename,
+				temporaryRoot
+			);
+
+			if (!quarantined.success || quarantined.state !== 'quarantined') {
+				throw new Error('Expected the stored audio file to be quarantined.');
+			}
+
+			await deleteQuarantinedAudioFile(quarantined.file);
+			await expect(
+				deleteQuarantinedAudioFile(quarantined.file)
+			).resolves.toBeUndefined();
+			expect(await readdir(temporaryRoot)).toEqual([]);
+		});
+
+		it('treats a missing file as already removed', async () => {
+			await expect(
+				quarantineStoredAudioFile(`${TEST_UUID}.wav`, temporaryRoot)
+			).resolves.toEqual({ success: true, state: 'missing' });
+		});
+
+		it.each([
+			`../${TEST_UUID}.mp3`,
+			`folder/${TEST_UUID}.mp3`,
+			`${TEST_UUID}.mp3.exe`
+		])('fails closed for unsafe stored filename %s', async (storedFilename) => {
+			const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+			const result = await quarantineStoredAudioFile(
+				storedFilename,
+				temporaryRoot
+			);
+
+			expect(result).toEqual({ success: false, reason: 'unsafe' });
+			expect(JSON.stringify(result)).not.toContain(temporaryRoot);
+			consoleError.mockRestore();
+		});
+
+		it('rejects a directory instead of deleting it', async () => {
+			const storedFilename = `${TEST_UUID}.mp3`;
+			await mkdir(resolveStorageFilePath(temporaryRoot, storedFilename));
+
+			await expect(
+				quarantineStoredAudioFile(storedFilename, temporaryRoot)
+			).resolves.toEqual({ success: false, reason: 'not-file' });
+			expect((await stat(resolveStorageFilePath(temporaryRoot, storedFilename))).isDirectory())
+				.toBe(true);
+		});
+
+		it('rejects a symbolic link without touching its target', async () => {
+			const storedFilename = `${TEST_UUID}.mp3`;
+			const targetDirectory = join(temporaryRoot, 'target');
+			const targetFile = join(targetDirectory, 'target.mp3');
+			await mkdir(targetDirectory);
+			await writeFile(targetFile, new Uint8Array([9, 8, 7]));
+			await symlink(
+				targetDirectory,
+				resolveStorageFilePath(temporaryRoot, storedFilename),
+				'junction'
+			);
+
+			await expect(
+				quarantineStoredAudioFile(storedFilename, temporaryRoot)
+			).resolves.toEqual({ success: false, reason: 'not-file' });
+			expect(new Uint8Array(await readFile(targetFile))).toEqual(
+				new Uint8Array([9, 8, 7])
+			);
 		});
 	});
 

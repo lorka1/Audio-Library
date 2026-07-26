@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { lstat, mkdir, open, realpath, unlink } from 'node:fs/promises';
+import { lstat, mkdir, open, realpath, rename, unlink } from 'node:fs/promises';
 import type { ReadStream } from 'node:fs';
 import { extname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { Readable } from 'node:stream';
@@ -38,6 +38,26 @@ export interface AudioStreamRange {
 	start: number;
 	end: number;
 }
+
+export interface QuarantinedAudioFile {
+	originalPath: string;
+	quarantinePath: string;
+}
+
+export type QuarantineStoredAudioFileResult =
+	| {
+			success: true;
+			state: 'missing';
+	  }
+	| {
+			success: true;
+			state: 'quarantined';
+			file: QuarantinedAudioFile;
+	  }
+	| {
+			success: false;
+			reason: 'unsafe' | 'not-file' | 'unavailable';
+	  };
 
 function resolveStorageRoot(root: string): string {
 	if (!root.trim()) {
@@ -217,6 +237,110 @@ export async function deleteStoredAudioFile(
 		}
 
 		logTrackStorageError('Unable to delete a stored audio file.', error);
+		throw error;
+	}
+}
+
+export async function quarantineStoredAudioFile(
+	storedFilename: string,
+	root = serverConfig.audioStoragePath
+): Promise<QuarantineStoredAudioFileResult> {
+	let filePath: string;
+
+	try {
+		filePath = resolveStorageFilePath(root, storedFilename);
+	} catch (error) {
+		logTrackStorageError('Stored audio deletion path validation failed.', error);
+		return { success: false, reason: 'unsafe' };
+	}
+
+	let canonicalRoot: string;
+
+	try {
+		const linkStat = await lstat(filePath);
+
+		if (linkStat.isSymbolicLink() || !linkStat.isFile()) {
+			return { success: false, reason: 'not-file' };
+		}
+
+		[canonicalRoot, filePath] = await Promise.all([
+			realpath(resolveStorageRoot(root)),
+			realpath(filePath)
+		]);
+		const pathWithinRoot = relative(canonicalRoot, filePath);
+
+		if (
+			pathWithinRoot === '' ||
+			pathWithinRoot === '..' ||
+			pathWithinRoot.startsWith(`..${sep}`) ||
+			isAbsolute(pathWithinRoot)
+		) {
+			return { success: false, reason: 'unsafe' };
+		}
+	} catch (error) {
+		const code = readErrorCode(error);
+
+		if (code === 'ENOENT' || code === 'ENOTDIR') {
+			return { success: true, state: 'missing' };
+		}
+
+		logTrackStorageError('Unable to verify stored audio before deletion.', error);
+		return { success: false, reason: 'unavailable' };
+	}
+
+	const quarantinePath = resolve(
+		canonicalRoot,
+		`.delete-${randomUUID()}.tmp`
+	);
+	const quarantineWithinRoot = relative(canonicalRoot, quarantinePath);
+
+	if (
+		quarantineWithinRoot === '' ||
+		quarantineWithinRoot === '..' ||
+		quarantineWithinRoot.startsWith(`..${sep}`) ||
+		isAbsolute(quarantineWithinRoot)
+	) {
+		return { success: false, reason: 'unsafe' };
+	}
+
+	try {
+		await rename(filePath, quarantinePath);
+		return {
+			success: true,
+			state: 'quarantined',
+			file: {
+				originalPath: filePath,
+				quarantinePath
+			}
+		};
+	} catch (error) {
+		const code = readErrorCode(error);
+
+		if (code === 'ENOENT' || code === 'ENOTDIR') {
+			return { success: true, state: 'missing' };
+		}
+
+		logTrackStorageError('Unable to quarantine stored audio for deletion.', error);
+		return { success: false, reason: 'unavailable' };
+	}
+}
+
+export async function restoreQuarantinedAudioFile(
+	file: QuarantinedAudioFile
+): Promise<void> {
+	await rename(file.quarantinePath, file.originalPath);
+}
+
+export async function deleteQuarantinedAudioFile(
+	file: QuarantinedAudioFile
+): Promise<void> {
+	try {
+		await unlink(file.quarantinePath);
+	} catch (error) {
+		if (readErrorCode(error) === 'ENOENT') {
+			return;
+		}
+
 		throw error;
 	}
 }

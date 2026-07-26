@@ -23,7 +23,7 @@
 	<footer class="site-footer">
 		<div class="page-container site-footer__inner">
 			<p>Audio Library</p>
-			<p>Phase 5 · public search, filtering, sorting, playback, and download</p>
+			<p>Phase 6 · owner-managed metadata and safe track deletion</p>
 		</div>
 	</footer>
 </div>

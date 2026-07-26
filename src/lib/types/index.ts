@@ -27,3 +27,19 @@ export interface PublicTrack {
 	createdAt: string;
 	updatedAt: string;
 }
+
+export interface OwnerTrack {
+	publicId: number;
+	title: string;
+	artist: string;
+	bpm: number | null;
+	musicalKey: string | null;
+	genre: string | null;
+	description: string | null;
+	visibility: TrackVisibility;
+	fileSizeBytes: number;
+	mimeType: string;
+	originalFilename: string;
+	createdAt: string;
+	updatedAt: string;
+}

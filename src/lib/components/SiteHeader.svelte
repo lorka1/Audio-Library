@@ -21,6 +21,7 @@
 				<li><a href="/tracks">Browse Tracks</a></li>
 				{#if user}
 					<li><a href="/upload">Upload</a></li>
+					<li><a href="/my-tracks">My Tracks</a></li>
 					<li><a href="/account">Account</a></li>
 					<li>
 						<span class="user-label" aria-label={`Signed in as ${user.username}`}>

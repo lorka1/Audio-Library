@@ -404,10 +404,131 @@ used for any real service.
 - [ ] In a disposable environment, create a private track whose title, artist, description, BPM, musical key, and genre match the active search and filters exactly.
 - [ ] Expected: The private track never appears in results, result counts, page data, or active-filter output, and the response reveals no internal UUID, stored filename, or physical path.
 
+## My Tracks
+
+### MYT-001 — Protected route while signed out
+
+- [ ] Sign out and open `/my-tracks`.
+- [ ] Expected: You are redirected to `/login`, with `/my-tracks` retained as the safe return destination.
+
+### MYT-002 — Only the signed-in owner's tracks
+
+- [ ] Create disposable tracks with two users, sign in as the first user, and open `/my-tracks`.
+- [ ] Expected: All public and private tracks owned by the first user appear newest first; no track owned by the second user appears.
+
+### MYT-003 — Private owned track
+
+- [ ] Inspect a private track owned by the signed-in user on `/my-tracks`.
+- [ ] Expected: It has a clear Private badge, Edit and Delete actions, and no link to the public detail route.
+
+### MYT-004 — Empty owner library
+
+- [ ] Sign in with a disposable account that owns no tracks and open `/my-tracks`.
+- [ ] Expected: `You have not uploaded any tracks yet.` appears with a link to `/upload`.
+
+## Owner metadata editing
+
+### EDT-001 — Load an owned public track
+
+- [ ] Open the Edit metadata action for your own public track.
+- [ ] Expected: The form contains the current title, artist, BPM, musical key, genre, and description; visibility and file details are read-only.
+
+### EDT-002 — Submit valid metadata
+
+- [ ] Change all editable metadata fields to valid values and submit.
+- [ ] Expected: The browser redirects to `/my-tracks?updated=1`, a success message appears, and the new values are displayed.
+
+### EDT-003 — Refresh after update
+
+- [ ] Refresh `/my-tracks?updated=1` after EDT-002.
+- [ ] Expected: The update is not submitted again and no additional database change occurs.
+
+### EDT-004 — Invalid metadata
+
+- [ ] Submit a blank title, decimal or signed BPM, invalid musical key, or invalid genre by bypassing browser constraints if needed.
+- [ ] Expected: Field-level validation appears, safe submitted values remain populated, and neither the database nor audio file changes.
+
+### EDT-005 — Another user's edit URL
+
+- [ ] While signed in as the first user, manually open the edit URL for a track owned by the second user.
+- [ ] Expected: The same safe 404 used for a nonexistent owner-management track is returned.
+
+### EDT-006 — Forged owner or track fields
+
+- [ ] Modify the POST body to include another user's owner ID, public ID, visibility, or storage key.
+- [ ] Expected: Forged fields are ignored; the authenticated owner-scoped target is the only possible row, and the other user's row is unchanged.
+
+### EDT-007 — Audio is immutable
+
+- [ ] Hash or copy an owned track's physical audio file, edit its metadata, then compare the bytes and test playback.
+- [ ] Expected: File bytes, generated stored filename, original filename metadata, MIME type, size, and playback are unchanged.
+
+## Owner track deletion
+
+### DEL-001 — Open confirmation
+
+- [ ] Open Delete for an owned track.
+- [ ] Expected: The page names the track and clearly warns that its metadata and stored audio will be removed and normally cannot be recovered.
+
+### DEL-002 — Cancel deletion
+
+- [ ] Use Cancel on the confirmation page.
+- [ ] Expected: You return to `/my-tracks`; the row and physical audio file remain.
+
+### DEL-003 — Confirm deletion
+
+- [ ] Submit Delete permanently for an owned disposable track.
+- [ ] Expected: A POST request removes the owner-scoped row and its correct audio file, then redirects to `/my-tracks?deleted=1`.
+
+### DEL-004 — Refresh after deletion
+
+- [ ] Refresh `/my-tracks?deleted=1` after DEL-003.
+- [ ] Expected: The deletion is not repeated; the success state remains safe.
+
+### DEL-005 — Another user's confirmation URL
+
+- [ ] While signed in as the first user, manually open the delete URL for a track owned by the second user.
+- [ ] Expected: A safe 404 is returned and no information about that track is disclosed.
+
+### DEL-006 — Forged non-owner POST
+
+- [ ] Submit a delete POST for the second user's public track ID while authenticated as the first user.
+- [ ] Expected: The other user's database row and physical file remain unchanged.
+
+### DEL-007 — Missing physical file
+
+- [ ] In a disposable environment, remove an owned track's physical file and then confirm deletion.
+- [ ] Expected: The already-missing file is treated as cleaned up, the owner-scoped row is removed, and no path or stored filename is shown.
+
+### DEL-008 — Unrelated media regression
+
+- [ ] Delete one disposable owned track, then play and download a different public track.
+- [ ] Expected: The unrelated stream and download remain functional and byte-correct.
+
+## Phase 6 navigation and privacy
+
+### NAV-004 — Signed-in My Tracks navigation
+
+- [ ] Sign in and inspect navigation at desktop and 320 px widths.
+- [ ] Expected: My Tracks appears and links to `/my-tracks`; all existing signed-in links and controls remain operable.
+
+### NAV-005 — Signed-out My Tracks navigation
+
+- [ ] Sign out and inspect navigation at desktop and 320 px widths.
+- [ ] Expected: My Tracks is hidden; Home, Browse Tracks, Login, and Register remain operable.
+
+### SEC-002 — Owner-management response privacy
+
+- [ ] Inspect the HTML and SvelteKit page data for `/my-tracks` and an owned edit page.
+- [ ] Expected: No internal UUID, owner ID or email, generated stored filename, storage root, physical path, session token, or password data appears.
+
 ## Phase boundary
 
 - [ ] Confirm upload is available only to signed-in users.
 - [ ] Confirm public browsing, public detail, streaming, seeking, and download work without authentication.
 - [ ] Confirm public search covers title, artist, and description; BPM, musical-key, and genre filters can be combined; and all five server-side sort options work.
 - [ ] Confirm filter state is URL-driven, survives refresh and sharing, works without JavaScript, and can be reset to `/tracks`.
-- [ ] Confirm Phase 6 features remain absent: pagination, My Tracks, metadata editing, audio-file replacement, deletion, visibility controls, automatic analysis, comments, ratings, playlists, and recommendations.
+- [ ] Confirm `/my-tracks` includes only the authenticated owner's public and private tracks.
+- [ ] Confirm owner-only metadata editing preserves ownership, visibility, IDs, filenames, and audio bytes.
+- [ ] Confirm deletion requires confirmation and POST, removes only the owned row and correct file, and uses Post/Redirect/Get.
+- [ ] Confirm the remaining future features are absent: audio-file replacement, visibility controls, pagination, automatic analysis, transcoding, waveform generation, comments, ratings, playlists, recommendations, and administrator functionality.

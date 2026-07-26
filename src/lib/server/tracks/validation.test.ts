@@ -14,6 +14,7 @@ import {
 	validateDescription,
 	validateGenre,
 	validateMusicalKey,
+	validateTrackMetadataFormData,
 	validateTitle,
 	validateUploadFormData
 } from './validation';
@@ -115,6 +116,13 @@ describe('BPM validation', () => {
 	});
 
 	it.each(['120.5', '120.0', '1e2'])('rejects a non-integer numeric spelling: %s', (bpm) => {
+		expect(validateBpm(bpm)).toEqual({
+			value: null,
+			error: 'BPM must be an integer.'
+		});
+	});
+
+	it.each(['+120', '-120', '0120'])('rejects a noncanonical integer spelling: %s', (bpm) => {
 		expect(validateBpm(bpm)).toEqual({
 			value: null,
 			error: 'BPM must be an integer.'
@@ -324,6 +332,72 @@ describe('audio file validation', () => {
 			value: null,
 			error: `Audio filename must be at most ${ORIGINAL_FILENAME_MAX_LENGTH} characters.`
 		});
+	});
+});
+
+describe('metadata-only form validation', () => {
+	it('validates editable metadata without requiring an audio file', () => {
+		const formData = validUploadFormData();
+		formData.delete('audioFile');
+
+		const result = validateTrackMetadataFormData(formData);
+
+		expect(result).toEqual({
+			success: true,
+			values: {
+				title: 'Test Track',
+				artist: 'Test Artist',
+				bpm: '120',
+				musicalKey: 'C major',
+				genre: 'Electronic',
+				description: 'A synthetic test track.'
+			},
+			metadata: {
+				title: 'Test Track',
+				artist: 'Test Artist',
+				bpm: 120,
+				musicalKey: 'C major',
+				genre: 'Electronic',
+				description: 'A synthetic test track.'
+			}
+		});
+	});
+
+	it('preserves bounded safe values and ignores forged ownership fields', () => {
+		const formData = validUploadFormData();
+		formData.delete('audioFile');
+		formData.set('title', '   ');
+		formData.set('bpm', '120.5');
+		formData.set('musicalKey', 'forged');
+		formData.set('genre', 'forged');
+		formData.set('description', 'D'.repeat(TRACK_DESCRIPTION_MAX_LENGTH + 1));
+		formData.set('ownerId', 'forged-owner');
+		formData.set('visibility', 'private');
+		formData.set('storageKey', '../secret.mp3');
+
+		const result = validateTrackMetadataFormData(formData);
+
+		expect(result.success).toBe(false);
+
+		if (!result.success) {
+			expect(result.values).toMatchObject({
+				title: '',
+				artist: 'Test Artist',
+				bpm: '120.5',
+				musicalKey: 'forged',
+				genre: 'forged'
+			});
+			expect(result.values).not.toHaveProperty('ownerId');
+			expect(result.values).not.toHaveProperty('visibility');
+			expect(result.values).not.toHaveProperty('storageKey');
+			expect(result.errors).toMatchObject({
+				title: 'Title is required.',
+				bpm: 'BPM must be an integer.',
+				musicalKey: 'Select a valid musical key.',
+				genre: 'Select a valid genre.',
+				description: `Description must be at most ${TRACK_DESCRIPTION_MAX_LENGTH} characters.`
+			});
+		}
 	});
 });
 

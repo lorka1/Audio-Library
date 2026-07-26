@@ -2,10 +2,12 @@ import { db } from '$lib/server/db';
 import { tracks, users } from '$lib/server/db/schema';
 import type { MusicGenre, MusicalKey } from '$lib/constants/music';
 import type { TrackSearchFilters } from '$lib/tracks-query';
-import type { PublicTrack } from '$lib/types';
+import type { OwnerTrack, PublicTrack } from '$lib/types';
 import { and, asc, desc, eq, gte, lte, or, sql, type SQL } from 'drizzle-orm';
+import { toOwnerTrack, type OwnerTrackRecord } from './owner-model';
 import { toPublicTrack, type PublicTrackRecord } from './public-model';
 import { escapeSqlLikeSearchTerm } from './query';
+import type { ValidatedTrackMetadata } from './validation';
 
 export interface CreateTrackInput {
 	id: string;
@@ -39,6 +41,15 @@ export interface PublicTrackFile {
 	visibility: 'public';
 }
 
+export interface OwnedTrackFile {
+	publicId: number;
+	storedFilename: string;
+}
+
+export interface UpdateOwnedTrackMetadataInput extends ValidatedTrackMetadata {
+	updatedAt: Date;
+}
+
 const publicTrackSelection = {
 	publicId: tracks.publicId,
 	title: tracks.title,
@@ -53,7 +64,29 @@ const publicTrackSelection = {
 	updatedAt: tracks.updatedAt
 };
 
+const ownerTrackSelection = {
+	publicId: tracks.publicId,
+	title: tracks.title,
+	artist: tracks.artist,
+	bpm: tracks.bpm,
+	musicalKey: tracks.musicalKey,
+	genre: tracks.genre,
+	description: tracks.description,
+	visibility: tracks.visibility,
+	fileSizeBytes: tracks.fileSizeBytes,
+	mimeType: tracks.mimeType,
+	originalFilename: tracks.originalFilename,
+	createdAt: tracks.createdAt,
+	updatedAt: tracks.updatedAt
+};
+
 type TrackDatabase = typeof db;
+
+function requireOwnerId(ownerId: string): void {
+	if (!ownerId.trim()) {
+		throw new Error('An authenticated owner ID is required.');
+	}
+}
 
 function publicTrackConditions(filters: TrackSearchFilters): SQL[] {
 	const conditions: SQL[] = [eq(tracks.visibility, 'public')];
@@ -178,4 +211,86 @@ export async function findPublicTrackFileById(id: number): Promise<PublicTrackFi
 				visibility: 'public'
 			}
 		: null;
+}
+
+export async function listTracksByOwner(
+	ownerId: string,
+	database: TrackDatabase = db
+): Promise<OwnerTrack[]> {
+	requireOwnerId(ownerId);
+
+	const records = await database
+		.select(ownerTrackSelection)
+		.from(tracks)
+		.where(eq(tracks.ownerId, ownerId))
+		.orderBy(desc(tracks.createdAt), desc(tracks.publicId));
+
+	return records.map((record) => toOwnerTrack(record satisfies OwnerTrackRecord));
+}
+
+export async function findOwnedTrackByPublicId(
+	publicId: number,
+	ownerId: string,
+	database: TrackDatabase = db
+): Promise<OwnerTrack | null> {
+	requireOwnerId(ownerId);
+
+	const [record] = await database
+		.select(ownerTrackSelection)
+		.from(tracks)
+		.where(and(eq(tracks.publicId, publicId), eq(tracks.ownerId, ownerId)))
+		.limit(1);
+
+	return record ? toOwnerTrack(record satisfies OwnerTrackRecord) : null;
+}
+
+export async function updateOwnedTrackMetadata(
+	publicId: number,
+	ownerId: string,
+	metadata: UpdateOwnedTrackMetadataInput,
+	database: TrackDatabase = db
+): Promise<OwnerTrack | null> {
+	requireOwnerId(ownerId);
+
+	const [record] = await database
+		.update(tracks)
+		.set(metadata)
+		.where(and(eq(tracks.publicId, publicId), eq(tracks.ownerId, ownerId)))
+		.returning(ownerTrackSelection);
+
+	return record ? toOwnerTrack(record satisfies OwnerTrackRecord) : null;
+}
+
+export async function findOwnedTrackFileByPublicId(
+	publicId: number,
+	ownerId: string,
+	database: TrackDatabase = db
+): Promise<OwnedTrackFile | null> {
+	requireOwnerId(ownerId);
+
+	const [record] = await database
+		.select({
+			publicId: tracks.publicId,
+			storedFilename: tracks.storageKey
+		})
+		.from(tracks)
+		.where(and(eq(tracks.publicId, publicId), eq(tracks.ownerId, ownerId)))
+		.limit(1);
+
+	return record ?? null;
+}
+
+export async function deleteOwnedTrackRecord(
+	publicId: number,
+	ownerId: string,
+	database: TrackDatabase = db
+): Promise<boolean> {
+	requireOwnerId(ownerId);
+
+	const deleted = await database
+		.delete(tracks)
+		.where(and(eq(tracks.publicId, publicId), eq(tracks.ownerId, ownerId)))
+		.returning({ publicId: tracks.publicId });
+
+	return deleted.length === 1;
 }
