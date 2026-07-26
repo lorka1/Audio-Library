@@ -82,6 +82,10 @@ a {
 	min-height: 100vh;
 }
 
+.site-shell.has-global-player {
+	padding-bottom: 5.75rem;
+}
+
 .page-container {
 	width: min(calc(100% - 2rem), var(--content-width));
 	margin-inline: auto;
@@ -615,6 +619,10 @@ main {
 }
 
 @media (max-width: 36rem) {
+	.site-shell.has-global-player {
+		padding-bottom: 8.75rem;
+	}
+
 	.upload-form-grid {
 		grid-template-columns: 1fr;
 	}

@@ -1,10 +1,45 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
+	import ProfileMenu from './ProfileMenu.svelte';
 	import type { NavigationUser } from '$lib/types';
 
 	let { user }: { user: NavigationUser | null } = $props();
+
+	let mobileOpen = $state(false);
+	let header: HTMLElement;
+	let mobileTrigger: HTMLButtonElement;
+
+	function closeMobileMenu(restoreFocus = false): void {
+		if (!mobileOpen) return;
+		mobileOpen = false;
+		if (restoreFocus) mobileTrigger.focus();
+	}
+
+	onMount(() => {
+		function handlePointerDown(event: PointerEvent): void {
+			if (mobileOpen && !header.contains(event.target as Node)) {
+				closeMobileMenu();
+			}
+		}
+
+		function handleKeyDown(event: KeyboardEvent): void {
+			if (event.key === 'Escape' && mobileOpen) {
+				event.preventDefault();
+				closeMobileMenu(true);
+			}
+		}
+
+		document.addEventListener('pointerdown', handlePointerDown);
+		document.addEventListener('keydown', handleKeyDown);
+
+		return () => {
+			document.removeEventListener('pointerdown', handlePointerDown);
+			document.removeEventListener('keydown', handleKeyDown);
+		};
+	});
 </script>
 
-<header class="site-header">
+<header class="site-header" bind:this={header}>
 	<div class="page-container site-header__inner">
 		<a class="brand" href="/" aria-label="Audio Library — home page">
 			<span class="brand__mark" aria-hidden="true">
@@ -15,40 +50,66 @@
 			<span>Audio Library</span>
 		</a>
 
-		<nav aria-label="Main navigation">
-			<ul>
-				<li><a href="/">Home</a></li>
-				<li><a href="/tracks">Browse Tracks</a></li>
-				{#if user}
-					<li><a href="/upload">Upload</a></li>
-					<li><a href="/my-tracks">My Tracks</a></li>
-					<li><a href="/account">Account</a></li>
-					<li>
-						<span class="user-label" aria-label={`Signed in as ${user.username}`}>
-							{user.username}
-						</span>
-					</li>
-					<li>
-						<form method="POST" action="/logout">
-							<button class="logout-button" type="submit">Logout</button>
-						</form>
-					</li>
-				{:else}
-					<li><a href="/login">Login</a></li>
-					<li><a class="register-link" href="/register">Register</a></li>
-				{/if}
-			</ul>
+		<nav class="desktop-navigation" aria-label="Main navigation">
+			<a class="nav-link" href="/tracks">Browse</a>
+			{#if user}
+				<a class="nav-link" href="/upload">Upload</a>
+				<ProfileMenu {user} menuId="desktop-profile-menu" />
+			{:else}
+				<a class="nav-link" href="/login">Login</a>
+				<a class="nav-link" href="/register">Register</a>
+			{/if}
 		</nav>
+
+		<div class="mobile-actions">
+			<button
+				bind:this={mobileTrigger}
+				class="mobile-menu-trigger"
+				type="button"
+				aria-label={mobileOpen ? 'Close navigation menu' : 'Open navigation menu'}
+				aria-expanded={mobileOpen}
+				aria-controls="mobile-navigation"
+				onclick={() => (mobileOpen = !mobileOpen)}
+			>
+				<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+					{#if mobileOpen}
+						<path d="M6.4 5 5 6.4l5.6 5.6L5 17.6 6.4 19l5.6-5.6 5.6 5.6 1.4-1.4-5.6-5.6L19 6.4 17.6 5 12 10.6z"></path>
+					{:else}
+						<path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"></path>
+					{/if}
+				</svg>
+			</button>
+			{#if user}
+				<ProfileMenu {user} menuId="mobile-profile-menu" />
+			{/if}
+		</div>
 	</div>
+
+	<nav
+		id="mobile-navigation"
+		class="mobile-navigation"
+		hidden={!mobileOpen}
+		aria-label="Mobile navigation"
+	>
+		<div class="page-container mobile-navigation__inner">
+			<a href="/tracks" onclick={() => closeMobileMenu()}>Browse</a>
+			{#if user}
+				<a href="/upload" onclick={() => closeMobileMenu()}>Upload</a>
+			{:else}
+				<a href="/login" onclick={() => closeMobileMenu()}>Login</a>
+				<a href="/register" onclick={() => closeMobileMenu()}>Register</a>
+			{/if}
+		</div>
+	</nav>
 </header>
 
 <style>
 	.site-header {
 		position: sticky;
-		z-index: 10;
+		z-index: 20;
 		top: 0;
 		color: #f9fafb;
-		background: rgb(17 24 39 / 95%);
+		background: rgb(17 24 39 / 96%);
 		border-bottom: 1px solid rgb(255 255 255 / 10%);
 		backdrop-filter: blur(0.75rem);
 	}
@@ -98,99 +159,87 @@
 		height: 1rem;
 	}
 
-	ul {
+	.desktop-navigation {
 		display: flex;
 		align-items: center;
+		justify-content: flex-end;
 		gap: 0.25rem;
-		margin: 0;
-		padding: 0;
-		list-style: none;
+		margin-left: auto;
 	}
 
-	nav a,
-	.logout-button {
+	.nav-link,
+	.mobile-navigation a {
 		display: inline-flex;
 		align-items: center;
-		padding: 0.55rem 0.7rem;
+		min-height: 2.75rem;
+		padding: 0.55rem 0.75rem;
 		color: #cbd5e1;
-		border: 0;
 		border-radius: 0.5rem;
-		background: transparent;
 		font-size: 0.875rem;
-		font-weight: 600;
+		font-weight: 650;
 		text-decoration: none;
-		cursor: pointer;
-		transition:
-			color 150ms ease,
-			background-color 150ms ease;
 	}
 
-	nav a:hover,
-	.logout-button:hover {
+	.nav-link:hover,
+	.mobile-navigation a:hover {
 		color: white;
 		background: rgb(255 255 255 / 8%);
 	}
 
-	.register-link {
-		color: white;
-		background: rgb(117 106 241 / 24%);
+	.mobile-actions,
+	.mobile-navigation {
+		display: none;
 	}
 
-	.user-label {
-		display: block;
-		max-width: 11rem;
-		padding: 0.55rem 0.7rem;
-		overflow: hidden;
-		color: #a5b4fc;
-		font-size: 0.875rem;
-		font-weight: 700;
-		text-overflow: ellipsis;
-		white-space: nowrap;
+	.mobile-menu-trigger {
+		display: inline-grid;
+		place-items: center;
+		width: 2.75rem;
+		height: 2.75rem;
+		padding: 0;
+		color: #dbe3ef;
+		border: 1px solid rgb(255 255 255 / 14%);
+		border-radius: 0.65rem;
+		background: rgb(255 255 255 / 6%);
+		cursor: pointer;
 	}
 
-	form {
-		margin: 0;
+	.mobile-menu-trigger svg {
+		width: 1.2rem;
+		height: 1.2rem;
+		fill: currentColor;
 	}
 
-	@media (max-width: 50rem) {
-		.site-header__inner {
-			flex-wrap: wrap;
-			gap: 0.35rem 1rem;
-			padding-block: 0.65rem;
-		}
-
-		nav {
-			flex-basis: 100%;
-			min-width: 0;
-		}
-
-		ul {
-			flex-wrap: wrap;
-		}
+	.mobile-navigation[hidden] {
+		display: none;
 	}
 
-	@media (max-width: 34rem) {
+	@media (max-width: 48rem) {
 		.site-header__inner {
 			min-height: 4rem;
 		}
 
-		.brand > span:last-child {
+		.desktop-navigation {
 			display: none;
 		}
 
-		ul {
-			gap: 0;
+		.mobile-actions {
+			display: flex;
+			align-items: center;
+			gap: 0.5rem;
+			margin-left: auto;
 		}
 
-		nav a,
-		.logout-button,
-		.user-label {
-			padding-inline: 0.5rem;
-			font-size: 0.8rem;
+		.mobile-navigation {
+			display: block;
+			border-top: 1px solid rgb(255 255 255 / 9%);
 		}
 
-		.user-label {
-			max-width: 8rem;
+		.mobile-navigation__inner {
+			display: flex;
+			gap: 0.25rem;
+			padding-block: 0.5rem;
 		}
 	}
+
 </style>

@@ -25,14 +25,10 @@
 			<a class="hero__link hero__link--primary" href="/tracks">Browse Tracks</a>
 			{#if data.user}
 				<a class="hero__link" href="/upload">Upload a Track</a>
-				<a class="hero__link" href="/my-tracks">Manage My Tracks</a>
 			{:else}
-				<a class="hero__link" href="/register">Register</a>
 				<a class="hero__link" href="/login">Login</a>
+				<a class="hero__link" href="/register">Register</a>
 			{/if}
-			<a class="hero__link" href="#features"
-				>Explore features <span aria-hidden="true">↓</span></a
-			>
 		</div>
 	</div>
 </section>
@@ -75,7 +71,7 @@
 			<span class="card-number" aria-hidden="true">04</span>
 			<h3>Play and download</h3>
 			<p>
-				Listen with native audio controls, seek with byte-range streaming, or download a
+				Listen with the persistent player, seek with byte-range streaming, or download a
 				safely named copy.
 			</p>
 		</article>

@@ -12,14 +12,16 @@ playback, safe downloads, and owner-only track management.
 - Browse public tracks and open detailed listening pages without signing in.
 - Search titles, artists, and descriptions; filter by BPM, key, and genre; and
   use deterministic server-side sorting.
-- Play and seek through audio with HTTP byte-range responses.
+- Start, pause, switch, and seek public tracks through one persistent global
+  player backed by HTTP byte-range responses.
 - Download tracks with sanitized user-facing filenames.
 - Review public and private owned tracks in My Tracks.
 - Edit owned track metadata without changing identity, ownership, visibility,
   filenames, or audio bytes.
 - Confirm owner-only deletion with coordinated database and filesystem cleanup.
-- Use the core forms, filters, navigation, and media links without client-side
-  JavaScript.
+- Use browsing, forms, filters, navigation, downloads, and direct media links
+  without client-side JavaScript; persistent playback is a focused client-side
+  enhancement.
 
 ## Tech stack
 
@@ -197,7 +199,13 @@ to `/tracks`.
 
 ## Streaming, seeking, and downloads
 
-The native player requests:
+The root layout owns one audio element and a compact bottom player, so selected
+audio, seek position, duration, volume, and play/pause state survive internal
+SvelteKit navigation. Browse cards, public track details, and public entries in
+My Tracks all control that same player. Its client state contains only the
+numeric public track ID, title, artist, stream URL, and public details URL.
+
+The global player requests:
 
 ```text
 GET /api/tracks/{publicId}/stream
