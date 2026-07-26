@@ -1,10 +1,8 @@
 import type { CurrentUser } from '$lib/types';
-import { eq, lt } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { sessions, users } from '$lib/server/db/schema';
 import type {
 	AuthSession,
-	AuthState,
 	CreateSessionRecordInput,
 	CreateUserInput
 } from './types';
@@ -43,44 +41,4 @@ export async function createUserWithSession(
 
 		return { user, session };
 	});
-}
-
-export async function createSessionRecord(
-	input: CreateSessionRecordInput
-): Promise<AuthSession> {
-	const [session] = await db.insert(sessions).values(input).returning(safeSessionSelection);
-
-	if (!session) {
-		throw new Error('The database did not return the created session.');
-	}
-
-	return session;
-}
-
-export async function findSessionWithUserByTokenHash(
-	tokenHash: string
-): Promise<AuthState | null> {
-	const [result] = await db
-		.select({
-			session: safeSessionSelection,
-			user: safeUserSelection
-		})
-		.from(sessions)
-		.innerJoin(users, eq(sessions.userId, users.id))
-		.where(eq(sessions.tokenHash, tokenHash))
-		.limit(1);
-
-	return result ?? null;
-}
-
-export async function deleteSessionById(sessionId: string): Promise<void> {
-	await db.delete(sessions).where(eq(sessions.id, sessionId));
-}
-
-export async function deleteSessionByTokenHash(tokenHash: string): Promise<void> {
-	await db.delete(sessions).where(eq(sessions.tokenHash, tokenHash));
-}
-
-export async function deleteExpiredSessionRecords(now: Date): Promise<void> {
-	await db.delete(sessions).where(lt(sessions.expiresAt, now));
 }

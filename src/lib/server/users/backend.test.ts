@@ -2,8 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
 	parseDatabaseBackend,
 	readDatabaseBackend,
-	requireM2ApplicationBackend,
-	UnsafeM2BackendTransitionError
+	assertUnifiedAuthBackend
 } from './backend';
 
 describe('database backend selection', () => {
@@ -30,12 +29,11 @@ describe('database backend selection', () => {
 		);
 	});
 
-	it('prevents MongoDB user cutover while sessions remain in SQLite', () => {
-		expect(
-			requireM2ApplicationBackend({ DATABASE_BACKEND: 'sqlite' })
-		).toBe('sqlite');
+	it('forbids mixed user and session backends', () => {
+		expect(assertUnifiedAuthBackend('sqlite', 'sqlite')).toBe('sqlite');
+		expect(assertUnifiedAuthBackend('mongodb', 'mongodb')).toBe('mongodb');
 		expect(() =>
-			requireM2ApplicationBackend({ DATABASE_BACKEND: 'mongodb' })
-		).toThrowError(UnsafeM2BackendTransitionError);
+			assertUnifiedAuthBackend('mongodb', 'sqlite')
+		).toThrowError('Mixed user and session backends are forbidden.');
 	});
 });

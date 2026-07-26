@@ -19,9 +19,8 @@ import {
 	verifyPassword
 } from '../src/lib/server/auth/password.ts';
 import {
+	assertUnifiedAuthBackend,
 	parseDatabaseBackend,
-	requireM2ApplicationBackend,
-	UnsafeM2BackendTransitionError
 } from '../src/lib/server/users/backend.ts';
 import {
 	createMongoUserRepository
@@ -277,13 +276,13 @@ async function main() {
 		check('SQLite backend default', () => {
 			assert.equal(parseDatabaseBackend(undefined), 'sqlite');
 		});
-		check('MongoDB application cutover guard', () => {
-			assert.throws(
-				() =>
-					requireM2ApplicationBackend({
-						DATABASE_BACKEND: 'mongodb'
-					}),
-				UnsafeM2BackendTransitionError
+		check('unified MongoDB auth backend', () => {
+			assert.equal(
+				assertUnifiedAuthBackend('mongodb', 'mongodb'),
+				'mongodb'
+			);
+			assert.throws(() =>
+				assertUnifiedAuthBackend('mongodb', 'sqlite')
 			);
 		});
 

@@ -6,15 +6,6 @@ export interface DatabaseBackendEnvironment {
 	DATABASE_BACKEND?: string;
 }
 
-export class UnsafeM2BackendTransitionError extends Error {
-	constructor() {
-		super(
-			'DATABASE_BACKEND=mongodb cannot serve application users until sessions migrate in M3.'
-		);
-		this.name = 'UnsafeM2BackendTransitionError';
-	}
-}
-
 export function parseDatabaseBackend(
 	value: string | undefined
 ): DatabaseBackend {
@@ -35,14 +26,12 @@ export function readDatabaseBackend(
 	return parseDatabaseBackend(environment.DATABASE_BACKEND);
 }
 
-export function requireM2ApplicationBackend(
-	environment: DatabaseBackendEnvironment = process.env
-): 'sqlite' {
-	const backend = readDatabaseBackend(environment);
-
-	if (backend === 'mongodb') {
-		throw new UnsafeM2BackendTransitionError();
+export function assertUnifiedAuthBackend(
+	userBackend: DatabaseBackend,
+	sessionBackend: DatabaseBackend
+): DatabaseBackend {
+	if (userBackend !== sessionBackend) {
+		throw new Error('Mixed user and session backends are forbidden.');
 	}
-
-	return backend;
+	return userBackend;
 }

@@ -1,35 +1,31 @@
 import type { CreateUserInput } from '$lib/server/auth/types';
 import type { DatabaseBackendEnvironment } from './backend';
-import { requireM2ApplicationBackend } from './backend';
-import { sqliteUserRepository } from './sqlite-repository';
-
-function applicationRepository(
-	environment: DatabaseBackendEnvironment = process.env
-) {
-	requireM2ApplicationBackend(environment);
-	return sqliteUserRepository;
-}
+import { getAuthPersistence } from '$lib/server/auth/persistence';
 
 export function createUser(
 	input: CreateUserInput,
 	environment?: DatabaseBackendEnvironment
 ) {
-	return applicationRepository(environment).createUser(input);
+	return getAuthPersistence(environment).then(({ users }) =>
+		users.createUser(input)
+	);
 }
 
 export function findUserById(
 	id: string,
 	environment?: DatabaseBackendEnvironment
 ) {
-	return applicationRepository(environment).findUserById(id);
+	return getAuthPersistence(environment).then(({ users }) =>
+		users.findUserById(id)
+	);
 }
 
 export function findUserByNormalizedUsername(
 	username: string,
 	environment?: DatabaseBackendEnvironment
 ) {
-	return applicationRepository(environment).findUserByNormalizedUsername(
-		username
+	return getAuthPersistence(environment).then(({ users }) =>
+		users.findUserByNormalizedUsername(username)
 	);
 }
 
@@ -37,15 +33,17 @@ export function findUserByNormalizedEmail(
 	email: string,
 	environment?: DatabaseBackendEnvironment
 ) {
-	return applicationRepository(environment).findUserByNormalizedEmail(email);
+	return getAuthPersistence(environment).then(({ users }) =>
+		users.findUserByNormalizedEmail(email)
+	);
 }
 
 export function findAuthenticationUser(
 	normalizedEmail: string,
 	environment?: DatabaseBackendEnvironment
 ) {
-	return applicationRepository(environment).findAuthenticationUser(
-		normalizedEmail
+	return getAuthPersistence(environment).then(({ users }) =>
+		users.findAuthenticationUser(normalizedEmail)
 	);
 }
 
@@ -53,7 +51,9 @@ export function findAccountUserById(
 	id: string,
 	environment?: DatabaseBackendEnvironment
 ) {
-	return applicationRepository(environment).findAccountUserById(id);
+	return getAuthPersistence(environment).then(({ users }) =>
+		users.findAccountUserById(id)
+	);
 }
 
 export function findRegistrationConflicts(
@@ -61,8 +61,7 @@ export function findRegistrationConflicts(
 	normalizedEmail: string,
 	environment?: DatabaseBackendEnvironment
 ) {
-	return applicationRepository(environment).findRegistrationConflicts(
-		normalizedUsername,
-		normalizedEmail
+	return getAuthPersistence(environment).then(({ users }) =>
+		users.findRegistrationConflicts(normalizedUsername, normalizedEmail)
 	);
 }

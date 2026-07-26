@@ -107,7 +107,7 @@ MONGODB_TEST_DB_NAME=audio_library_test_local
 | Variable | Purpose |
 | --- | --- |
 | `DATABASE_URL` | Required path to the SQLite database file. |
-| `DATABASE_BACKEND` | Server-only phased-migration selector: `sqlite` or `mongodb`. It defaults to `sqlite`; M2 deliberately prevents MongoDB application cutover until sessions migrate in M3. |
+| `DATABASE_BACKEND` | Server-only auth persistence selector: `sqlite` or `mongodb`. It defaults to `sqlite` and always selects users and sessions together. |
 | `AUDIO_STORAGE_PATH` | Private audio directory, resolved from the project working directory when relative. Blank values fall back to `storage/audio`. |
 | `MAX_AUDIO_FILE_SIZE_MB` | Maximum application-level size of one upload. Invalid or blank values use 50 MB. |
 | `BODY_SIZE_LIMIT` | Request-body limit used by the production Node adapter. It must exceed the audio limit enough to allow multipart overhead. |
@@ -295,7 +295,7 @@ The current migrations create users, hashed sessions, track metadata and
 ownership, public/private visibility, storage references, metadata constraints,
 and the numeric public route ID while preserving the server-only track UUID.
 
-### MongoDB migration M1–M2
+### MongoDB migration M1–M3
 
 The MongoDB migration is being introduced in phases. M1 adds the official
 MongoDB Node.js driver, validated environment settings, typed document and
@@ -312,10 +312,18 @@ integration-tested only against a unique database derived from
 `MONGODB_TEST_DB_NAME`. That name must differ from `MONGODB_DB_NAME` and start
 with `audio_library_test_`.
 
-Sessions and tracks remain SQLite-backed. Because SQLite sessions reference
-SQLite users, `DATABASE_BACKEND=mongodb` is recognized but cannot serve
-application users until users and sessions can move together safely in M3.
-Full MongoDB application cutover is not complete.
+M3 adds matching SQLite and MongoDB session repositories and one unified auth
+selector. `DATABASE_BACKEND=sqlite` remains the safe default.
+`DATABASE_BACKEND=mongodb` selects MongoDB for both users and sessions; mixed
+auth backends are forbidden. MongoDB auth requires Atlas, a replica set, or a
+compatible sharded deployment because registration uses a transaction to
+create the user and initial session atomically. There is no non-atomic fallback.
+
+Tracks and audio metadata remain SQLite-backed regardless of the selected auth
+backend. Real users and sessions are not migrated yet. A final switch to
+MongoDB auth will invalidate existing SQLite login cookies; users should sign
+in again rather than copying active session tokens. Full application cutover
+is not complete.
 
 With all three MongoDB environment variables configured, verify connectivity,
 database selection, and indexes without reading or writing application
@@ -348,6 +356,7 @@ it is not the server itself and is not required by the application.
 | `npm run db:studio` | Open Drizzle Studio. |
 | `npm run db:mongodb:check` | Safely check the configured MongoDB connection, selected development database, and M1 indexes. |
 | `npm run test:mongodb:users` | Run the isolated M2 MongoDB user-repository integration checks and remove their uniquely owned test database. |
+| `npm run test:mongodb:auth` | Verify M3 MongoDB transactions, users-plus-sessions authentication behavior, privacy, and isolated cleanup. |
 
 There is no separate lint script. `npm run check` is the enforced Svelte and
 TypeScript static-analysis command.

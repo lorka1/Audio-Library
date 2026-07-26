@@ -108,7 +108,7 @@ export function createMongoUserRepository(
 	});
 
 	const repository: UserRepository = {
-		async createUser(input) {
+		async createUser(input, context) {
 			assertNormalizedCreateUserInput(input);
 			const now = options.now?.() ?? new Date();
 			const document: UserDocument = {
@@ -121,7 +121,10 @@ export function createMongoUserRepository(
 			};
 
 			try {
-				await users.insertOne(document, operationOptions);
+				await users.insertOne(document, {
+					...operationOptions,
+					session: context?.mongoSession
+				});
 			} catch (error) {
 				const field = duplicateField(error);
 

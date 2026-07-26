@@ -1,8 +1,7 @@
 export {
+	assertUnifiedAuthBackend,
 	parseDatabaseBackend,
-	readDatabaseBackend,
-	requireM2ApplicationBackend,
-	UnsafeM2BackendTransitionError
+	readDatabaseBackend
 } from './backend';
 export {
 	assertNormalizedCreateUserInput

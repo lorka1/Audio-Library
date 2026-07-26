@@ -1,4 +1,5 @@
 import type { CreateUserInput } from '../auth/types.ts';
+import type { ClientSession } from 'mongodb';
 import {
 	normalizeEmail,
 	validateEmail,
@@ -12,7 +13,10 @@ import type {
 } from './types';
 
 export interface UserRepository {
-	createUser(input: CreateUserInput): Promise<SafeUser>;
+	createUser(
+		input: CreateUserInput,
+		context?: { mongoSession?: ClientSession }
+	): Promise<SafeUser>;
 	findUserById(id: string): Promise<SafeUser | null>;
 	findUserByNormalizedUsername(username: string): Promise<SafeUser | null>;
 	findUserByNormalizedEmail(email: string): Promise<SafeUser | null>;

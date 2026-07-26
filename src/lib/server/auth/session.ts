@@ -2,13 +2,7 @@ import { dev } from '$app/environment';
 import type { Cookies } from '@sveltejs/kit';
 import { randomUUID } from 'node:crypto';
 import { serverConfig } from '$lib/server/config';
-import {
-	createSessionRecord,
-	deleteExpiredSessionRecords,
-	deleteSessionById,
-	deleteSessionByTokenHash,
-	findSessionWithUserByTokenHash
-} from './repository';
+import { getAuthPersistence } from './persistence';
 import {
 	generateSessionToken,
 	hashSessionToken,
@@ -45,7 +39,8 @@ export async function createSession(userId: string): Promise<{
 	session: AuthSession;
 }> {
 	const prepared = prepareSession(userId);
-	const session = await createSessionRecord(prepared.record);
+	const persistence = await getAuthPersistence();
+	const session = await persistence.sessions.createSession(prepared.record);
 	return { token: prepared.token, session };
 }
 
@@ -54,18 +49,11 @@ export async function validateSessionToken(token: string): Promise<AuthState | n
 		return null;
 	}
 
-	const state = await findSessionWithUserByTokenHash(hashSessionToken(token));
-
-	if (!state) {
-		return null;
-	}
-
-	if (state.session.expiresAt.getTime() <= Date.now()) {
-		await deleteSessionById(state.session.id);
-		return null;
-	}
-
-	return state;
+	const persistence = await getAuthPersistence();
+	return persistence.sessions.findValidSessionWithUser(
+		hashSessionToken(token),
+		new Date()
+	);
 }
 
 export async function invalidateSession(token: string): Promise<void> {
@@ -73,11 +61,15 @@ export async function invalidateSession(token: string): Promise<void> {
 		return;
 	}
 
-	await deleteSessionByTokenHash(hashSessionToken(token));
+	const persistence = await getAuthPersistence();
+	await persistence.sessions.deleteSessionByTokenHash(
+		hashSessionToken(token)
+	);
 }
 
 export async function deleteExpiredSessions(now = new Date()): Promise<void> {
-	await deleteExpiredSessionRecords(now);
+	const persistence = await getAuthPersistence();
+	await persistence.sessions.deleteExpiredSessions(now);
 }
 
 export function setSessionCookie(cookies: Cookies, token: string, expiresAt: Date): void {

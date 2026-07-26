@@ -46,7 +46,8 @@ describe('MongoDB user repository', () => {
 		});
 		expect(users.insertOne).toHaveBeenCalledWith(document, {
 			timeoutMS: 2_000,
-			signal: undefined
+			signal: undefined,
+			session: undefined
 		});
 		expect(await repository.createUser(input)).not.toHaveProperty(
 			'passwordHash'
