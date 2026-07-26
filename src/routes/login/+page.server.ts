@@ -6,8 +6,8 @@ import {
 	performDummyPasswordCheck,
 	verifyPassword
 } from '$lib/server/auth/password';
-import { findUserByEmail } from '$lib/server/auth/repository';
 import { createSession, setSessionCookie } from '$lib/server/auth/session';
+import { findAuthenticationUser } from '$lib/server/users/repository';
 import {
 	getSafeRedirectPath,
 	readFormString,
@@ -56,7 +56,7 @@ export const actions = {
 		const values = { email: validation.data.email };
 
 		try {
-			const user = await findUserByEmail(values.email);
+			const user = await findAuthenticationUser(values.email);
 
 			if (!user) {
 				await performDummyPasswordCheck(validation.data.password);

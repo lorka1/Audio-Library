@@ -93,12 +93,13 @@ upload a track, or open `/tracks` to browse the public library.
 
 ```dotenv
 DATABASE_URL=./data/app.db
+DATABASE_BACKEND=sqlite
 AUDIO_STORAGE_PATH=storage/audio
 MAX_AUDIO_FILE_SIZE_MB=50
 BODY_SIZE_LIMIT=55M
 SESSION_COOKIE_NAME=audio_library_session
 SESSION_DURATION_DAYS=7
-MONGODB_URI=mongodb://mongodb-host.example.invalid:27017
+MONGODB_URI=mongodb://127.0.0.1:27017
 MONGODB_DB_NAME=audio_library_dev
 MONGODB_TEST_DB_NAME=audio_library_test_local
 ```
@@ -106,6 +107,7 @@ MONGODB_TEST_DB_NAME=audio_library_test_local
 | Variable | Purpose |
 | --- | --- |
 | `DATABASE_URL` | Required path to the SQLite database file. |
+| `DATABASE_BACKEND` | Server-only phased-migration selector: `sqlite` or `mongodb`. It defaults to `sqlite`; M2 deliberately prevents MongoDB application cutover until sessions migrate in M3. |
 | `AUDIO_STORAGE_PATH` | Private audio directory, resolved from the project working directory when relative. Blank values fall back to `storage/audio`. |
 | `MAX_AUDIO_FILE_SIZE_MB` | Maximum application-level size of one upload. Invalid or blank values use 50 MB. |
 | `BODY_SIZE_LIMIT` | Request-body limit used by the production Node adapter. It must exceed the audio limit enough to allow multipart overhead. |
@@ -293,13 +295,27 @@ The current migrations create users, hashed sessions, track metadata and
 ownership, public/private visibility, storage references, metadata constraints,
 and the numeric public route ID while preserving the server-only track UUID.
 
-### MongoDB migration M1
+### MongoDB migration M1–M2
 
 The MongoDB migration is being introduced in phases. M1 adds the official
 MongoDB Node.js driver, validated environment settings, typed document and
 collection definitions, a cached server-only client, and idempotent index
 creation. The application still uses SQLite and Drizzle for all runtime data;
 no repository or stored data has been migrated.
+
+M2 adds a focused user-repository contract with SQLite and MongoDB
+implementations. SQLite remains the safe application default. Registration
+conflict checks, password-authentication lookup, and account lookup use the
+SQLite implementation through the contract; atomic user-and-session creation
+remains one SQLite transaction. MongoDB user operations are
+integration-tested only against a unique database derived from
+`MONGODB_TEST_DB_NAME`. That name must differ from `MONGODB_DB_NAME` and start
+with `audio_library_test_`.
+
+Sessions and tracks remain SQLite-backed. Because SQLite sessions reference
+SQLite users, `DATABASE_BACKEND=mongodb` is recognized but cannot serve
+application users until users and sessions can move together safely in M3.
+Full MongoDB application cutover is not complete.
 
 With all three MongoDB environment variables configured, verify connectivity,
 database selection, and indexes without reading or writing application
@@ -331,6 +347,7 @@ it is not the server itself and is not required by the application.
 | `npm run db:generate` | Generate a migration from an intentional schema change. |
 | `npm run db:studio` | Open Drizzle Studio. |
 | `npm run db:mongodb:check` | Safely check the configured MongoDB connection, selected development database, and M1 indexes. |
+| `npm run test:mongodb:users` | Run the isolated M2 MongoDB user-repository integration checks and remove their uniquely owned test database. |
 
 There is no separate lint script. `npm run check` is the enforced Svelte and
 TypeScript static-analysis command.

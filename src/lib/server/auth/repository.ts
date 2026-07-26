@@ -23,36 +23,6 @@ const safeSessionSelection = {
 	createdAt: sessions.createdAt
 };
 
-export async function findUserByEmail(email: string) {
-	const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
-	return user ?? null;
-}
-
-export async function findUserByUsername(username: string): Promise<CurrentUser | null> {
-	const [user] = await db
-		.select(safeUserSelection)
-		.from(users)
-		.where(eq(users.username, username))
-		.limit(1);
-
-	return user ?? null;
-}
-
-export async function findUserById(id: string): Promise<CurrentUser | null> {
-	const [user] = await db.select(safeUserSelection).from(users).where(eq(users.id, id)).limit(1);
-	return user ?? null;
-}
-
-export async function createUser(input: CreateUserInput): Promise<CurrentUser> {
-	const [user] = await db.insert(users).values(input).returning(safeUserSelection);
-
-	if (!user) {
-		throw new Error('The database did not return the created user.');
-	}
-
-	return user;
-}
-
 export async function createUserWithSession(
 	userInput: CreateUserInput,
 	sessionInput: CreateSessionRecordInput
@@ -113,19 +83,4 @@ export async function deleteSessionByTokenHash(tokenHash: string): Promise<void>
 
 export async function deleteExpiredSessionRecords(now: Date): Promise<void> {
 	await db.delete(sessions).where(lt(sessions.expiresAt, now));
-}
-
-export async function findRegistrationConflicts(
-	username: string,
-	email: string
-): Promise<{ usernameTaken: boolean; emailTaken: boolean }> {
-	const [usernameMatch, emailMatch] = await Promise.all([
-		findUserByUsername(username),
-		findUserByEmail(email)
-	]);
-
-	return {
-		usernameTaken: usernameMatch !== null,
-		emailTaken: emailMatch !== null
-	};
 }

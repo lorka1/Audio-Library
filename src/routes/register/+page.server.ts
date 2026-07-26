@@ -4,11 +4,9 @@ import type { Actions, PageServerLoad } from './$types';
 import { requireGuest } from '$lib/server/auth/guards';
 import { logAuthError } from '$lib/server/auth/logging';
 import { hashPassword } from '$lib/server/auth/password';
-import {
-	createUserWithSession,
-	findRegistrationConflicts
-} from '$lib/server/auth/repository';
+import { createUserWithSession } from '$lib/server/auth/repository';
 import { prepareSession, setSessionCookie } from '$lib/server/auth/session';
+import { findRegistrationConflicts } from '$lib/server/users/repository';
 import {
 	readFormString,
 	validateRegistrationInput,

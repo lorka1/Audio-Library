@@ -19,6 +19,7 @@
     "test:integration": "node scripts/phase4-integration.mjs",
     "test:integration:phase5": "node scripts/phase5-integration.mjs",
     "test:integration:phase6": "node scripts/phase6-integration.mjs",
+    "test:mongodb:users": "node --experimental-strip-types scripts/mongodb-users-integration.mjs",
     "verify:clean-clone": "node scripts/clean-clone-check.mjs",
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate",
