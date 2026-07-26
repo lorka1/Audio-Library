@@ -57,6 +57,7 @@
 		font-weight: 800;
 		letter-spacing: 0.08em;
 		text-transform: uppercase;
+		overflow-wrap: anywhere;
 	}
 
 	h2 {
@@ -119,6 +120,7 @@
 
 	footer p {
 		margin: 0;
+		overflow-wrap: anywhere;
 	}
 
 	@media (max-width: 28rem) {

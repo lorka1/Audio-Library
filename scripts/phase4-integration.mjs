@@ -40,7 +40,7 @@ const LOG_TAIL_LIMIT = 64 * 1024;
 loadEnvironment({ path: join(PROJECT_ROOT, '.env'), quiet: true });
 
 let child;
-let childExitPromise;
+let childClosePromise;
 let temporaryRoot;
 let temporaryClient;
 let testPort;
@@ -221,15 +221,98 @@ function requestSignal() {
 }
 
 async function request(baseUrl, path, options = {}) {
+	const { headers, ...requestOptions } = options;
+
 	return fetch(`${baseUrl}${path}`, {
 		redirect: 'manual',
-		...options,
+		...requestOptions,
+		headers: {
+			Connection: 'close',
+			...headers
+		},
 		signal: requestSignal()
 	});
 }
 
 function delay(milliseconds) {
 	return new Promise((resolveDelay) => setTimeout(resolveDelay, milliseconds));
+}
+
+async function waitForChildClose(milliseconds) {
+	let timeout;
+
+	try {
+		return await Promise.race([
+			childClosePromise.then(() => true),
+			new Promise((resolveWait) => {
+				timeout = setTimeout(() => resolveWait(false), milliseconds);
+			})
+		]);
+	} finally {
+		clearTimeout(timeout);
+	}
+}
+
+function terminateWindowsChildTree(pid) {
+	const result = spawnSync(
+		'taskkill.exe',
+		['/PID', String(pid), '/T', '/F'],
+		{
+			stdio: 'ignore',
+			timeout: SHUTDOWN_TIMEOUT_MS,
+			windowsHide: true
+		}
+	);
+
+	if (result.error && isProcessAlive(pid)) {
+		throw new Error(
+			`Windows could not terminate the owned Vite process tree (${result.error.name}${
+				result.error.code ? `; code ${result.error.code}` : ''
+			}).`
+		);
+	}
+
+	if (result.status !== 0 && isProcessAlive(pid)) {
+		throw new Error(
+			`Windows taskkill returned status ${result.status ?? 'unknown'} for the owned Vite process tree.`
+		);
+	}
+}
+
+function closeChildStream(stream, label) {
+	if (!stream || stream.closed) {
+		return Promise.resolve();
+	}
+
+	return new Promise((resolveClose, rejectClose) => {
+		const timeout = setTimeout(() => {
+			finish(new Error(`The Vite ${label} stream did not close.`));
+		}, SHUTDOWN_TIMEOUT_MS);
+
+		function finish(error) {
+			clearTimeout(timeout);
+			stream.removeListener('close', onClose);
+			stream.removeListener('error', onError);
+
+			if (error) {
+				rejectClose(error);
+			} else {
+				resolveClose();
+			}
+		}
+
+		function onClose() {
+			finish();
+		}
+
+		function onError(error) {
+			finish(error);
+		}
+
+		stream.once('close', onClose);
+		stream.once('error', onError);
+		stream.destroy();
+	});
 }
 
 async function waitForStartup(baseUrl) {
@@ -283,7 +366,14 @@ async function waitForStartup(baseUrl) {
 async function canConnect(port) {
 	return new Promise((resolveConnection) => {
 		const socket = connect({ host: '127.0.0.1', port });
+		let finished = false;
+
 		const finish = (connected) => {
+			if (finished) {
+				return;
+			}
+
+			finished = true;
 			socket.destroy();
 			resolveConnection(connected);
 		};
@@ -292,6 +382,69 @@ async function canConnect(port) {
 		socket.once('connect', () => finish(true));
 		socket.once('error', () => finish(false));
 	});
+}
+
+async function waitForPortRelease(port, milliseconds = SHUTDOWN_TIMEOUT_MS) {
+	const deadline = Date.now() + milliseconds;
+
+	do {
+		if (!(await canConnect(port))) {
+			return;
+		}
+
+		await delay(150);
+	} while (Date.now() < deadline);
+
+	throw new Error(`The integration port ${port} is still accepting connections.`);
+}
+
+function readErrorCode(error) {
+	if (typeof error !== 'object' || error === null || !('code' in error)) {
+		return undefined;
+	}
+
+	const code = error.code;
+	return typeof code === 'string' || typeof code === 'number' ? code : undefined;
+}
+
+async function removeTemporaryDirectoryWithRetry(root) {
+	const attempts = process.platform === 'win32' ? 12 : 3;
+	let lastError;
+
+	for (let attempt = 1; attempt <= attempts; attempt += 1) {
+		try {
+			await rm(root, {
+				recursive: true,
+				force: true,
+				maxRetries: process.platform === 'win32' ? 2 : 0,
+				retryDelay: 100
+			});
+
+			if (!existsSync(root)) {
+				return;
+			}
+
+			lastError = new Error('The temporary directory still exists.');
+		} catch (error) {
+			lastError = error;
+		}
+
+		console.error(
+			`[cleanup] temporary-directory retry ${attempt}/${attempts} (code ${
+				readErrorCode(lastError) ?? 'unknown'
+			})`
+		);
+
+		if (attempt < attempts) {
+			await delay(250);
+		}
+	}
+
+	throw new Error(
+		`The integration temporary directory could not be removed after ${attempts} attempts (code ${
+			readErrorCode(lastError) ?? 'unknown'
+		}).`
+	);
 }
 
 function isProcessAlive(pid) {
@@ -308,31 +461,39 @@ function isProcessAlive(pid) {
 }
 
 async function stopChildProcess() {
-	if (!child?.pid || child.exitCode !== null) {
+	if (!child?.pid) {
 		return;
 	}
 
-	if (process.platform === 'win32') {
-		spawnSync('taskkill.exe', ['/PID', String(child.pid), '/T', '/F'], {
-			stdio: 'ignore',
-			windowsHide: true
-		});
-	} else {
-		try {
-			process.kill(-child.pid, 'SIGTERM');
-		} catch {
-			child.kill('SIGTERM');
+	let terminationError;
+
+	if (child.exitCode === null && child.signalCode === null) {
+		if (process.platform === 'win32') {
+			try {
+				terminateWindowsChildTree(child.pid);
+			} catch (error) {
+				terminationError = error;
+				child.kill();
+			}
+		} else {
+			try {
+				process.kill(-child.pid, 'SIGTERM');
+			} catch {
+				child.kill('SIGTERM');
+			}
 		}
 	}
 
-	await Promise.race([childExitPromise, delay(SHUTDOWN_TIMEOUT_MS)]);
+	let closed = await waitForChildClose(SHUTDOWN_TIMEOUT_MS);
 
-	if (child.exitCode === null) {
+	if (!closed && isProcessAlive(child.pid)) {
 		if (process.platform === 'win32') {
-			spawnSync('taskkill.exe', ['/PID', String(child.pid), '/T', '/F'], {
-				stdio: 'ignore',
-				windowsHide: true
-			});
+			try {
+				terminateWindowsChildTree(child.pid);
+			} catch (error) {
+				terminationError ??= error;
+				child.kill();
+			}
 		} else {
 			try {
 				process.kill(-child.pid, 'SIGKILL');
@@ -341,7 +502,18 @@ async function stopChildProcess() {
 			}
 		}
 
-		await Promise.race([childExitPromise, delay(SHUTDOWN_TIMEOUT_MS)]);
+		closed = await waitForChildClose(SHUTDOWN_TIMEOUT_MS);
+	}
+
+	assert(
+		closed && !isProcessAlive(child.pid),
+		`The integration Vite process ${child.pid} did not stop.`
+	);
+
+	if (terminationError) {
+		console.warn(
+			`[cleanup] Vite tree termination used the direct-child fallback (${terminationError.name}).`
+		);
 	}
 }
 
@@ -933,8 +1105,8 @@ async function runIntegration() {
 			windowsHide: true
 		}
 	);
-	childExitPromise = new Promise((resolveExit) => {
-		child.once('exit', (code, signal) => resolveExit({ code, signal }));
+	childClosePromise = new Promise((resolveClose) => {
+		child.once('close', (code, signal) => resolveClose({ code, signal }));
 	});
 	child.stdout.on('data', (chunk) => {
 		const text = chunk.toString();
@@ -969,29 +1141,54 @@ async function cleanup(realState) {
 	const cleanupErrors = [];
 	overallController.abort();
 
+	function recordCleanupError(step, error) {
+		cleanupErrors.push(error);
+		console.error(
+			`[cleanup] ${step} failed (${error instanceof Error ? error.name : 'UnknownError'}${
+				readErrorCode(error) === undefined
+					? ''
+					: `; code ${readErrorCode(error)}`
+			}): ${error instanceof Error ? error.message : String(error)}`
+		);
+	}
+
 	try {
 		temporaryClient?.close();
+		temporaryClient = undefined;
 	} catch (error) {
-		cleanupErrors.push(error);
+		recordCleanupError('temporary database connection close', error);
 	}
 
 	try {
 		await stopChildProcess();
 	} catch (error) {
-		cleanupErrors.push(error);
+		recordCleanupError('owned Vite process stop', error);
+	} finally {
+		const streamResults = await Promise.allSettled([
+			closeChildStream(child?.stdout, 'stdout'),
+			closeChildStream(child?.stderr, 'stderr')
+		]);
+
+		for (const result of streamResults) {
+			if (result.status === 'rejected') {
+				recordCleanupError('Vite output stream close', result.reason);
+			}
+		}
+
+		child?.unref();
 	}
 
+	let portReleased = true;
 	if (testPort) {
 		try {
-			assert(
-				!(await canConnect(testPort)),
-				`The integration port ${testPort} is still accepting connections.`
-			);
+			await waitForPortRelease(testPort);
 		} catch (error) {
-			cleanupErrors.push(error);
+			portReleased = false;
+			recordCleanupError(`port ${testPort} postcondition`, error);
 		}
 	}
 
+	let childStopped = true;
 	if (child?.pid) {
 		try {
 			assert(
@@ -999,7 +1196,8 @@ async function cleanup(realState) {
 				`The integration Vite process ${child.pid} is still alive.`
 			);
 		} catch (error) {
-			cleanupErrors.push(error);
+			childStopped = false;
+			recordCleanupError(`process ${child.pid} postcondition`, error);
 		}
 	}
 
@@ -1014,28 +1212,32 @@ async function cleanup(realState) {
 				'The real database or audio storage changed during integration cleanup.'
 			);
 		} catch (error) {
-			cleanupErrors.push(error);
+			recordCleanupError('real-state postcondition', error);
 		}
 	}
 
 	if (temporaryRoot && existsSync(temporaryRoot)) {
-		try {
-			assert(
-				isSafeTemporaryRoot(temporaryRoot),
-				'Refusing to remove an unvalidated temporary directory.'
+		if (!childStopped || !portReleased) {
+			recordCleanupError(
+				'temporary-directory removal safety gate',
+				new Error(
+					'Temporary removal was skipped because the owned process or port remained active.'
+				)
 			);
-			await rm(temporaryRoot, {
-				recursive: true,
-				force: true,
-				maxRetries: 20,
-				retryDelay: 250
-			});
-			assert(
-				!existsSync(temporaryRoot),
-				'The integration temporary directory was not removed.'
-			);
-		} catch (error) {
-			cleanupErrors.push(error);
+		} else {
+			try {
+				assert(
+					isSafeTemporaryRoot(temporaryRoot),
+					'Refusing to remove an unvalidated temporary directory.'
+				);
+				await removeTemporaryDirectoryWithRetry(temporaryRoot);
+				assert(
+					!existsSync(temporaryRoot),
+					'The integration temporary directory was not removed.'
+				);
+			} catch (error) {
+				recordCleanupError('temporary-directory postcondition', error);
+			}
 		}
 	}
 
@@ -1043,7 +1245,9 @@ async function cleanup(realState) {
 		throw new AggregateError(cleanupErrors, 'Phase 4 integration cleanup failed.');
 	}
 
-	console.log('[cleanup] Vite stopped, port released, and temporary directory removed');
+	console.log(
+		'[cleanup] database, Vite, port, streams, and temporary directory closed'
+	);
 }
 
 let primaryError;

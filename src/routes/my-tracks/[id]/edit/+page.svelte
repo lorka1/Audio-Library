@@ -187,7 +187,7 @@
 
 				<div class="management-actions">
 					<button class="primary-button" type="submit">Save metadata</button>
-					<a href="/my-tracks">Cancel</a>
+					<a class="secondary-button" href="/my-tracks">Cancel</a>
 				</div>
 			</form>
 		</div>

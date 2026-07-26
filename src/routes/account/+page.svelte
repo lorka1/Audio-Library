@@ -46,7 +46,7 @@
 		</div>
 
 		<div class="account-note">
-			<p>Profile and password editing will be introduced in a later phase.</p>
+			<p>Your account details are available only during your authenticated session.</p>
 		</div>
 	</div>
 </section>

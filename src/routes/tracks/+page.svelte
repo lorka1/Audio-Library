@@ -55,6 +55,9 @@
 						? 'No public tracks match the selected search and filters.'
 						: 'No public tracks have been uploaded yet.'}
 				</p>
+				{#if data.hasActiveFilters}
+					<a class="secondary-button tracks-empty__action" href="/tracks">Clear filters</a>
+				{/if}
 			</div>
 		{/if}
 	</div>
@@ -106,6 +109,11 @@
 		border: 1px solid var(--border);
 		border-radius: 999px;
 		background: var(--surface);
+		overflow-wrap: anywhere;
+	}
+
+	.tracks-empty__action {
+		margin-top: 1rem;
 	}
 
 	@media (max-width: 42rem) {

@@ -10,6 +10,25 @@ npm run dev
 Use unique synthetic account details and disposable test audio that are not
 used for any real service.
 
+## Final release checklist
+
+- [ ] Register with synthetic details, then verify duplicate username/email and invalid-field feedback.
+- [ ] Log in, refresh the session, log out through POST, and confirm protected routes return to their original safe destination after login.
+- [ ] Upload one valid MP3, WAV, and OGG file; confirm each creates exactly one owned public track and one private stored file.
+- [ ] Try empty, oversized, unsupported, extension/MIME-mismatched, and invalid-metadata uploads; confirm no file or row remains.
+- [ ] Browse public list, detail, and empty states while signed out.
+- [ ] Exercise title/artist/description search, BPM/key/genre filters, all sort modes, URL refresh/reset/share behavior, and private-track exclusion.
+- [ ] Play, pause, seek, and inspect a 206 range response; verify the native-player fallback link.
+- [ ] Download a track with spaces and Croatian characters; verify its safe original-facing name, byte count, and security headers.
+- [ ] Open My Tracks with owners who have public, private, and empty libraries; confirm owner isolation and text visibility labels.
+- [ ] Edit an owned track, then try a non-owner URL and forged immutable fields; confirm safe 404 behavior and unchanged IDs, ownership, filenames, visibility, and audio.
+- [ ] Cancel one deletion, confirm another through POST, try a non-owner deletion, refresh the redirect, and replay an unrelated track.
+- [ ] Review signed-in and signed-out navigation, forms, filters, cards, metadata, player, and action groups at 360, 768, 1024, and 1440 px with no horizontal overflow.
+- [ ] Complete every workflow by keyboard; verify the skip link, visible focus, labels, error announcements, success announcements, and text status cues.
+- [ ] Open invalid, missing, private, and unauthorized URLs and simulate an unexpected error in a disposable environment; confirm clean pages with no internal details.
+- [ ] From a clean checkout, run install, environment copy, fresh migration, check, test, build, bounded production probes, and cleanup.
+- [ ] Inspect Git tracking and rendered page data: no `.env`, database, audio, quarantine file, dependency/build output, internal UUID, owner ID, unrelated email, storage key, or path may be exposed.
+
 ## Registration
 
 - [ ] Open `/register` while signed out. The registration form is displayed.
@@ -505,7 +524,7 @@ used for any real service.
 - [ ] Delete one disposable owned track, then play and download a different public track.
 - [ ] Expected: The unrelated stream and download remain functional and byte-correct.
 
-## Phase 6 navigation and privacy
+## Owner navigation and response privacy
 
 ### NAV-004 — Signed-in My Tracks navigation
 
@@ -522,7 +541,7 @@ used for any real service.
 - [ ] Inspect the HTML and SvelteKit page data for `/my-tracks` and an owned edit page.
 - [ ] Expected: No internal UUID, owner ID or email, generated stored filename, storage root, physical path, session token, or password data appears.
 
-## Phase boundary
+## Scope confirmation
 
 - [ ] Confirm upload is available only to signed-in users.
 - [ ] Confirm public browsing, public detail, streaming, seeking, and download work without authentication.

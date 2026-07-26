@@ -48,6 +48,8 @@ let realStateForCleanup;
 
 const overallController = new AbortController();
 const httpAgent = new HttpAgent({ keepAlive: false });
+const activeHttpRequests = new Set();
+const activeHttpResponses = new Set();
 
 function assert(condition, message) {
 	if (!condition) {
@@ -287,8 +289,14 @@ async function request(baseUrl, path, options = {}) {
 		const chunks = [];
 		let completed = false;
 		let clientRequest;
+		let clientResponse;
 		const timeout = setTimeout(() => {
-			finish(new Error(`HTTP request to ${url.pathname} exceeded 10 seconds.`));
+			const error = new Error(
+				`HTTP request to ${url.pathname} exceeded 10 seconds.`
+			);
+			clientResponse?.destroy(error);
+			clientRequest?.destroy(error);
+			finish(error);
 		}, REQUEST_TIMEOUT_MS);
 
 		function finish(error, response) {
@@ -299,6 +307,8 @@ async function request(baseUrl, path, options = {}) {
 			completed = true;
 			clearTimeout(timeout);
 			overallController.signal.removeEventListener('abort', onAbort);
+			activeHttpRequests.delete(clientRequest);
+			activeHttpResponses.delete(clientResponse);
 
 			if (error) {
 				reject(error);
@@ -308,8 +318,11 @@ async function request(baseUrl, path, options = {}) {
 		}
 
 		function onAbort() {
-			clientRequest?.destroy(overallController.signal.reason);
-			finish(overallController.signal.reason ?? new Error('HTTP request aborted.'));
+			const error =
+				overallController.signal.reason ?? new Error('HTTP request aborted.');
+			clientResponse?.destroy(error);
+			clientRequest?.destroy(error);
+			finish(error);
 		}
 
 		const requestOptions = {
@@ -325,7 +338,9 @@ async function request(baseUrl, path, options = {}) {
 			protocol: url.protocol
 		};
 
-		clientRequest = httpRequest(requestOptions, (clientResponse) => {
+		clientRequest = httpRequest(requestOptions, (incomingResponse) => {
+			clientResponse = incomingResponse;
+			activeHttpResponses.add(clientResponse);
 			clientResponse.on('data', (chunk) => chunks.push(chunk));
 			clientResponse.once('error', (error) => finish(error));
 			clientResponse.once('end', () => {
@@ -343,10 +358,27 @@ async function request(baseUrl, path, options = {}) {
 			});
 		});
 
+		activeHttpRequests.add(clientRequest);
 		overallController.signal.addEventListener('abort', onAbort, { once: true });
 		clientRequest.once('error', (error) => finish(error));
 		clientRequest.end(options.body);
 	});
+}
+
+function cancelActiveHttpOperations() {
+	const error = new Error('Phase 5 cleanup cancelled an active HTTP operation.');
+
+	for (const response of activeHttpResponses) {
+		response.destroy(error);
+	}
+
+	for (const request of activeHttpRequests) {
+		request.destroy(error);
+	}
+
+	activeHttpResponses.clear();
+	activeHttpRequests.clear();
+	httpAgent.destroy();
 }
 
 async function waitForStartup(baseUrl) {
@@ -1359,7 +1391,7 @@ async function cleanup(realState) {
 
 	console.log('[cleanup] closing HTTP client connections');
 	try {
-		httpAgent.destroy();
+		cancelActiveHttpOperations();
 	} catch (error) {
 		recordCleanupError('HTTP client connection close', error);
 	}

@@ -5,78 +5,95 @@
 </script>
 
 <svelte:head>
-	<title>Audio Library · Browse and share audio tracks</title>
+	<title>Audio Library · Discover, play, and manage audio</title>
 </svelte:head>
 
 <section class="hero">
 	<div class="page-container hero__inner">
-		<p class="eyebrow">Public track discovery is ready</p>
+		<p class="eyebrow">Your audio, ready to share</p>
 		<h1>
 			{data.user
 				? `Welcome back, ${data.user.username}.`
 				: 'Discover community audio.'}
 		</h1>
 		<p class="lead">
-			Search, filter, and sort public tracks, then open a detailed listening page, seek through
-			audio, and download the original user-facing file. Signed-in members can also publish
-			validated uploads.
+			Upload and organize your audio, browse public tracks, search titles, artists, and
+			descriptions, then play, seek, and download. Your own tracks stay easy to manage from
+			one secure library.
 		</p>
 		<div class="hero__actions">
-			<a class="hero__link hero__link--primary" href="/tracks">Search public tracks</a>
+			<a class="hero__link hero__link--primary" href="/tracks">Browse Tracks</a>
 			{#if data.user}
-				<a class="hero__link" href="/upload">Upload an audio track</a>
-				<a class="hero__link" href="/my-tracks">Manage your tracks</a>
-				<a class="hero__link" href="/account">View your account</a>
+				<a class="hero__link" href="/upload">Upload a Track</a>
+				<a class="hero__link" href="/my-tracks">Manage My Tracks</a>
 			{:else}
-				<a class="hero__link" href="/register">Create an account</a>
+				<a class="hero__link" href="/register">Register</a>
 				<a class="hero__link" href="/login">Login</a>
 			{/if}
-			<a class="hero__link" href="#foundation"
-				>Review the foundation <span aria-hidden="true">↓</span></a
+			<a class="hero__link" href="#features"
+				>Explore features <span aria-hidden="true">↓</span></a
 			>
 		</div>
 	</div>
 </section>
 
-<section class="foundation page-container" id="foundation" aria-labelledby="foundation-title">
+<section class="features page-container" id="features" aria-labelledby="features-title">
 	<div class="section-heading">
-		<p class="eyebrow">Phase 6</p>
-		<h2 id="foundation-title">Public listening with owner-safe management</h2>
+		<p class="eyebrow">A complete audio workflow</p>
+		<h2 id="features-title">From private storage to public listening</h2>
 		<p>
-			Owners can update metadata or safely delete their tracks while internal identifiers,
-			storage names, physical paths, and authorization rules remain server-only.
+			Audio Library keeps upload, discovery, playback, download, and owner controls
+			straightforward on desktop and mobile.
 		</p>
 	</div>
 
 	<div class="card-grid">
 		<article>
-			<span class="card-number">01</span>
-			<h3>Safe public metadata</h3>
+			<span class="card-number" aria-hidden="true">01</span>
+			<h3>Upload and organize</h3>
 			<p>
-				Browse and detail pages include only explicit public fields and the owner's username.
+				Add MP3, WAV, or OGG audio with a title, artist, BPM, musical key, genre, and
+				description.
 			</p>
 		</article>
 		<article>
-			<span class="card-number">02</span>
-			<h3>Range streaming</h3>
+			<span class="card-number" aria-hidden="true">02</span>
+			<h3>Browse public tracks</h3>
 			<p>
-				Audio remains outside the static directory and is streamed through validated track IDs.
+				Open a clear public catalog and detailed track pages with useful, safe metadata.
 			</p>
 		</article>
 		<article>
-			<span class="card-number">03</span>
-			<h3>Safe downloads</h3>
+			<span class="card-number" aria-hidden="true">03</span>
+			<h3>Search and filter</h3>
 			<p>
-				Downloads use sanitized original filenames without revealing generated storage names.
+				Search titles, artists, and descriptions, then refine results by BPM, key, genre,
+				and sort order.
+			</p>
+		</article>
+		<article>
+			<span class="card-number" aria-hidden="true">04</span>
+			<h3>Play and download</h3>
+			<p>
+				Listen with native audio controls, seek with byte-range streaming, or download a
+				safely named copy.
+			</p>
+		</article>
+		<article>
+			<span class="card-number" aria-hidden="true">05</span>
+			<h3>Manage your tracks</h3>
+			<p>
+				Review public and private uploads, edit their metadata, and confirm owner-only
+				deletion.
 			</p>
 		</article>
 	</div>
 
-	<aside class="phase-note">
+	<aside class="library-note">
 		<span aria-hidden="true">i</span>
 		<p>
-			My Tracks now supports owner-only metadata editing and confirmed deletion. Audio-file
-			replacement, visibility controls, pagination, and social features remain outside Phase 6.
+			<strong>Private by design.</strong> Stored filenames, internal identifiers, ownership
+			keys, and filesystem paths stay on the server.
 		</p>
 	</aside>
 </section>
@@ -112,6 +129,7 @@
 		font-size: clamp(2.65rem, 8vw, 5.75rem);
 		line-height: 0.98;
 		letter-spacing: -0.055em;
+		overflow-wrap: anywhere;
 	}
 
 	.lead {
@@ -159,7 +177,7 @@
 		background: var(--accent-strong);
 	}
 
-	.foundation {
+	.features {
 		padding-block: clamp(4.5rem, 9vw, 7rem);
 		scroll-margin-top: 5rem;
 	}
@@ -184,7 +202,7 @@
 
 	.card-grid {
 		display: grid;
-		grid-template-columns: repeat(3, 1fr);
+		grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
 		gap: 1rem;
 		margin-top: 3rem;
 	}
@@ -223,9 +241,9 @@
 		line-height: 1.65;
 	}
 
-	.phase-note {
+	.library-note {
 		display: flex;
-		align-items: center;
+		align-items: flex-start;
 		gap: 0.85rem;
 		margin-top: 1rem;
 		padding: 1rem 1.25rem;
@@ -235,7 +253,7 @@
 		background: var(--surface-muted);
 	}
 
-	.phase-note span {
+	.library-note span {
 		display: grid;
 		flex: 0 0 auto;
 		place-items: center;
@@ -249,10 +267,14 @@
 		font-weight: 700;
 	}
 
-	.phase-note p {
+	.library-note p {
 		margin: 0;
 		font-size: 0.9rem;
 		line-height: 1.5;
+	}
+
+	.library-note strong {
+		color: var(--text);
 	}
 
 	@media (max-width: 48rem) {

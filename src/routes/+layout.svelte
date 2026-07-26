@@ -9,21 +9,22 @@
 <svelte:head>
 	<meta
 		name="description"
-		content="A secure personal library for uploading audio tracks and organizing their metadata."
+		content="Upload and manage audio, discover public tracks, and listen or download securely."
 	/>
 </svelte:head>
 
 <div class="site-shell">
+	<a class="skip-link" href="#main-content">Skip to main content</a>
 	<SiteHeader user={data.user} />
 
-	<main>
+	<main id="main-content" tabindex="-1">
 		{@render children()}
 	</main>
 
 	<footer class="site-footer">
 		<div class="page-container site-footer__inner">
 			<p>Audio Library</p>
-			<p>Phase 6 · owner-managed metadata and safe track deletion</p>
+			<p>Private storage · public discovery · owner controls</p>
 		</div>
 	</footer>
 </div>

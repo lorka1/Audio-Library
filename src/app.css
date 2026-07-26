@@ -53,8 +53,27 @@ a {
 }
 
 :focus-visible {
-	outline: 3px solid rgb(91 78 232 / 35%);
+	outline: 3px solid #756af1;
 	outline-offset: 3px;
+}
+
+.skip-link {
+	position: fixed;
+	z-index: 100;
+	top: 0.75rem;
+	left: 0.75rem;
+	padding: 0.7rem 0.9rem;
+	color: white;
+	border-radius: 0.55rem;
+	background: var(--accent-strong);
+	font-weight: 750;
+	text-decoration: none;
+	transform: translateY(calc(-100% - 1rem));
+	transition: transform 150ms ease;
+}
+
+.skip-link:focus {
+	transform: translateY(0);
 }
 
 .site-shell {
@@ -190,7 +209,7 @@ main {
 .form-field textarea:focus {
 	border-color: var(--accent);
 	outline: 0;
-	box-shadow: 0 0 0 3px rgb(91 78 232 / 14%);
+	box-shadow: 0 0 0 3px #756af1;
 }
 
 .form-field input[aria-invalid='true'],
@@ -523,6 +542,7 @@ main {
 	margin: 0.75rem 0 0;
 	color: var(--text-muted);
 	font-size: clamp(1.05rem, 3vw, 1.35rem);
+	overflow-wrap: anywhere;
 }
 
 .track-detail__actions {
@@ -552,7 +572,9 @@ main {
 	border-right: 0;
 }
 
-.track-detail__metadata div:nth-last-child(-n + 3) {
+.track-detail__metadata div:last-child {
+	grid-column: 1 / -1;
+	border-right: 0;
 	border-bottom: 0;
 }
 
@@ -612,8 +634,7 @@ main {
 	}
 
 	.track-detail__metadata div,
-	.track-detail__metadata div:nth-child(3n),
-	.track-detail__metadata div:nth-last-child(-n + 3) {
+	.track-detail__metadata div:nth-child(3n) {
 		border-right: 0;
 		border-bottom: 1px solid var(--border);
 	}
@@ -626,5 +647,16 @@ main {
 @media (min-width: 36.01rem) and (max-width: 58rem) {
 	.track-grid {
 		grid-template-columns: 1fr;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		scroll-behavior: auto !important;
+		transition-duration: 0.01ms !important;
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
 	}
 }

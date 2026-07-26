@@ -20,10 +20,10 @@
 				<strong>{data.track.title}</strong> by {data.track.artist}
 			</p>
 
-			<div class="delete-warning">
+			<div class="delete-warning" id="delete-warning">
 				<p>The track metadata will be deleted from the database.</p>
 				<p>The stored audio file will also be deleted.</p>
-				<p>This operation cannot normally be undone.</p>
+				<p>This operation cannot be undone.</p>
 			</div>
 
 			{#if form?.message}
@@ -32,9 +32,9 @@
 				</div>
 			{/if}
 
-			<form method="POST">
+			<form method="POST" aria-describedby="delete-warning">
 				<button class="danger-button" type="submit">Delete permanently</button>
-				<a href="/my-tracks">Cancel</a>
+				<a class="secondary-button" href="/my-tracks">Cancel</a>
 			</form>
 		</div>
 	</div>
