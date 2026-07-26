@@ -213,6 +213,57 @@ function delay(milliseconds) {
 	return new Promise((resolveDelay) => setTimeout(resolveDelay, milliseconds));
 }
 
+async function waitForChildExit(milliseconds) {
+	let timeout;
+
+	try {
+		return await Promise.race([
+			childExitPromise.then(() => true),
+			new Promise((resolveWait) => {
+				timeout = setTimeout(() => resolveWait(false), milliseconds);
+			})
+		]);
+	} finally {
+		clearTimeout(timeout);
+	}
+}
+
+function closeChildStream(stream, label) {
+	if (!stream || stream.closed) {
+		return Promise.resolve();
+	}
+
+	return new Promise((resolveClose, rejectClose) => {
+		const timeout = setTimeout(() => {
+			finish(new Error(`The Vite ${label} stream did not close.`));
+		}, SHUTDOWN_TIMEOUT_MS);
+
+		function finish(error) {
+			clearTimeout(timeout);
+			stream.removeListener('close', onClose);
+			stream.removeListener('error', onError);
+
+			if (error) {
+				rejectClose(error);
+			} else {
+				resolveClose();
+			}
+		}
+
+		function onClose() {
+			finish();
+		}
+
+		function onError(error) {
+			finish(error);
+		}
+
+		stream.once('close', onClose);
+		stream.once('error', onError);
+		stream.destroy();
+	});
+}
+
 function normalizeHeaders(headers) {
 	const normalized = new Map();
 
@@ -405,7 +456,7 @@ async function stopChildProcess() {
 		}
 	}
 
-	await Promise.race([childExitPromise, delay(SHUTDOWN_TIMEOUT_MS)]);
+	await waitForChildExit(SHUTDOWN_TIMEOUT_MS);
 
 	if (child.exitCode === null && child.signalCode === null) {
 		if (process.platform === 'win32') {
@@ -422,8 +473,15 @@ async function stopChildProcess() {
 			}
 		}
 
-		await Promise.race([childExitPromise, delay(SHUTDOWN_TIMEOUT_MS)]);
+		await waitForChildExit(SHUTDOWN_TIMEOUT_MS);
 	}
+
+	assert(
+		child.exitCode !== null ||
+			child.signalCode !== null ||
+			!isProcessAlive(child.pid),
+		`The integration Vite process ${child.pid} did not stop.`
+	);
 }
 
 function recordHeaders(response) {
@@ -1284,8 +1342,17 @@ async function cleanup(realState) {
 	} catch (error) {
 		recordCleanupError('owned Vite process stop', error);
 	} finally {
-		child?.stdout?.destroy();
-		child?.stderr?.destroy();
+		const streamResults = await Promise.allSettled([
+			closeChildStream(child?.stdout, 'stdout'),
+			closeChildStream(child?.stderr, 'stderr')
+		]);
+
+		for (const result of streamResults) {
+			if (result.status === 'rejected') {
+				recordCleanupError('Vite output stream close', result.reason);
+			}
+		}
+
 		child?.unref();
 	}
 	console.log('[cleanup] owned Vite process stop completed');
@@ -1375,7 +1442,7 @@ let primaryError;
 let integrationPassed = false;
 const overallTimer = setTimeout(() => {
 	overallController.abort(
-		new Error('The Phase 5 integration test exceeded its 240-second timeout.')
+		new Error('The Phase 5 integration test exceeded its 120-second timeout.')
 	);
 }, OVERALL_TIMEOUT_MS);
 
@@ -1421,8 +1488,8 @@ try {
 }
 
 if (primaryError) {
-	process.exit(1);
+	process.exitCode = 1;
 } else if (integrationPassed) {
 	console.log('PHASE5_INTEGRATION_CHECKS_PASSED=26');
-	process.exit(0);
+	process.exitCode = 0;
 }
