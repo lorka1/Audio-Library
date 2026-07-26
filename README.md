@@ -98,6 +98,9 @@ MAX_AUDIO_FILE_SIZE_MB=50
 BODY_SIZE_LIMIT=55M
 SESSION_COOKIE_NAME=audio_library_session
 SESSION_DURATION_DAYS=7
+MONGODB_URI=mongodb://mongodb-host.example.invalid:27017
+MONGODB_DB_NAME=audio_library_dev
+MONGODB_TEST_DB_NAME=audio_library_test_local
 ```
 
 | Variable | Purpose |
@@ -108,6 +111,9 @@ SESSION_DURATION_DAYS=7
 | `BODY_SIZE_LIMIT` | Request-body limit used by the production Node adapter. It must exceed the audio limit enough to allow multipart overhead. |
 | `SESSION_COOKIE_NAME` | Name of the private authentication cookie. |
 | `SESSION_DURATION_DAYS` | Session and cookie lifetime. Valid values are whole days from 1 through 30; the default is 7. |
+| `MONGODB_URI` | MongoDB connection string used only by the M1 connection infrastructure and connectivity check. Never commit a credential-bearing URI. |
+| `MONGODB_DB_NAME` | Development MongoDB database name. |
+| `MONGODB_TEST_DB_NAME` | Isolated MongoDB test database name. It must start with `audio_library_test_` and differ from the development name. |
 
 Keep production secrets and deployment-specific paths in the untracked `.env`
 file or the hosting environment. Reverse proxies and hosting platforms may
@@ -287,6 +293,25 @@ The current migrations create users, hashed sessions, track metadata and
 ownership, public/private visibility, storage references, metadata constraints,
 and the numeric public route ID while preserving the server-only track UUID.
 
+### MongoDB migration M1
+
+The MongoDB migration is being introduced in phases. M1 adds the official
+MongoDB Node.js driver, validated environment settings, typed document and
+collection definitions, a cached server-only client, and idempotent index
+creation. The application still uses SQLite and Drizzle for all runtime data;
+no repository or stored data has been migrated.
+
+With all three MongoDB environment variables configured, verify connectivity,
+database selection, and indexes without reading or writing application
+documents:
+
+```powershell
+npm run db:mongodb:check
+```
+
+MongoDB Compass is an optional desktop client for inspecting a MongoDB server;
+it is not the server itself and is not required by the application.
+
 ## Commands
 
 | Command | Purpose |
@@ -305,6 +330,7 @@ and the numeric public route ID while preserving the server-only track UUID.
 | `npm run db:migrate` | Apply committed migrations. |
 | `npm run db:generate` | Generate a migration from an intentional schema change. |
 | `npm run db:studio` | Open Drizzle Studio. |
+| `npm run db:mongodb:check` | Safely check the configured MongoDB connection, selected development database, and M1 indexes. |
 
 There is no separate lint script. `npm run check` is the enforced Svelte and
 TypeScript static-analysis command.

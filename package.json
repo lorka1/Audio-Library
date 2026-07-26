@@ -23,12 +23,14 @@
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
+    "db:mongodb:check": "node --experimental-strip-types scripts/mongodb-check.mjs",
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
     "@libsql/client": "^0.17.4",
     "bcryptjs": "^3.0.3",
-    "drizzle-orm": "^0.45.2"
+    "drizzle-orm": "^0.45.2",
+    "mongodb": "^7.5.0"
   },
   "devDependencies": {
     "@sveltejs/adapter-node": "^5.5.7",
