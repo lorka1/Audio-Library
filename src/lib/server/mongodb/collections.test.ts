@@ -16,12 +16,14 @@ describe('MongoDB collection mapping', () => {
 			users: 'users',
 			sessions: 'sessions',
 			tracks: 'tracks',
-			counters: 'counters'
+			counters: 'counters',
+			migrations: 'migrations'
 		});
-		expect(collection).toHaveBeenCalledTimes(4);
+		expect(collection).toHaveBeenCalledTimes(5);
 		expect(collections.users.collectionName).toBe('users');
 		expect(collections.sessions.collectionName).toBe('sessions');
 		expect(collections.tracks.collectionName).toBe('tracks');
 		expect(collections.counters.collectionName).toBe('counters');
+		expect(collections.migrations.collectionName).toBe('migrations');
 	});
 });

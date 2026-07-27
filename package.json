@@ -23,11 +23,15 @@
     "test:mongodb:auth": "node --experimental-strip-types scripts/mongodb-auth-integration.mjs",
     "test:mongodb:tracks": "node --experimental-strip-types scripts/mongodb-tracks-integration.mjs",
     "test:mongodb:queries": "node --experimental-strip-types scripts/mongodb-queries-integration.mjs",
+    "test:mongodb:migration": "node --experimental-strip-types scripts/mongodb-migration-integration.mjs",
     "verify:clean-clone": "node scripts/clean-clone-check.mjs",
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:mongodb:check": "node --experimental-strip-types scripts/mongodb-check.mjs",
+    "db:migrate:mongodb:dry-run": "node --experimental-strip-types scripts/migrate-sqlite-to-mongodb.mjs --mode=dry-run --target=development",
+    "db:migrate:mongodb:apply": "node --experimental-strip-types scripts/migrate-sqlite-to-mongodb.mjs --mode=apply --target=development",
+    "db:migrate:mongodb:verify": "node --experimental-strip-types scripts/migrate-sqlite-to-mongodb.mjs --mode=verify --target=development",
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {

@@ -1,6 +1,7 @@
 import type { Collection, Db } from 'mongodb';
 import type {
 	CounterDocument,
+	MigrationDocument,
 	SessionDocument,
 	TrackDocument,
 	UserDocument
@@ -10,7 +11,8 @@ export const MONGODB_COLLECTION_NAMES = {
 	users: 'users',
 	sessions: 'sessions',
 	tracks: 'tracks',
-	counters: 'counters'
+	counters: 'counters',
+	migrations: 'migrations'
 } as const;
 
 export interface MongoCollections {
@@ -18,6 +20,7 @@ export interface MongoCollections {
 	sessions: Collection<SessionDocument>;
 	tracks: Collection<TrackDocument>;
 	counters: Collection<CounterDocument>;
+	migrations: Collection<MigrationDocument>;
 }
 
 export function getMongoCollections(database: Db): MongoCollections {
@@ -33,6 +36,9 @@ export function getMongoCollections(database: Db): MongoCollections {
 		),
 		counters: database.collection<CounterDocument>(
 			MONGODB_COLLECTION_NAMES.counters
+		),
+		migrations: database.collection<MigrationDocument>(
+			MONGODB_COLLECTION_NAMES.migrations
 		)
 	};
 }

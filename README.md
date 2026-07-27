@@ -297,7 +297,7 @@ The current migrations create users, hashed sessions, track metadata and
 ownership, public/private visibility, storage references, metadata constraints,
 and the numeric public route ID while preserving the server-only track UUID.
 
-### MongoDB migration M1–M5
+### MongoDB migration M1–M6
 
 The MongoDB migration is being introduced in phases. M1 adds the official
 MongoDB Node.js driver, validated environment settings, typed document and
@@ -339,8 +339,21 @@ M6 migrates real users and tracks.
 No real users, sessions, or tracks have been migrated to MongoDB yet. Existing
 sessions will not be migrated. Audio bytes remain in private filesystem
 storage under `AUDIO_STORAGE_PATH` for both backends. Enabling MongoDB before
-M6 therefore selects an empty, complete MongoDB application backend rather
+M7 therefore selects an empty, complete MongoDB application backend rather
 than copying SQLite data. Final production cutover is not complete.
+
+M6 adds read-only analysis, transactional migration, and aggregate
+verification tooling. It maps SQLite users and track metadata to MongoDB while
+preserving UUIDs, password hashes, ownership, public IDs, storage references,
+visibility, nullable metadata, and timestamps. Sessions and audio bytes are
+intentionally excluded. Apply requires a replica set or sharded deployment,
+all required indexes, an empty or exactly compatible target, and the explicit
+confirmation token `MIGRATE_SQLITE_TO_MONGODB`.
+
+The default migration action is a read-only dry-run. Apply has not been run on
+real data. SQLite and the private audio directory remain unchanged as the
+rollback source. M7 will perform the controlled real migration, require users
+to sign in again, verify the result, and coordinate the environment cutover.
 
 With all three MongoDB environment variables configured, verify connectivity,
 database selection, and indexes without reading or writing application
@@ -376,6 +389,10 @@ it is not the server itself and is not required by the application.
 | `npm run test:mongodb:auth` | Verify M3 MongoDB transactions, users-plus-sessions authentication behavior, privacy, and isolated cleanup. |
 | `npm run test:mongodb:tracks` | Verify M4 MongoDB track repositories, atomic public IDs, safe projections, owner CRUD, filesystem consistency, and isolated cleanup. |
 | `npm run test:mongodb:queries` | Verify M5 SQLite/MongoDB public-query parity, safe backend selection, development integrity, and isolated cleanup. |
+| `npm run test:mongodb:migration` | Verify M6 dry-run, transactional migration, rollback, verification, rerun safety, and isolated cleanup using synthetic data only. |
+| `npm run db:migrate:mongodb:dry-run` | Analyze the real SQLite source and development MongoDB target read-only, reporting safe aggregates only. |
+| `npm run db:migrate:mongodb:apply -- --confirm=MIGRATE_SQLITE_TO_MONGODB` | Explicitly authorize the transactional development-target migration. Reserved for the controlled M7 run; do not run casually. |
+| `npm run db:migrate:mongodb:verify` | Compare SQLite and MongoDB migration results read-only using aggregate checks and safe fingerprints. |
 
 There is no separate lint script. `npm run check` is the enforced Svelte and
 TypeScript static-analysis command.

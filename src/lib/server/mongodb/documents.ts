@@ -53,3 +53,15 @@ export interface CounterDocument {
 	_id: typeof TRACK_PUBLIC_ID_COUNTER;
 	value: number;
 }
+
+export const SQLITE_MONGODB_MIGRATION_ID = 'sqlite-to-mongodb-v1' as const;
+
+export interface MigrationDocument {
+	_id: typeof SQLITE_MONGODB_MIGRATION_ID;
+	version: 1;
+	userCount: number;
+	trackCount: number;
+	maxPublicId: number;
+	fingerprint: string;
+	completedAt: Date;
+}
