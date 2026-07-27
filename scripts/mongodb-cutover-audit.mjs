@@ -8,15 +8,10 @@ import { MongoClientManager } from '../src/lib/server/mongodb/client.ts';
 import { readMongoConfig } from '../src/lib/server/mongodb/config.ts';
 import { getMongoCollections } from '../src/lib/server/mongodb/collections.ts';
 import {
-	SQLITE_MONGODB_MIGRATION_ID,
 	TRACK_PUBLIC_ID_COUNTER
 } from '../src/lib/server/mongodb/documents.ts';
 import { MONGODB_INDEX_DEFINITIONS } from '../src/lib/server/mongodb/indexes.ts';
-import {
-	readSqliteMigrationSnapshot,
-	resolveSqliteSource,
-	verifyMigration
-} from './lib/sqlite-mongodb-migration.mjs';
+import { safeMongoAggregateFingerprint } from './lib/mongodb-fingerprint.mjs';
 
 function configuredPath(value, fallback) {
 	const candidate = value?.trim() || fallback;
@@ -84,6 +79,10 @@ try {
 	const client = await manager.connect();
 	const database = client.db(config.databaseName);
 	const collections = getMongoCollections(database);
+	const aggregateBefore = await safeMongoAggregateFingerprint(collections);
+	const hello = await client
+		.db('admin')
+		.command({ hello: 1 }, { timeoutMS: 5_000 });
 	const [userCount, sessionCount, trackCount, maximum, counter, marker, tracks] =
 		await Promise.all([
 			collections.users.countDocuments({}, { timeoutMS: 5_000 }),
@@ -99,8 +98,18 @@ try {
 				{ projection: { _id: 0, value: 1 }, timeoutMS: 5_000 }
 			),
 			collections.migrations.findOne(
-				{ _id: SQLITE_MONGODB_MIGRATION_ID },
-				{ projection: { _id: 0, fingerprint: 1, version: 1 }, timeoutMS: 5_000 }
+				{ version: 1 },
+				{
+					projection: {
+						_id: 0,
+						fingerprint: 1,
+						maxPublicId: 1,
+						trackCount: 1,
+						userCount: 1,
+						version: 1
+					},
+					timeoutMS: 5_000
+				}
 			),
 			collections.tracks
 				.find({}, { projection: { _id: 0, storageKey: 1 }, timeoutMS: 5_000 })
@@ -122,26 +131,21 @@ try {
 			names.every((name) => actualIndexes[collection].includes(name))
 	);
 	const audioRoot = configuredPath(process.env.AUDIO_STORAGE_PATH, 'storage/audio');
-	const opened = await readSqliteMigrationSnapshot({
-		sourcePath: resolveSqliteSource(process.env.DATABASE_URL),
-		audioStoragePath: audioRoot
-	});
-	let migrationVerification;
-	try {
-		migrationVerification = await verifyMigration({
-			snapshot: opened.snapshot,
-			analysis: opened.analysis,
-			collections
-		});
-	} finally {
-		opened.close();
-	}
 	const audio = await audioAudit(
 		audioRoot,
 		new Set(tracks.map(({ storageKey }) => storageKey.split('\\').join('/')))
 	);
+	const aggregateAfter = await safeMongoAggregateFingerprint(collections);
+	const markerComplete =
+		marker?.version === 1 &&
+		marker.userCount === userCount &&
+		marker.trackCount === trackCount &&
+		marker.maxPublicId === (maximum?.publicId ?? 0) &&
+		typeof marker.fingerprint === 'string' &&
+		marker.fingerprint.length > 0;
 	assert.ok(indexesVerified);
-	assert.ok(migrationVerification.ok);
+	assert.ok(markerComplete);
+	assert.equal(aggregateAfter, aggregateBefore);
 	assert.ok((counter?.value ?? -1) >= (maximum?.publicId ?? 0));
 	assert.equal(audio.missingReferences, 0);
 
@@ -150,17 +154,17 @@ try {
 			{
 				writesPerformed: false,
 				mongo: {
+					primary: hello.isWritablePrimary === true,
+					transactionCapable:
+						typeof hello.setName === 'string' || hello.msg === 'isdbgrid',
 					userCount,
 					sessionCount,
 					trackCount,
 					maxPublicId: maximum?.publicId ?? 0,
 					counterCompatible:
 						(counter?.value ?? -1) >= (maximum?.publicId ?? 0),
-					migrationMarkerComplete:
-						marker?.version === 1 && migrationVerification.checks.marker,
-					fingerprintVerified:
-						migrationVerification.checks.records &&
-						migrationVerification.checks.marker,
+					migrationMarkerComplete: markerComplete,
+					aggregateStableDuringAudit: aggregateAfter === aggregateBefore,
 					indexesVerified
 				},
 				audio

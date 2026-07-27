@@ -16,7 +16,7 @@ import {
 import { getMongoCollections } from '../src/lib/server/mongodb/collections.ts';
 import { TRACK_PUBLIC_ID_COUNTER } from '../src/lib/server/mongodb/documents.ts';
 import { ensureMongoIndexes } from '../src/lib/server/mongodb/indexes.ts';
-import { safeMongoAggregateFingerprint } from './lib/sqlite-mongodb-migration.mjs';
+import { safeMongoAggregateFingerprint } from './lib/mongodb-fingerprint.mjs';
 
 const EXPECTED_CHECKS = 23;
 const STARTUP_TIMEOUT_MS = 45_000;
@@ -275,8 +275,6 @@ async function main() {
 		assert.ok(isOwnedTemporaryRoot(temporaryRoot));
 		temporaryAudioRoot = join(temporaryRoot, 'audio');
 		await mkdir(temporaryAudioRoot);
-		const temporarySqlite = join(temporaryRoot, 'unused.sqlite');
-
 		manager = new MongoClientManager({
 			...config,
 			databaseName: ownedName,
@@ -307,8 +305,6 @@ async function main() {
 				cwd: resolve('.'),
 				env: {
 					...process.env,
-					DATABASE_BACKEND: 'mongodb',
-					DATABASE_URL: temporarySqlite,
 					AUDIO_STORAGE_PATH: temporaryAudioRoot,
 					SESSION_COOKIE_NAME: cookieName,
 					MONGODB_DB_NAME: ownedName,

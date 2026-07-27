@@ -54,10 +54,8 @@ export interface CounterDocument {
 	value: number;
 }
 
-export const SQLITE_MONGODB_MIGRATION_ID = 'sqlite-to-mongodb-v1' as const;
-
-export interface MigrationDocument {
-	_id: typeof SQLITE_MONGODB_MIGRATION_ID;
+export interface HistoricalMigrationDocument {
+	_id: string;
 	version: 1;
 	userCount: number;
 	trackCount: number;

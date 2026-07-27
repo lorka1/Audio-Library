@@ -8,6 +8,8 @@ import {
 	assertMongoTestDatabaseName,
 	readMongoConfig
 } from './config.ts';
+import { getMongoCollections } from './collections.ts';
+import { ensureMongoIndexes } from './indexes.ts';
 
 export type MongoClientFactory = (
 	uri: string,
@@ -76,6 +78,7 @@ export class MongoClientManager {
 
 let processManager: MongoClientManager | undefined;
 let processConfigSignature: string | undefined;
+let developmentInitializationPromise: Promise<void> | undefined;
 
 function configSignature(config: MongoConfig): string {
 	return JSON.stringify([
@@ -106,9 +109,24 @@ export async function connectMongoDevelopment(
 ): Promise<MongoConnection> {
 	const config = readMongoConfig(environment);
 	const client = await processMongoManager(config).connect();
+	const database = client.db(config.databaseName);
+	if (!developmentInitializationPromise) {
+		const attempt = ensureMongoIndexes(getMongoCollections(database)).then(
+			() => undefined
+		);
+		let cached: Promise<void>;
+		cached = attempt.catch((error) => {
+			if (developmentInitializationPromise === cached) {
+				developmentInitializationPromise = undefined;
+			}
+			throw error;
+		});
+		developmentInitializationPromise = cached;
+	}
+	await developmentInitializationPromise;
 	return {
 		client,
-		database: client.db(config.databaseName)
+		database
 	};
 }
 
@@ -131,6 +149,7 @@ export async function closeMongoClient(force = false): Promise<void> {
 	const manager = processManager;
 	processManager = undefined;
 	processConfigSignature = undefined;
+	developmentInitializationPromise = undefined;
 
 	if (manager) {
 		await manager.close(force);

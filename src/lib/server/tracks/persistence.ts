@@ -1,12 +1,7 @@
 import { connectMongoDevelopment } from '../mongodb/client';
 import { getMongoCollections } from '../mongodb/collections';
-import {
-	readDatabaseBackend,
-	type DatabaseBackendEnvironment
-} from '../users/backend';
 import type { TrackRepository } from './contract';
 import { createMongoTrackRepository } from './mongodb-repository';
-import { sqliteTrackRepository } from './sqlite-repository';
 
 let mongoTrackRepositoryPromise: Promise<TrackRepository> | undefined;
 
@@ -25,12 +20,8 @@ async function mongoTrackRepository(): Promise<TrackRepository> {
 	return mongoTrackRepositoryPromise;
 }
 
-export async function getApplicationTrackRepository(
-	environment: DatabaseBackendEnvironment = process.env
-): Promise<TrackRepository> {
-	return readDatabaseBackend(environment) === 'sqlite'
-		? sqliteTrackRepository
-		: mongoTrackRepository();
+export async function getApplicationTrackRepository(): Promise<TrackRepository> {
+	return mongoTrackRepository();
 }
 
 export async function getFocusedMongoTrackRepository(): Promise<TrackRepository> {

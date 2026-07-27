@@ -10,16 +10,6 @@ function resolvePath(configuredPath: string): string {
 	return isAbsolute(configuredPath) ? configuredPath : resolve(process.cwd(), configuredPath);
 }
 
-function requiredDatabasePath(): string {
-	const configuredPath = env.DATABASE_URL?.trim();
-
-	if (!configuredPath) {
-		throw new Error('Missing required environment variable DATABASE_URL.');
-	}
-
-	return resolvePath(configuredPath);
-}
-
 function readAudioStoragePath(): string {
 	return resolvePath(env.AUDIO_STORAGE_PATH?.trim() || DEFAULT_AUDIO_STORAGE_PATH);
 }
@@ -51,7 +41,6 @@ const sessionDurationDays = readSessionDurationDays();
 const audioFileSizeLimit = parseAudioFileSizeLimit(env.MAX_AUDIO_FILE_SIZE_MB);
 
 export const serverConfig = {
-	databasePath: requiredDatabasePath(),
 	audioStoragePath: readAudioStoragePath(),
 	maxAudioFileSizeMb: audioFileSizeLimit.megabytes,
 	maxAudioFileSizeBytes: audioFileSizeLimit.bytes,

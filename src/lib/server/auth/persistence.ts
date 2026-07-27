@@ -5,18 +5,11 @@ import {
 } from '../mongodb/client';
 import { getMongoCollections } from '../mongodb/collections';
 import {
-	readDatabaseBackend,
-	type DatabaseBackend,
-	type DatabaseBackendEnvironment
-} from '../users/backend';
-import {
 	createMongoUserRepository
 } from '../users/mongodb-repository';
-import { sqliteUserRepository } from '../users/sqlite-repository';
 import {
 	createMongoSessionRepository
 } from '../sessions/mongodb-repository';
-import { sqliteSessionRepository } from '../sessions/sqlite-repository';
 import type { SessionRepository } from '../sessions/contract';
 import type { UserRepository } from '../users/contract';
 import type {
@@ -24,12 +17,10 @@ import type {
 	CreateSessionRecordInput,
 	CreateUserInput
 } from './types';
-import { createUserWithSession as createSqliteUserWithSession } from './repository';
 
 const TRANSACTION_TIMEOUT_MS = 8_000;
 
 export interface AuthPersistence {
-	backend: DatabaseBackend;
 	users: UserRepository;
 	sessions: SessionRepository;
 	createUserWithSession(
@@ -37,21 +28,6 @@ export interface AuthPersistence {
 		sessionInput: CreateSessionRecordInput
 	): Promise<{ user: CurrentUser; session: AuthSession }>;
 }
-
-export function authBackendPair<T>(
-	backend: DatabaseBackend,
-	sqlite: T,
-	mongodb: T
-): T {
-	return backend === 'sqlite' ? sqlite : mongodb;
-}
-
-const sqliteAuthPersistence: AuthPersistence = {
-	backend: 'sqlite',
-	users: sqliteUserRepository,
-	sessions: sqliteSessionRepository,
-	createUserWithSession: createSqliteUserWithSession
-};
 
 async function assertTransactionSupport(client: MongoClient): Promise<void> {
 	const hello = await client
@@ -84,7 +60,6 @@ function mongoAuthPersistence(): Promise<AuthPersistence> {
 		);
 
 		const persistence: AuthPersistence = {
-			backend: 'mongodb',
 			users,
 			sessions,
 			async createUserWithSession(
@@ -136,11 +111,6 @@ function mongoAuthPersistence(): Promise<AuthPersistence> {
 	return mongoAuthPersistencePromise;
 }
 
-export async function getAuthPersistence(
-	environment: DatabaseBackendEnvironment = process.env
-): Promise<AuthPersistence> {
-	const backend = readDatabaseBackend(environment);
-	return backend === 'sqlite'
-		? sqliteAuthPersistence
-		: mongoAuthPersistence();
+export async function getAuthPersistence(): Promise<AuthPersistence> {
+	return mongoAuthPersistence();
 }

@@ -1,15 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-	sqliteTrackRepository: { backend: 'sqlite-track-repository' },
 	connectMongoDevelopment: vi.fn(),
 	getMongoCollections: vi.fn(),
 	createMongoTrackRepository: vi.fn()
 }));
 
-vi.mock('./sqlite-repository', () => ({
-	sqliteTrackRepository: mocks.sqliteTrackRepository
-}));
 vi.mock('../mongodb/client', () => ({
 	connectMongoDevelopment: mocks.connectMongoDevelopment
 }));
@@ -25,38 +21,21 @@ import {
 	getFocusedMongoTrackRepository
 } from './persistence';
 
-describe('M5 track persistence selection', () => {
+describe('MongoDB track persistence', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 	});
 
-	it('keeps SQLite as the default complete application track backend', async () => {
-		await expect(
-			getApplicationTrackRepository({ DATABASE_BACKEND: 'sqlite' })
-		).resolves.toBe(mocks.sqliteTrackRepository);
-		await expect(
-			getApplicationTrackRepository({ DATABASE_BACKEND: '' })
-		).resolves.toBe(mocks.sqliteTrackRepository);
-	});
-
-	it('selects the complete MongoDB track backend', async () => {
+	it('constructs the application repository from centralized MongoDB collections', async () => {
 		const database = {};
-		const collections = {
-			tracks: {},
-			counters: {},
-			users: {}
-		};
+		const collections = { tracks: {}, counters: {}, users: {} };
 		const repository = {};
-		mocks.connectMongoDevelopment.mockResolvedValue({
-			client: {},
-			database
-		});
+		mocks.connectMongoDevelopment.mockResolvedValue({ client: {}, database });
 		mocks.getMongoCollections.mockReturnValue(collections);
 		mocks.createMongoTrackRepository.mockReturnValue(repository);
 
-		await expect(
-			getApplicationTrackRepository({ DATABASE_BACKEND: 'mongodb' })
-		).resolves.toBe(repository);
+		await expect(getApplicationTrackRepository()).resolves.toBe(repository);
+		expect(mocks.getMongoCollections).toHaveBeenCalledWith(database);
 		expect(mocks.createMongoTrackRepository).toHaveBeenCalledWith(
 			collections.tracks,
 			collections.counters,
@@ -64,7 +43,7 @@ describe('M5 track persistence selection', () => {
 		);
 	});
 
-	it('constructs focused MongoDB verification without changing the selector', async () => {
+	it('uses the same MongoDB construction for focused verification', async () => {
 		const collections = { tracks: {}, counters: {}, users: {} };
 		const repository = {};
 		mocks.connectMongoDevelopment.mockResolvedValue({

@@ -4,7 +4,7 @@ import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { readFile, readdir, stat } from 'node:fs/promises';
-import { isAbsolute, join, resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import { MongoClientManager } from '../src/lib/server/mongodb/client.ts';
 import {
 	MONGODB_TEST_DATABASE_PREFIX,
@@ -12,23 +12,25 @@ import {
 } from '../src/lib/server/mongodb/config.ts';
 import { getMongoCollections } from '../src/lib/server/mongodb/collections.ts';
 import { TRACK_PUBLIC_ID_COUNTER } from '../src/lib/server/mongodb/documents.ts';
-import { safeMongoAggregateFingerprint } from './lib/sqlite-mongodb-migration.mjs';
+import { safeMongoAggregateFingerprint } from './lib/mongodb-fingerprint.mjs';
 
 const COMMAND_TIMEOUT_MS = 240_000;
 const suites = [
 	['MongoDB users contract', ['--experimental-strip-types', 'scripts/mongodb-users-integration.mjs']],
 	['MongoDB auth and failure paths', ['--experimental-strip-types', 'scripts/mongodb-auth-integration.mjs']],
 	['MongoDB tracks and storage failures', ['--experimental-strip-types', 'scripts/mongodb-tracks-integration.mjs']],
-	['SQLite/MongoDB query parity', ['--experimental-strip-types', 'scripts/mongodb-queries-integration.mjs']],
-	['migration safety and transaction rollback', ['--experimental-strip-types', 'scripts/mongodb-migration-integration.mjs']],
+	['MongoDB query behavior', ['--experimental-strip-types', 'scripts/mongodb-queries-integration.mjs']],
 	['full application cutover', ['--experimental-strip-types', 'scripts/mongodb-cutover-integration.mjs']],
 	[
 		'privacy, configuration, filesystem and quarantine failures',
 		[
 			'node_modules/vitest/vitest.mjs',
 			'run',
-			'src/lib/server/config.test.ts',
-			'src/lib/server/users/backend.test.ts',
+			'src/lib/server/config-values.test.ts',
+			'src/lib/server/mongodb/config.test.ts',
+			'src/lib/server/mongodb/client.test.ts',
+			'src/lib/server/mongodb/indexes.test.ts',
+			'src/lib/server/tracks/persistence.test.ts',
 			'src/lib/server/tracks/service.test.ts',
 			'src/lib/server/tracks/management.test.ts',
 			'src/lib/server/tracks/files.test.ts',
@@ -37,11 +39,6 @@ const suites = [
 		]
 	]
 ];
-
-function configuredPath(value, fallback) {
-	const candidate = value?.trim() || fallback;
-	return isAbsolute(candidate) ? resolve(candidate) : resolve(candidate);
-}
 
 async function fileSnapshot(path) {
 	if (!existsSync(path)) return null;
@@ -75,7 +72,7 @@ async function directorySnapshot(root) {
 
 function runSuite(label, args) {
 	return new Promise((resolveRun, rejectRun) => {
-		console.log(`\n[M8] ${label}`);
+		console.log(`\n[MongoDB] ${label}`);
 		const child = spawn(process.execPath, args, {
 			cwd: resolve('.'),
 			env: { ...process.env, CI: '1', NO_COLOR: '1' },
@@ -97,8 +94,7 @@ function runSuite(label, args) {
 
 const config = readMongoConfig(process.env);
 const manager = new MongoClientManager(config);
-const sqlitePath = configuredPath(process.env.DATABASE_URL, 'data/app.db');
-const audioRoot = configuredPath(process.env.AUDIO_STORAGE_PATH, 'storage/audio');
+const audioRoot = resolve(process.env.AUDIO_STORAGE_PATH?.trim() || 'storage/audio');
 let initialTestDatabases;
 let realMongoBefore;
 let localBefore;
@@ -121,9 +117,6 @@ try {
 		)
 	};
 	localBefore = {
-		sqlite: await fileSnapshot(sqlitePath),
-		sqliteWal: await fileSnapshot(`${sqlitePath}-wal`),
-		sqliteShm: await fileSnapshot(`${sqlitePath}-shm`),
 		audio: await directorySnapshot(audioRoot),
 		env: await fileSnapshot(resolve('.env'))
 	};
@@ -160,9 +153,6 @@ try {
 	}
 
 	const localAfter = {
-		sqlite: await fileSnapshot(sqlitePath),
-		sqliteWal: await fileSnapshot(`${sqlitePath}-wal`),
-		sqliteShm: await fileSnapshot(`${sqlitePath}-shm`),
 		audio: await directorySnapshot(audioRoot),
 		env: await fileSnapshot(resolve('.env'))
 	};
@@ -170,7 +160,7 @@ try {
 	console.log('\nMONGODB_CUTOVER_REGRESSION_PASSED=1');
 	console.log('PASS: development MongoDB fingerprint and counter are unchanged.');
 	console.log('PASS: pre-existing test databases were preserved and no owned test database leaked.');
-	console.log('PASS: SQLite, audio, and .env state are unchanged.');
+	console.log('PASS: audio and .env state are unchanged.');
 } catch (error) {
 	primaryFailure = error;
 } finally {

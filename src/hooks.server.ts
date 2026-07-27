@@ -5,10 +5,10 @@ import {
 	validateSessionToken
 } from '$lib/server/auth/session';
 import { logAuthError } from '$lib/server/auth/logging';
-import { readDatabaseBackend } from '$lib/server/users/backend';
+import { connectMongoDevelopment } from '$lib/server/mongodb/client';
 
 export const handle: Handle = async ({ event, resolve }) => {
-	readDatabaseBackend();
+	await connectMongoDevelopment();
 	event.locals.user = null;
 	event.locals.session = null;
 

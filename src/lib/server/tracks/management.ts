@@ -8,9 +8,9 @@ import {
 } from './files';
 import { logTrackStorageError } from './logging';
 import {
-	type OwnedTrackFile,
-	type UpdateOwnedTrackMetadataInput
-} from './repository';
+	type OwnerTrackStorage,
+	type UpdateOwnerTrackMetadataInput
+} from './contract';
 import { getApplicationTrackRepository } from './persistence';
 import {
 	validateTrackMetadataFormData,
@@ -27,9 +27,9 @@ export interface TrackManagementDependencies {
 	updateMetadata(
 		publicId: number,
 		ownerId: string,
-		metadata: UpdateOwnedTrackMetadataInput
+		metadata: UpdateOwnerTrackMetadataInput
 	): Promise<OwnerTrack | null>;
-	findFile(publicId: number, ownerId: string): Promise<OwnedTrackFile | null>;
+	findFile(publicId: number, ownerId: string): Promise<OwnerTrackStorage | null>;
 	deleteRecord(publicId: number, ownerId: string): Promise<boolean>;
 	quarantineFile(storedFilename: string): Promise<QuarantineStoredAudioFileResult>;
 	deleteQuarantinedFile(file: QuarantinedAudioFile): Promise<void>;
@@ -143,7 +143,7 @@ export async function deleteTrack(
 	input: DeleteTrackInput,
 	dependencies: TrackManagementDependencies = defaultDependencies
 ): Promise<DeleteTrackResult> {
-	let trackFile: OwnedTrackFile | null;
+	let trackFile: OwnerTrackStorage | null;
 
 	try {
 		trackFile = await dependencies.findFile(input.publicId, input.ownerId);

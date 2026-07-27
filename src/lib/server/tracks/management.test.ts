@@ -176,7 +176,7 @@ describe('updateTrackMetadata', () => {
 		const testDependencies = dependencies();
 		testDependencies.updateMetadata = vi
 			.fn<TrackManagementDependencies['updateMetadata']>()
-			.mockRejectedValue(new Error('C:\\private\\database\\app.db'));
+			.mockRejectedValue(new Error('C:\\private\\database\\secret.db'));
 		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
 		const result = await updateTrackMetadata(

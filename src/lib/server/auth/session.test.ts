@@ -33,7 +33,6 @@ describe('selected session repository service', () => {
 	beforeEach(() => {
 		sessions = sessionRepository();
 		mocks.getAuthPersistence.mockResolvedValue({
-			backend: 'sqlite',
 			users: {},
 			sessions
 		});

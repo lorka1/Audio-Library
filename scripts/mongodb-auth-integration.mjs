@@ -13,16 +13,12 @@ import {
 	generateSessionToken,
 	hashSessionToken
 } from '../src/lib/server/auth/session-token.ts';
-import {
-	assertUnifiedAuthBackend,
-	parseDatabaseBackend
-} from '../src/lib/server/users/backend.ts';
 import { createMongoUserRepository } from '../src/lib/server/users/mongodb-repository.ts';
 import { createMongoSessionRepository } from '../src/lib/server/sessions/mongodb-repository.ts';
 
 const OPERATION_TIMEOUT_MS = 5_000;
 const TOTAL_TIMEOUT_MS = 120_000;
-const EXPECTED_CHECKS = 21;
+const EXPECTED_CHECKS = 18;
 let checkNumber = 0;
 let activeStep = 'controller setup';
 let activeCheckName;
@@ -431,20 +427,6 @@ async function main() {
 			})
 		);
 		await check('session token hash uniqueness', () => undefined);
-		await check('SQLite default backend', () =>
-			assert.equal(parseDatabaseBackend(undefined), 'sqlite')
-		);
-		await check('MongoDB users and sessions selected together', () =>
-			assert.equal(
-				assertUnifiedAuthBackend('mongodb', 'mongodb'),
-				'mongodb'
-			)
-		);
-		await check('mixed backend selection impossible', () =>
-			assert.throws(() =>
-				assertUnifiedAuthBackend('mongodb', 'sqlite')
-			)
-		);
 	} catch (error) {
 		primaryFailure = captureFailure(
 			error,

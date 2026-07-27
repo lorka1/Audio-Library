@@ -19,10 +19,6 @@ import {
 	verifyPassword
 } from '../src/lib/server/auth/password.ts';
 import {
-	assertUnifiedAuthBackend,
-	parseDatabaseBackend,
-} from '../src/lib/server/users/backend.ts';
-import {
 	createMongoUserRepository
 } from '../src/lib/server/users/mongodb-repository.ts';
 import {
@@ -32,7 +28,7 @@ import {
 const TOTAL_TIMEOUT_MS = 90_000;
 const OPERATION_TIMEOUT_MS = 5_000;
 const TEST_DATABASE_MAX_LENGTH = 63;
-const EXPECTED_CHECKS = 15;
+const EXPECTED_CHECKS = 13;
 
 let completedChecks = 0;
 let activeStep = 'setup';
@@ -93,8 +89,7 @@ function safeFailureMessage(error) {
 	if (
 		error instanceof Error &&
 		(error.message.startsWith('Missing required environment variable MONGODB_') ||
-			error.message.startsWith('MONGODB_') ||
-			error.message.startsWith('DATABASE_BACKEND'))
+			error.message.startsWith('MONGODB_'))
 	) {
 		return error.message;
 	}
@@ -272,19 +267,6 @@ async function main() {
 			false
 		);
 		check('invalid password verification', () => undefined);
-
-		check('SQLite backend default', () => {
-			assert.equal(parseDatabaseBackend(undefined), 'sqlite');
-		});
-		check('unified MongoDB auth backend', () => {
-			assert.equal(
-				assertUnifiedAuthBackend('mongodb', 'mongodb'),
-				'mongodb'
-			);
-			assert.throws(() =>
-				assertUnifiedAuthBackend('mongodb', 'sqlite')
-			);
-		});
 
 		assert.equal(completedChecks, EXPECTED_CHECKS);
 	} catch (error) {

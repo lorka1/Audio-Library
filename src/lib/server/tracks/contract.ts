@@ -22,7 +22,7 @@ export interface CreateTrackInput {
 
 export interface CreateTrackOptions {
 	/**
-	 * Reserved for isolated migration/import checks. Normal creation lets the
+	 * Reserved for isolated repository checks. Normal creation lets the
 	 * repository choose a never-reused public ID.
 	 */
 	publicId?: number;
