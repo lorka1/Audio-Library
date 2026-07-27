@@ -8,12 +8,10 @@ import {
 } from './files';
 import { logTrackStorageError } from './logging';
 import {
-	deleteOwnedTrackRecord,
-	findOwnedTrackFileByPublicId,
-	updateOwnedTrackMetadata,
 	type OwnedTrackFile,
 	type UpdateOwnedTrackMetadataInput
 } from './repository';
+import { getApplicationTrackRepository } from './persistence';
 import {
 	validateTrackMetadataFormData,
 	type TrackMetadataErrors,
@@ -72,9 +70,16 @@ export type DeleteTrackResult =
 	  };
 
 const defaultDependencies: TrackManagementDependencies = {
-	updateMetadata: updateOwnedTrackMetadata,
-	findFile: findOwnedTrackFileByPublicId,
-	deleteRecord: deleteOwnedTrackRecord,
+	updateMetadata: (publicId, ownerId, metadata) =>
+		getApplicationTrackRepository().updateOwnerTrackMetadata(
+			publicId,
+			ownerId,
+			metadata
+		),
+	findFile: (publicId, ownerId) =>
+		getApplicationTrackRepository().getOwnerTrackStorage(publicId, ownerId),
+	deleteRecord: (publicId, ownerId) =>
+		getApplicationTrackRepository().deleteOwnerTrack(publicId, ownerId),
 	quarantineFile: quarantineStoredAudioFile,
 	deleteQuarantinedFile: deleteQuarantinedAudioFile,
 	restoreQuarantinedFile: restoreQuarantinedAudioFile,

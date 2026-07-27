@@ -4,7 +4,7 @@ import { requireUser } from '$lib/server/auth/guards';
 import { parseTrackId } from '$lib/server/tracks/id';
 import { logTrackStorageError } from '$lib/server/tracks/logging';
 import { deleteTrack } from '$lib/server/tracks/management';
-import { findOwnedTrackByPublicId } from '$lib/server/tracks/repository';
+import { getApplicationTrackRepository } from '$lib/server/tracks/persistence';
 
 export const load = (async (event) => {
 	const user = requireUser(event);
@@ -15,7 +15,10 @@ export const load = (async (event) => {
 	}
 
 	try {
-		const track = await findOwnedTrackByPublicId(publicId, user.id);
+		const track = await getApplicationTrackRepository().findOwnerTrack(
+			publicId,
+			user.id
+		);
 
 		if (!track) {
 			error(404, 'Track not found.');

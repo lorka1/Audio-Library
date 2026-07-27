@@ -5,8 +5,10 @@ import {
 	validateSessionToken
 } from '$lib/server/auth/session';
 import { logAuthError } from '$lib/server/auth/logging';
+import { assertM4ApplicationPersistenceReady } from '$lib/server/tracks/persistence';
 
 export const handle: Handle = async ({ event, resolve }) => {
+	assertM4ApplicationPersistenceReady();
 	event.locals.user = null;
 	event.locals.session = null;
 

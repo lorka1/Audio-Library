@@ -107,7 +107,7 @@ MONGODB_TEST_DB_NAME=audio_library_test_local
 | Variable | Purpose |
 | --- | --- |
 | `DATABASE_URL` | Required path to the SQLite database file. |
-| `DATABASE_BACKEND` | Server-only auth persistence selector: `sqlite` or `mongodb`. It defaults to `sqlite` and always selects users and sessions together. |
+| `DATABASE_BACKEND` | Central server-only persistence selector: `sqlite` or `mongodb`. It defaults to `sqlite`; during M4 the complete application is guarded to `sqlite` while focused MongoDB repository tests remain available. |
 | `AUDIO_STORAGE_PATH` | Private audio directory, resolved from the project working directory when relative. Blank values fall back to `storage/audio`. |
 | `MAX_AUDIO_FILE_SIZE_MB` | Maximum application-level size of one upload. Invalid or blank values use 50 MB. |
 | `BODY_SIZE_LIMIT` | Request-body limit used by the production Node adapter. It must exceed the audio limit enough to allow multipart overhead. |
@@ -295,7 +295,7 @@ The current migrations create users, hashed sessions, track metadata and
 ownership, public/private visibility, storage references, metadata constraints,
 and the numeric public route ID while preserving the server-only track UUID.
 
-### MongoDB migration M1–M3
+### MongoDB migration M1–M4
 
 The MongoDB migration is being introduced in phases. M1 adds the official
 MongoDB Node.js driver, validated environment settings, typed document and
@@ -319,11 +319,22 @@ auth backends are forbidden. MongoDB auth requires Atlas, a replica set, or a
 compatible sharded deployment because registration uses a transaction to
 create the user and initial session atomically. There is no non-atomic fallback.
 
-Tracks and audio metadata remain SQLite-backed regardless of the selected auth
-backend. Real users and sessions are not migrated yet. A final switch to
-MongoDB auth will invalidate existing SQLite login cookies; users should sign
-in again rather than copying active session tokens. Full application cutover
-is not complete.
+M4 adds a focused track repository contract with SQLite and MongoDB
+implementations for creation, basic public browsing, public media lookup,
+owner-safe management, and server-only storage lookup. MongoDB public IDs use
+one atomic `tracks.publicId` counter document with `findOneAndUpdate`, `$inc`,
+upsert, and the updated result; concurrent allocations are unique, positive,
+and never reused. Audio bytes remain in private filesystem storage under
+`AUDIO_STORAGE_PATH`; MongoDB stores metadata and the private storage key only.
+
+SQLite remains the complete application backend. MongoDB track route cutover
+is explicitly guarded until M5 implements search, filter, and sort parity, so
+MongoDB auth cannot accidentally run beside SQLite track routes. The MongoDB
+track repository is available only for focused verification during M4. Real
+users, sessions, and tracks have not been migrated. A later switch to MongoDB
+auth will invalidate existing SQLite login cookies; users should sign in again
+rather than copying active session tokens. Full application cutover is not
+complete.
 
 With all three MongoDB environment variables configured, verify connectivity,
 database selection, and indexes without reading or writing application
@@ -357,6 +368,7 @@ it is not the server itself and is not required by the application.
 | `npm run db:mongodb:check` | Safely check the configured MongoDB connection, selected development database, and M1 indexes. |
 | `npm run test:mongodb:users` | Run the isolated M2 MongoDB user-repository integration checks and remove their uniquely owned test database. |
 | `npm run test:mongodb:auth` | Verify M3 MongoDB transactions, users-plus-sessions authentication behavior, privacy, and isolated cleanup. |
+| `npm run test:mongodb:tracks` | Verify M4 MongoDB track repositories, atomic public IDs, safe projections, owner CRUD, filesystem consistency, and isolated cleanup. |
 
 There is no separate lint script. `npm run check` is the enforced Svelte and
 TypeScript static-analysis command.

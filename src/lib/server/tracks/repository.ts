@@ -1,6 +1,5 @@
 import { db } from '$lib/server/db';
 import { tracks, users } from '$lib/server/db/schema';
-import type { MusicGenre, MusicalKey } from '$lib/constants/music';
 import type { TrackSearchFilters } from '$lib/tracks-query';
 import type { OwnerTrack, PublicTrack } from '$lib/types';
 import { and, asc, desc, eq, gte, lte, or, sql, type SQL } from 'drizzle-orm';
@@ -8,29 +7,26 @@ import { toOwnerTrack, type OwnerTrackRecord } from './owner-model';
 import { toPublicTrack, type PublicTrackRecord } from './public-model';
 import { escapeSqlLikeSearchTerm } from './query';
 import type { ValidatedTrackMetadata } from './validation';
+import type {
+	CreatedTrack,
+	CreateTrackOptions,
+	CreateTrackInput,
+	OwnerTrackStorage,
+	TrackForDownload,
+	TrackForStreaming,
+	TrackRepository
+} from './contract';
+import { requireTrackOwnerId } from './contract';
 
-export interface CreateTrackInput {
-	id: string;
-	ownerId: string;
-	title: string;
-	artist: string;
-	bpm: number | null;
-	musicalKey: MusicalKey | null;
-	genre: MusicGenre | null;
-	description: string | null;
-	originalFilename: string;
-	storageKey: string;
-	mimeType: string;
-	fileSizeBytes: number;
-	createdAt: Date;
-	updatedAt: Date;
-}
-
-export interface CreatedTrack {
-	id: number;
-	title: string;
-	createdAt: Date;
-}
+export type {
+	CreatedTrack,
+	CreateTrackOptions,
+	CreateTrackInput,
+	OwnerTrackStorage,
+	TrackForDownload,
+	TrackForStreaming,
+	TrackRepository
+} from './contract';
 
 export interface PublicTrackFile {
 	id: number;
@@ -81,12 +77,6 @@ const ownerTrackSelection = {
 };
 
 type TrackDatabase = typeof db;
-
-function requireOwnerId(ownerId: string): void {
-	if (!ownerId.trim()) {
-		throw new Error('An authenticated owner ID is required.');
-	}
-}
 
 function publicTrackConditions(filters: TrackSearchFilters): SQL[] {
 	const conditions: SQL[] = [eq(tracks.visibility, 'public')];
@@ -217,7 +207,7 @@ export async function listTracksByOwner(
 	ownerId: string,
 	database: TrackDatabase = db
 ): Promise<OwnerTrack[]> {
-	requireOwnerId(ownerId);
+	requireTrackOwnerId(ownerId);
 
 	const records = await database
 		.select(ownerTrackSelection)
@@ -233,7 +223,7 @@ export async function findOwnedTrackByPublicId(
 	ownerId: string,
 	database: TrackDatabase = db
 ): Promise<OwnerTrack | null> {
-	requireOwnerId(ownerId);
+	requireTrackOwnerId(ownerId);
 
 	const [record] = await database
 		.select(ownerTrackSelection)
@@ -250,7 +240,7 @@ export async function updateOwnedTrackMetadata(
 	metadata: UpdateOwnedTrackMetadataInput,
 	database: TrackDatabase = db
 ): Promise<OwnerTrack | null> {
-	requireOwnerId(ownerId);
+	requireTrackOwnerId(ownerId);
 
 	const [record] = await database
 		.update(tracks)
@@ -266,7 +256,7 @@ export async function findOwnedTrackFileByPublicId(
 	ownerId: string,
 	database: TrackDatabase = db
 ): Promise<OwnedTrackFile | null> {
-	requireOwnerId(ownerId);
+	requireTrackOwnerId(ownerId);
 
 	const [record] = await database
 		.select({
@@ -285,7 +275,7 @@ export async function deleteOwnedTrackRecord(
 	ownerId: string,
 	database: TrackDatabase = db
 ): Promise<boolean> {
-	requireOwnerId(ownerId);
+	requireTrackOwnerId(ownerId);
 
 	const deleted = await database
 		.delete(tracks)
@@ -294,3 +284,107 @@ export async function deleteOwnedTrackRecord(
 
 	return deleted.length === 1;
 }
+
+/**
+ * M4's contract-backed SQLite implementation. Existing route functions remain
+ * exported above so M5 search/filter/sort behavior is unchanged.
+ */
+export function createSqliteTrackRepository(
+	database: TrackDatabase = db
+): TrackRepository {
+	return {
+		async createTrack(input, options: CreateTrackOptions = {}) {
+			if (options.publicId !== undefined) {
+				if (!Number.isSafeInteger(options.publicId) || options.publicId < 1) {
+					throw new Error('Track public ID must be a positive safe integer.');
+				}
+			}
+			const [track] = await database
+				.insert(tracks)
+				.values({
+					...input,
+					...(options.publicId === undefined
+						? {}
+						: { publicId: options.publicId }),
+					visibility: options.visibility ?? 'public'
+				})
+				.returning({
+					id: tracks.publicId,
+					title: tracks.title,
+					createdAt: tracks.createdAt
+				});
+			if (!track) {
+				throw new Error('The database did not return the created track.');
+			}
+			return track;
+		},
+		async allocatePublicTrackId() {
+			throw new Error(
+				'SQLite allocates public track IDs atomically during createTrack.'
+			);
+		},
+		findPublicTrackByPublicId: (publicId) =>
+			findPublicTrackByIdWithDatabase(publicId, database),
+		listBasicPublicTracks: () =>
+			listPublicTracks({ sort: 'newest' }, database),
+		findTrackForStreaming: (publicId) =>
+			findPublicTrackFileByIdWithDatabase(publicId, database).then((file) =>
+				file
+					? {
+							id: file.id,
+							storedFilename: file.storedFilename,
+							mimeType: file.mimeType,
+							fileSizeBytes: file.fileSizeBytes,
+							visibility: 'public'
+						}
+					: null
+			),
+		findTrackForDownload: (publicId) =>
+			findPublicTrackFileByIdWithDatabase(publicId, database),
+		listTracksForOwner: (ownerId) => listTracksByOwner(ownerId, database),
+		findOwnerTrack: (publicId, ownerId) =>
+			findOwnedTrackByPublicId(publicId, ownerId, database),
+		updateOwnerTrackMetadata: (publicId, ownerId, metadata) =>
+			updateOwnedTrackMetadata(publicId, ownerId, metadata, database),
+		deleteOwnerTrack: (publicId, ownerId) =>
+			deleteOwnedTrackRecord(publicId, ownerId, database),
+		getOwnerTrackStorage: (publicId, ownerId) =>
+			findOwnedTrackFileByPublicId(publicId, ownerId, database)
+	};
+}
+
+async function findPublicTrackByIdWithDatabase(
+	id: number,
+	database: TrackDatabase
+): Promise<PublicTrack | null> {
+	const [record] = await database
+		.select(publicTrackSelection)
+		.from(tracks)
+		.innerJoin(users, eq(tracks.ownerId, users.id))
+		.where(and(eq(tracks.publicId, id), eq(tracks.visibility, 'public')))
+		.limit(1);
+	return record ? toPublicTrack(record satisfies PublicTrackRecord) : null;
+}
+
+async function findPublicTrackFileByIdWithDatabase(
+	id: number,
+	database: TrackDatabase
+): Promise<PublicTrackFile | null> {
+	const [record] = await database
+		.select({
+			id: tracks.publicId,
+			storedFilename: tracks.storageKey,
+			originalFilename: tracks.originalFilename,
+			mimeType: tracks.mimeType,
+			fileSizeBytes: tracks.fileSizeBytes,
+			visibility: tracks.visibility
+		})
+		.from(tracks)
+		.where(and(eq(tracks.publicId, id), eq(tracks.visibility, 'public')))
+		.limit(1);
+	return record?.visibility === 'public'
+		? { ...record, visibility: 'public' }
+		: null;
+}
+
+export const sqliteTrackRepository = createSqliteTrackRepository();

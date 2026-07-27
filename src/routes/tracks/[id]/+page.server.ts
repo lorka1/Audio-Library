@@ -2,10 +2,7 @@ import { error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { parseTrackId } from '$lib/server/tracks/id';
 import { logTrackStorageError } from '$lib/server/tracks/logging';
-import {
-	findOwnedTrackByPublicId,
-	findPublicTrackById
-} from '$lib/server/tracks/repository';
+import { getApplicationTrackRepository } from '$lib/server/tracks/persistence';
 
 export const load = (async ({ locals, params, url }) => {
 	const id = parseTrackId(params.id);
@@ -15,7 +12,8 @@ export const load = (async ({ locals, params, url }) => {
 	}
 
 	try {
-		const track = await findPublicTrackById(id);
+		const repository = getApplicationTrackRepository();
+		const track = await repository.findPublicTrackByPublicId(id);
 
 		if (!track) {
 			error(404, 'Track not found.');
@@ -24,7 +22,7 @@ export const load = (async ({ locals, params, url }) => {
 		return {
 			track,
 			canManage: locals.user
-				? (await findOwnedTrackByPublicId(id, locals.user.id)) !== null
+				? (await repository.findOwnerTrack(id, locals.user.id)) !== null
 				: false,
 			uploaded: url.searchParams.get('uploaded') === '1'
 		};

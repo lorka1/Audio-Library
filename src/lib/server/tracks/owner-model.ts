@@ -1,4 +1,4 @@
-import type { OwnerTrack, TrackVisibility } from '$lib/types';
+import type { OwnerTrack, TrackVisibility } from '../../types';
 
 export interface OwnerTrackRecord {
 	publicId: number;
