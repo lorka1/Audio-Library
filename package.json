@@ -24,6 +24,7 @@
     "test:mongodb:tracks": "node --experimental-strip-types scripts/mongodb-tracks-integration.mjs",
     "test:mongodb:queries": "node --experimental-strip-types scripts/mongodb-queries-integration.mjs",
     "test:mongodb:migration": "node --experimental-strip-types scripts/mongodb-migration-integration.mjs",
+    "test:mongodb:cutover": "node --experimental-strip-types scripts/mongodb-cutover-integration.mjs",
     "verify:clean-clone": "node scripts/clean-clone-check.mjs",
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate",
