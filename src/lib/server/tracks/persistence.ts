@@ -8,27 +8,29 @@ import type { TrackRepository } from './contract';
 import { createMongoTrackRepository } from './mongodb-repository';
 import { sqliteTrackRepository } from './sqlite-repository';
 
-export const M4_MONGODB_TRACK_CUTOVER_GUARD_MESSAGE =
-	'MongoDB application track routes remain guarded until M5 search, filter, and sort parity is complete.';
+let mongoTrackRepositoryPromise: Promise<TrackRepository> | undefined;
 
-export function assertM4ApplicationPersistenceReady(
-	environment: DatabaseBackendEnvironment = process.env
-): void {
-	if (readDatabaseBackend(environment) === 'mongodb') {
-		throw new Error(M4_MONGODB_TRACK_CUTOVER_GUARD_MESSAGE);
+async function mongoTrackRepository(): Promise<TrackRepository> {
+	if (!mongoTrackRepositoryPromise) {
+		const attempt = getFocusedMongoTrackRepository();
+		let cached: Promise<TrackRepository>;
+		cached = attempt.catch((error) => {
+			if (mongoTrackRepositoryPromise === cached) {
+				mongoTrackRepositoryPromise = undefined;
+			}
+			throw error;
+		});
+		mongoTrackRepositoryPromise = cached;
 	}
+	return mongoTrackRepositoryPromise;
 }
 
-/**
- * Complete application routes use this selector. In M4 it intentionally
- * returns SQLite only; focused MongoDB repository verification uses the
- * factory below without enabling an incomplete application cutover.
- */
-export function getApplicationTrackRepository(
+export async function getApplicationTrackRepository(
 	environment: DatabaseBackendEnvironment = process.env
-): TrackRepository {
-	assertM4ApplicationPersistenceReady(environment);
-	return sqliteTrackRepository;
+): Promise<TrackRepository> {
+	return readDatabaseBackend(environment) === 'sqlite'
+		? sqliteTrackRepository
+		: mongoTrackRepository();
 }
 
 export async function getFocusedMongoTrackRepository(): Promise<TrackRepository> {

@@ -21,35 +21,25 @@ vi.mock('./mongodb-repository', () => ({
 }));
 
 import {
-	assertM4ApplicationPersistenceReady,
 	getApplicationTrackRepository,
-	getFocusedMongoTrackRepository,
-	M4_MONGODB_TRACK_CUTOVER_GUARD_MESSAGE
+	getFocusedMongoTrackRepository
 } from './persistence';
 
-describe('M4 track persistence selection', () => {
+describe('M5 track persistence selection', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 	});
 
-	it('keeps SQLite as the complete application track backend', () => {
-		expect(
+	it('keeps SQLite as the default complete application track backend', async () => {
+		await expect(
 			getApplicationTrackRepository({ DATABASE_BACKEND: 'sqlite' })
-		).toBe(mocks.sqliteTrackRepository);
-		expect(
+		).resolves.toBe(mocks.sqliteTrackRepository);
+		await expect(
 			getApplicationTrackRepository({ DATABASE_BACKEND: '' })
-		).toBe(mocks.sqliteTrackRepository);
+		).resolves.toBe(mocks.sqliteTrackRepository);
 	});
 
-	it('guards an incomplete MongoDB application route cutover', () => {
-		expect(() =>
-			assertM4ApplicationPersistenceReady({
-				DATABASE_BACKEND: 'mongodb'
-			})
-		).toThrowError(M4_MONGODB_TRACK_CUTOVER_GUARD_MESSAGE);
-	});
-
-	it('constructs MongoDB tracks only through the focused repository factory', async () => {
+	it('selects the complete MongoDB track backend', async () => {
 		const database = {};
 		const collections = {
 			tracks: {},
@@ -64,11 +54,26 @@ describe('M4 track persistence selection', () => {
 		mocks.getMongoCollections.mockReturnValue(collections);
 		mocks.createMongoTrackRepository.mockReturnValue(repository);
 
-		await expect(getFocusedMongoTrackRepository()).resolves.toBe(repository);
+		await expect(
+			getApplicationTrackRepository({ DATABASE_BACKEND: 'mongodb' })
+		).resolves.toBe(repository);
 		expect(mocks.createMongoTrackRepository).toHaveBeenCalledWith(
 			collections.tracks,
 			collections.counters,
 			collections.users
 		);
+	});
+
+	it('constructs focused MongoDB verification without changing the selector', async () => {
+		const collections = { tracks: {}, counters: {}, users: {} };
+		const repository = {};
+		mocks.connectMongoDevelopment.mockResolvedValue({
+			client: {},
+			database: {}
+		});
+		mocks.getMongoCollections.mockReturnValue(collections);
+		mocks.createMongoTrackRepository.mockReturnValue(repository);
+
+		await expect(getFocusedMongoTrackRepository()).resolves.toBe(repository);
 	});
 });

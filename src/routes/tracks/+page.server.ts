@@ -2,7 +2,7 @@ import { error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { logTrackStorageError } from '$lib/server/tracks/logging';
 import { parseTrackQuery } from '$lib/server/tracks/query';
-import { listPublicTracks } from '$lib/server/tracks/repository';
+import { getApplicationTrackRepository } from '$lib/server/tracks/persistence';
 import {
 	getActiveTrackFilterSummary,
 	hasActiveTrackFilters
@@ -23,7 +23,9 @@ export const load = (async ({ url }) => {
 
 	try {
 		return {
-			tracks: await listPublicTracks(parsedQuery.filters),
+			tracks: await (
+				await getApplicationTrackRepository()
+			).listPublicTracks(parsedQuery.filters),
 			filterValues: parsedQuery.values,
 			filterErrors: parsedQuery.errors,
 			activeFilterSummary: getActiveTrackFilterSummary(parsedQuery.filters),

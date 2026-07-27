@@ -235,7 +235,9 @@ async function main() {
 		await check('private tracks are excluded from public reads', async () => {
 			assert.equal(await repository.findPublicTrackByPublicId(privateTrack.id), null);
 			assert.equal(
-				(await repository.listBasicPublicTracks()).some(({ id }) => id === privateTrack.id),
+				(await repository.listPublicTracks({ sort: 'newest' })).some(
+					({ id }) => id === privateTrack.id
+				),
 				false
 			);
 		});

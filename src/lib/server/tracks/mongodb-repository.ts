@@ -19,6 +19,10 @@ import type {
 	UpdateOwnerTrackMetadataInput
 } from './contract.ts';
 import {
+	escapeRegexSearchTerm,
+	type TrackSearchFilters
+} from '../../tracks-query.ts';
+import {
 	assertPositivePublicTrackId,
 	DuplicateTrackError,
 	requireTrackOwnerId
@@ -176,16 +180,63 @@ export function createMongoTrackRepository(
 		return counter.value;
 	}
 
+	function publicQueryMatch(
+		query: TrackSearchFilters
+	): Record<string, unknown> {
+		const match: Record<string, unknown> = { visibility: 'public' };
+		if (query.q) {
+			const literalSubstring = new RegExp(escapeRegexSearchTerm(query.q), 'i');
+			match.$or = [
+				{ title: literalSubstring },
+				{ artist: literalSubstring },
+				{ description: literalSubstring }
+			];
+		}
+		if (query.bpmMin !== undefined || query.bpmMax !== undefined) {
+			match.bpm = {
+				...(query.bpmMin === undefined ? {} : { $gte: query.bpmMin }),
+				...(query.bpmMax === undefined ? {} : { $lte: query.bpmMax })
+			};
+		}
+		if (query.musicalKey) match.musicalKey = query.musicalKey;
+		if (query.genre) match.genre = query.genre;
+		return match;
+	}
+
+	function publicQuerySort(query: TrackSearchFilters) {
+		switch (query.sort) {
+			case 'oldest':
+				return { createdAt: 1, publicId: 1 } as const;
+			case 'title_asc':
+				return { __sortTitle: 1, publicId: 1 } as const;
+			case 'title_desc':
+				return { __sortTitle: -1, publicId: 1 } as const;
+			case 'bpm_asc':
+				return { __bpmMissing: 1, bpm: 1, publicId: 1 } as const;
+			case 'bpm_desc':
+				return { __bpmMissing: 1, bpm: -1, publicId: 1 } as const;
+			case 'newest':
+				return { createdAt: -1, publicId: -1 } as const;
+		}
+	}
+
 	async function publicAggregate(
 		match: Record<string, unknown>,
-		limit: number
+		query: TrackSearchFilters = { sort: 'newest' }
 	): Promise<PublicTrackAggregateRecord[]> {
 		return tracks
 			.aggregate<PublicTrackAggregateRecord>(
 				[
 					{ $match: { ...match, visibility: 'public' } },
-					{ $sort: { createdAt: -1, publicId: -1 } },
-					{ $limit: limit },
+					{
+						$set: {
+							__sortTitle: { $toLower: '$title' },
+							__bpmMissing: {
+								$cond: [{ $eq: ['$bpm', null] }, 1, 0]
+							}
+						}
+					},
+					{ $sort: publicQuerySort(query) },
 					{
 						$lookup: {
 							from: users.collectionName,
@@ -241,12 +292,12 @@ export function createMongoTrackRepository(
 
 		async findPublicTrackByPublicId(publicId) {
 			assertPositivePublicTrackId(publicId);
-			const [record] = await publicAggregate({ publicId }, 1);
+			const [record] = await publicAggregate({ publicId });
 			return record ? toPublicTrack(record) : null;
 		},
 
-		async listBasicPublicTracks() {
-			const records = await publicAggregate({}, MONGODB_BASIC_PUBLIC_TRACK_LIMIT);
+		async listPublicTracks(query) {
+			const records = await publicAggregate(publicQueryMatch(query), query);
 			return records.map(toPublicTrack);
 		},
 

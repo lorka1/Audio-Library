@@ -32,7 +32,9 @@ export const GET = (async ({ params }) => {
 	let trackFile;
 
 	try {
-		trackFile = await getApplicationTrackRepository().findTrackForDownload(id);
+		trackFile = await (
+			await getApplicationTrackRepository()
+		).findTrackForDownload(id);
 	} catch (error) {
 		logTrackStorageError('Public audio download lookup failed.', error);
 		return unavailableResponse(500);

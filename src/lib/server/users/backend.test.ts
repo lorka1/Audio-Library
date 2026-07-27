@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+	assertUnifiedDatabaseBackend,
+	assertUnifiedAuthBackend,
 	parseDatabaseBackend,
-	readDatabaseBackend,
-	assertUnifiedAuthBackend
+	readDatabaseBackend
 } from './backend';
 
 describe('database backend selection', () => {
@@ -35,5 +36,17 @@ describe('database backend selection', () => {
 		expect(() =>
 			assertUnifiedAuthBackend('mongodb', 'sqlite')
 		).toThrowError('Mixed user and session backends are forbidden.');
+	});
+
+	it('forbids mixed complete application backends', () => {
+		expect(
+			assertUnifiedDatabaseBackend('sqlite', 'sqlite', 'sqlite')
+		).toBe('sqlite');
+		expect(
+			assertUnifiedDatabaseBackend('mongodb', 'mongodb', 'mongodb')
+		).toBe('mongodb');
+		expect(() =>
+			assertUnifiedDatabaseBackend('mongodb', 'mongodb', 'sqlite')
+		).toThrowError('Mixed database backends are forbidden.');
 	});
 });

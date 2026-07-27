@@ -423,6 +423,23 @@ describe('listPublicTracks sorting and projection', () => {
 		expectPrivateExcluded(records);
 	});
 
+	it('sorts titles descending case-insensitively with a stable public ID tie-breaker', async () => {
+		const records = await listPublicTracks(
+			filters({ sort: 'title_desc' }),
+			testDatabase
+		);
+
+		expect(titles(records)).toEqual([
+			'Zulu Beat',
+			"Quote's Song",
+			'Percent 100%_mix',
+			'Croatian Night',
+			'Bravo',
+			'alpha pulse'
+		]);
+		expectPrivateExcluded(records);
+	});
+
 	it('sorts numeric BPM ascending and places null BPM last', async () => {
 		const records = await listPublicTracks(filters({ sort: 'bpm_asc' }), testDatabase);
 

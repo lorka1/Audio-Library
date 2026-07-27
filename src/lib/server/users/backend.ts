@@ -33,5 +33,18 @@ export function assertUnifiedAuthBackend(
 	if (userBackend !== sessionBackend) {
 		throw new Error('Mixed user and session backends are forbidden.');
 	}
-	return userBackend;
+	return assertUnifiedDatabaseBackend(
+		userBackend,
+		sessionBackend
+	);
+}
+
+export function assertUnifiedDatabaseBackend(
+	...backends: [DatabaseBackend, DatabaseBackend, ...DatabaseBackend[]]
+): DatabaseBackend {
+	const [selected, ...remaining] = backends;
+	if (remaining.some((backend) => backend !== selected)) {
+		throw new Error('Mixed database backends are forbidden.');
+	}
+	return selected;
 }

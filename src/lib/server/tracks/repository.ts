@@ -119,6 +119,8 @@ function publicTrackOrder(filters: TrackSearchFilters): SQL[] {
 			return [asc(tracks.createdAt), asc(tracks.publicId)];
 		case 'title_asc':
 			return [asc(sql`lower(${tracks.title})`), asc(tracks.publicId)];
+		case 'title_desc':
+			return [desc(sql`lower(${tracks.title})`), asc(tracks.publicId)];
 		case 'bpm_asc':
 			return [
 				asc(sql`case when ${tracks.bpm} is null then 1 else 0 end`),
@@ -325,8 +327,7 @@ export function createSqliteTrackRepository(
 		},
 		findPublicTrackByPublicId: (publicId) =>
 			findPublicTrackByIdWithDatabase(publicId, database),
-		listBasicPublicTracks: () =>
-			listPublicTracks({ sort: 'newest' }, database),
+		listPublicTracks: (query) => listPublicTracks(query, database),
 		findTrackForStreaming: (publicId) =>
 			findPublicTrackFileByIdWithDatabase(publicId, database).then((file) =>
 				file

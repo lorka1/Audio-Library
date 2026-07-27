@@ -1,5 +1,6 @@
 import type { MusicGenre, MusicalKey } from '../../constants/music';
 import type { OwnerTrack, PublicTrack, TrackVisibility } from '../../types';
+import type { TrackSearchFilters } from '../../tracks-query';
 import type { ValidatedTrackMetadata } from './validation';
 
 export interface CreateTrackInput {
@@ -71,7 +72,7 @@ export interface TrackRepository {
 	createTrack(input: CreateTrackInput, options?: CreateTrackOptions): Promise<CreatedTrack>;
 	allocatePublicTrackId(): Promise<number>;
 	findPublicTrackByPublicId(publicId: number): Promise<PublicTrack | null>;
-	listBasicPublicTracks(): Promise<PublicTrack[]>;
+	listPublicTracks(query: TrackSearchFilters): Promise<PublicTrack[]>;
 	findTrackForStreaming(publicId: number): Promise<TrackForStreaming | null>;
 	findTrackForDownload(publicId: number): Promise<TrackForDownload | null>;
 	listTracksForOwner(ownerId: string): Promise<OwnerTrack[]>;

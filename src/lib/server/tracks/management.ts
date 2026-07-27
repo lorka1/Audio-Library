@@ -70,16 +70,16 @@ export type DeleteTrackResult =
 	  };
 
 const defaultDependencies: TrackManagementDependencies = {
-	updateMetadata: (publicId, ownerId, metadata) =>
-		getApplicationTrackRepository().updateOwnerTrackMetadata(
+	updateMetadata: async (publicId, ownerId, metadata) =>
+		(await getApplicationTrackRepository()).updateOwnerTrackMetadata(
 			publicId,
 			ownerId,
 			metadata
 		),
-	findFile: (publicId, ownerId) =>
-		getApplicationTrackRepository().getOwnerTrackStorage(publicId, ownerId),
-	deleteRecord: (publicId, ownerId) =>
-		getApplicationTrackRepository().deleteOwnerTrack(publicId, ownerId),
+	findFile: async (publicId, ownerId) =>
+		(await getApplicationTrackRepository()).getOwnerTrackStorage(publicId, ownerId),
+	deleteRecord: async (publicId, ownerId) =>
+		(await getApplicationTrackRepository()).deleteOwnerTrack(publicId, ownerId),
 	quarantineFile: quarantineStoredAudioFile,
 	deleteQuarantinedFile: deleteQuarantinedAudioFile,
 	restoreQuarantinedFile: restoreQuarantinedAudioFile,

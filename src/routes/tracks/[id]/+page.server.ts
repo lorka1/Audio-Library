@@ -12,7 +12,7 @@ export const load = (async ({ locals, params, url }) => {
 	}
 
 	try {
-		const repository = getApplicationTrackRepository();
+		const repository = await getApplicationTrackRepository();
 		const track = await repository.findPublicTrackByPublicId(id);
 
 		if (!track) {

@@ -5,10 +5,10 @@ import {
 	validateSessionToken
 } from '$lib/server/auth/session';
 import { logAuthError } from '$lib/server/auth/logging';
-import { assertM4ApplicationPersistenceReady } from '$lib/server/tracks/persistence';
+import { readDatabaseBackend } from '$lib/server/users/backend';
 
 export const handle: Handle = async ({ event, resolve }) => {
-	assertM4ApplicationPersistenceReady();
+	readDatabaseBackend();
 	event.locals.user = null;
 	event.locals.session = null;
 

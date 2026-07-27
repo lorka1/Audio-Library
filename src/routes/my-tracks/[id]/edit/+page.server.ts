@@ -22,7 +22,7 @@ export const load = (async (event) => {
 	}
 
 	try {
-		const track = await getApplicationTrackRepository().findOwnerTrack(
+		const track = await (await getApplicationTrackRepository()).findOwnerTrack(
 			publicId,
 			user.id
 		);

@@ -107,7 +107,7 @@ MONGODB_TEST_DB_NAME=audio_library_test_local
 | Variable | Purpose |
 | --- | --- |
 | `DATABASE_URL` | Required path to the SQLite database file. |
-| `DATABASE_BACKEND` | Central server-only persistence selector: `sqlite` or `mongodb`. It defaults to `sqlite`; during M4 the complete application is guarded to `sqlite` while focused MongoDB repository tests remain available. |
+| `DATABASE_BACKEND` | Central server-only persistence selector: `sqlite` or `mongodb`. It defaults to `sqlite`; each value selects users, sessions, and tracks together. |
 | `AUDIO_STORAGE_PATH` | Private audio directory, resolved from the project working directory when relative. Blank values fall back to `storage/audio`. |
 | `MAX_AUDIO_FILE_SIZE_MB` | Maximum application-level size of one upload. Invalid or blank values use 50 MB. |
 | `BODY_SIZE_LIMIT` | Request-body limit used by the production Node adapter. It must exceed the audio limit enough to allow multipart overhead. |
@@ -193,13 +193,15 @@ and usable without JavaScript.
 | `bpmMax` | Inclusive maximum BPM from 20 through 300. |
 | `musicalKey` | Exact value from the musical-key allowlist. |
 | `genre` | Exact value from the genre allowlist. |
-| `sort` | `newest`, `oldest`, `title_asc`, `bpm_asc`, or `bpm_desc`. |
+| `sort` | `newest`, `oldest`, `title_asc`, `title_desc`, `bpm_asc`, or `bpm_desc`. |
 
-Search values are parameter-bound. `%`, `_`, and backslash are escaped as
-literal SQL `LIKE` text, and the public visibility condition is grouped
-separately from the title/artist/description OR expression. BPM filters
-exclude unspecified BPM values. BPM sorting keeps unspecified values last in
-both directions, and every sort has a public-ID tie-breaker for stable results.
+Search values are bounded and treated as literal substrings. SQLite escapes
+SQL `LIKE` metacharacters, while MongoDB escapes every regular-expression
+metacharacter before constructing a server-owned case-insensitive expression.
+The public visibility condition remains separate from the
+title/artist/description OR expression. BPM filters exclude unspecified BPM
+values. BPM sorting keeps unspecified values last in both directions, and
+every sort has a public-ID tie-breaker for stable results.
 
 Invalid filter values produce accessible validation messages and no misleading
 query. Submitted safe values remain visible, and Reset filters returns exactly
@@ -295,7 +297,7 @@ The current migrations create users, hashed sessions, track metadata and
 ownership, public/private visibility, storage references, metadata constraints,
 and the numeric public route ID while preserving the server-only track UUID.
 
-### MongoDB migration M1–M4
+### MongoDB migration M1–M5
 
 The MongoDB migration is being introduced in phases. M1 adds the official
 MongoDB Node.js driver, validated environment settings, typed document and
@@ -327,14 +329,18 @@ upsert, and the updated result; concurrent allocations are unique, positive,
 and never reused. Audio bytes remain in private filesystem storage under
 `AUDIO_STORAGE_PATH`; MongoDB stores metadata and the private storage key only.
 
-SQLite remains the complete application backend. MongoDB track route cutover
-is explicitly guarded until M5 implements search, filter, and sort parity, so
-MongoDB auth cannot accidentally run beside SQLite track routes. The MongoDB
-track repository is available only for focused verification during M4. Real
-users, sessions, and tracks have not been migrated. A later switch to MongoDB
-auth will invalidate existing SQLite login cookies; users should sign in again
-rather than copying active session tokens. Full application cutover is not
-complete.
+M5 completes MongoDB public query parity for literal substring search, BPM
+bounds, musical key, genre, combined filters, and all deterministic sort
+orders. `DATABASE_BACKEND=sqlite` selects SQLite users, sessions, and tracks;
+`DATABASE_BACKEND=mongodb` selects MongoDB users, sessions, and tracks. Route
+files never select a backend independently. SQLite remains the default until
+M6 migrates real users and tracks.
+
+No real users, sessions, or tracks have been migrated to MongoDB yet. Existing
+sessions will not be migrated. Audio bytes remain in private filesystem
+storage under `AUDIO_STORAGE_PATH` for both backends. Enabling MongoDB before
+M6 therefore selects an empty, complete MongoDB application backend rather
+than copying SQLite data. Final production cutover is not complete.
 
 With all three MongoDB environment variables configured, verify connectivity,
 database selection, and indexes without reading or writing application
@@ -369,6 +375,7 @@ it is not the server itself and is not required by the application.
 | `npm run test:mongodb:users` | Run the isolated M2 MongoDB user-repository integration checks and remove their uniquely owned test database. |
 | `npm run test:mongodb:auth` | Verify M3 MongoDB transactions, users-plus-sessions authentication behavior, privacy, and isolated cleanup. |
 | `npm run test:mongodb:tracks` | Verify M4 MongoDB track repositories, atomic public IDs, safe projections, owner CRUD, filesystem consistency, and isolated cleanup. |
+| `npm run test:mongodb:queries` | Verify M5 SQLite/MongoDB public-query parity, safe backend selection, development integrity, and isolated cleanup. |
 
 There is no separate lint script. `npm run check` is the enforced Svelte and
 TypeScript static-analysis command.

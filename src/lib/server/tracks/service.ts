@@ -50,7 +50,8 @@ export type UploadTrackResult =
 const defaultDependencies: TrackUploadDependencies = {
 	saveFile: saveAudioFile,
 	deleteFile: deleteStoredAudioFile,
-	insertTrack: (input) => getApplicationTrackRepository().createTrack(input),
+	insertTrack: async (input) =>
+		(await getApplicationTrackRepository()).createTrack(input),
 	generateId: randomUUID,
 	now: () => new Date()
 };

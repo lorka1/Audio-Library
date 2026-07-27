@@ -9,7 +9,9 @@ export const load = (async (event) => {
 
 	try {
 		return {
-			tracks: await getApplicationTrackRepository().listTracksForOwner(user.id),
+			tracks: await (
+				await getApplicationTrackRepository()
+			).listTracksForOwner(user.id),
 			updated: event.url.searchParams.get('updated') === '1',
 			deleted: event.url.searchParams.get('deleted') === '1'
 		};
