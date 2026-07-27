@@ -17,6 +17,14 @@ IDs, and private storage references.
 Registration creates a user and initial session in one transaction. A
 standalone MongoDB server without transaction support is rejected.
 
+## Technology stack
+
+- SvelteKit and Svelte with the Node adapter;
+- TypeScript and Vite;
+- MongoDB as the only persistence service;
+- private local filesystem storage for audio bytes;
+- Vitest plus isolated MongoDB/HTTP/recovery integration controllers.
+
 ## Setup
 
 Install the lockfile dependencies:
@@ -35,7 +43,7 @@ Configure these values in the untracked `.env`:
 
 | Variable | Purpose |
 | --- | --- |
-| `MONGODB_URI` | Connection string for the transaction-capable MongoDB deployment. Never commit credentials. |
+| `MONGODB_URI` | Private connection string for the transaction-capable deployment; the local production URI includes `replicaSet=rs0`. Never commit credentials. |
 | `MONGODB_DB_NAME` | Application database name. |
 | `MONGODB_TEST_DB_NAME` | Base name for uniquely owned integration databases. It must start with `audio_library_test_` and differ from the application database. |
 | `AUDIO_STORAGE_PATH` | Private filesystem directory for audio bytes. |
@@ -43,6 +51,12 @@ Configure these values in the untracked `.env`:
 | `BODY_SIZE_LIMIT` | Adapter request limit, including multipart overhead. |
 | `SESSION_COOKIE_NAME` | HttpOnly session cookie name. |
 | `SESSION_DURATION_DAYS` | Session lifetime from 1 through 30 days. |
+| `MONGODB_BACKUP_ROOT` | Explicit private destination root used only by the MongoDB backup command. |
+| `AUDIO_BACKUP_ROOT` | Explicit private destination root used only by the audio backup command. |
+
+Production additionally supplies `HOST`, `PORT`, and an HTTPS `ORIGIN` through
+its private process environment. Production configuration is validated at
+startup and does not rely on development defaults.
 
 Start development:
 
@@ -151,6 +165,8 @@ through a static file server. MongoDB and audio backups are separate artifacts
 but one logical recovery set. Pair their timestamps, verify restores
 periodically, and never commit backups or `.env`. The complete same-computer
 Windows runbook is in [`docs/operations.md`](docs/operations.md).
+The final operator commissioning checklist is in
+[`docs/production-commissioning-checklist.md`](docs/production-commissioning-checklist.md).
 
 ## Privacy and storage
 

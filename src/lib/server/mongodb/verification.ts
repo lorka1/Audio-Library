@@ -14,6 +14,17 @@ export interface MongoOperationalVerification {
 	topology: 'replicaSet' | 'sharded';
 }
 
+export function isMongoCounterCompatible(
+	value: unknown,
+	maximumPublicId: unknown
+): boolean {
+	return Number.isSafeInteger(value) &&
+		(value as number) >= 0 &&
+		Number.isSafeInteger(maximumPublicId) &&
+		(maximumPublicId as number) >= 0 &&
+		(value as number) >= (maximumPublicId as number);
+}
+
 function entries(value: unknown): [string, unknown][] {
 	if (!value || typeof value !== 'object') return [];
 	return Object.entries(value);
@@ -100,12 +111,10 @@ export async function verifyMongoOperationalState(
 			}
 		).sort({ publicId: -1 }).limit(1).next()
 	]);
-	if (
-		!counter ||
-		!Number.isSafeInteger(counter.value) ||
-		counter.value < 0 ||
-		counter.value < (maximumTrack?.publicId ?? 0)
-	) {
+	if (!counter || !isMongoCounterCompatible(
+		counter.value,
+		maximumTrack?.publicId ?? 0
+	)) {
 		throw new Error('MongoDB public track-ID counter is structurally incompatible.');
 	}
 

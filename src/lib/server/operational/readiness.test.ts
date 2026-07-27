@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { checkApplicationReadiness } from './readiness';
+import {
+	checkApplicationReadiness,
+	ReadinessError
+} from './readiness';
 
 describe('readiness behavior', () => {
 	it('succeeds when all bounded dependencies are healthy', async () => {
@@ -19,6 +22,21 @@ describe('readiness behavior', () => {
 		await expect(checkApplicationReadiness({
 			verify: () => new Promise<void>(() => undefined),
 			timeoutMs: 10
-		})).rejects.toThrow('timed out');
+		})).rejects.toMatchObject({
+			name: 'ReadinessError',
+			safeCode: 'readiness_timeout'
+		});
+	});
+
+	it('preserves safe dependency failure classifications', async () => {
+		await expect(checkApplicationReadiness({
+			verify: vi.fn().mockRejectedValue(
+				new ReadinessError('filesystem', 'readiness_storage_unavailable')
+			),
+			timeoutMs: 100
+		})).rejects.toMatchObject({
+			category: 'filesystem',
+			safeCode: 'readiness_storage_unavailable'
+		});
 	});
 });

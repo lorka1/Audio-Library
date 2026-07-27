@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { MONGODB_INDEX_DEFINITIONS } from './indexes';
 import {
 	isRequiredMongoIndexCompatible,
+	isMongoCounterCompatible,
 	verifyMongoOperationalState
 } from './verification';
 
@@ -38,6 +39,24 @@ describe('required MongoDB index compatibility', () => {
 			unique: true,
 			sparse: true
 		}, expected)).toBe(false);
+	});
+});
+
+describe('MongoDB counter compatibility', () => {
+	it('accepts a non-negative safe counter at or above the maximum public ID', () => {
+		expect(isMongoCounterCompatible(3, 3)).toBe(true);
+		expect(isMongoCounterCompatible(4, 3)).toBe(true);
+	});
+
+	it.each([
+		[-1, 0],
+		[2, 3],
+		[1.5, 1],
+		[Number.MAX_SAFE_INTEGER + 1, 1],
+		['3', 3],
+		[3, -1]
+	])('rejects invalid counter state %s / %s', (value, maximum) => {
+		expect(isMongoCounterCompatible(value, maximum)).toBe(false);
 	});
 });
 

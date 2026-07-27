@@ -1,6 +1,6 @@
 {
   "name": "audio-library",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "packageManager": "npm@11.6.0",
@@ -31,11 +31,11 @@
     "backup:audio": "node --experimental-strip-types scripts/audio-backup.mjs",
     "verify:mongodb:restore": "node --experimental-strip-types scripts/mongodb-restore-verification.mjs",
     "test:mongodb:recovery": "node --experimental-strip-types scripts/mongodb-recovery-integration.mjs",
-    "test:watch": "vitest",
-    "db:mongodb:check": "npm run db:mongodb:verify"
+    "test:watch": "vitest"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
+    "dotenv": "^17.4.2",
     "mongodb": "^7.5.0"
   },
   "devDependencies": {
@@ -43,7 +43,6 @@
     "@sveltejs/kit": "^2.70.1",
     "@sveltejs/vite-plugin-svelte": "^7.2.0",
     "@types/node": "^24.13.3",
-    "dotenv": "^17.4.2",
     "svelte": "^5.56.7",
     "svelte-check": "^4.7.3",
     "typescript": "^6.0.3",

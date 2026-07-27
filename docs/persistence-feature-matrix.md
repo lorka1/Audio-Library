@@ -5,7 +5,7 @@ it through centralized server-only persistence modules.
 
 | Domain | Active implementation | Automated coverage |
 | --- | --- | --- |
-| Configuration and startup | Validated MongoDB URI, application/test database separation, cached client, idempotent indexes | MongoDB config/client/index unit tests; connectivity check; clean-copy production probe |
+| Configuration and startup | Validated private environment, application/test database separation, one cached client, explicit index initialization, read-only operational verification | MongoDB config/client/index/verification tests; clean-copy production probe |
 | Users | MongoDB user repository with normalized conflict lookup and safe projections | User contract integration; duplicate username/email mapping; password verification |
 | Sessions | Hashed-token MongoDB session repository | Auth integration and session unit tests: creation, lookup, expiration, missing user, logout, uniqueness |
 | Registration | Required MongoDB transaction for user plus initial session | Commit, duplicate-conflict rollback, failed-session rollback, and transaction-support checks |
@@ -18,12 +18,14 @@ it through centralized server-only persistence modules.
 | Delete recovery | Quarantine file, delete MongoDB record, remove or restore file | Success, database failure restore, quarantine failures, missing file, concurrent deletion |
 | Privacy | Public, owner, account, navigation, and server-only models | Projection unit tests, full-app payload checks, sanitized error-path tests |
 | Resource safety | Unique owned database, temporary audio/port, bounded clients/processes | Every integration controller plus aggregate supervisor and clean-copy postconditions |
+| Operations | Bounded startup/readiness, liveness, structured safe logs, SIGINT/SIGTERM shutdown | Operational failure-path tests and production startup/shutdown probe |
+| Recovery | Native MongoDB dump, separate aggregate-verified audio copy, owned isolated restore | Missing-tool/path/mismatch tests and complete synthetic recovery integration |
 
 ## Full-application traceability
 
 The cutover and aggregate regression commands cover:
 
-- startup and index initialization;
+- explicit database initialization plus read-only startup and readiness;
 - registration, duplicate conflicts, login, invalid credentials, sessions,
   expiration, logout, and protected routes;
 - upload validation, successful upload, and failed-insert cleanup;

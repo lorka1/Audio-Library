@@ -134,11 +134,23 @@ async function waitForServer(baseUrl, child) {
 	while (Date.now() < deadline) {
 		if (child.exitCode !== null) throw new Error('Production server exited during startup.');
 		try {
-			const response = await fetch(baseUrl, {
+			const live = await fetch(`${baseUrl}/api/health/live`, {
 				signal: AbortSignal.timeout(1_500)
 			});
-			const body = await response.text();
-			if (response.status === 200 && body.length > 0) return;
+			const ready = await fetch(`${baseUrl}/api/health/ready`, {
+				signal: AbortSignal.timeout(6_000)
+			});
+			const application = await fetch(baseUrl, {
+				signal: AbortSignal.timeout(1_500)
+			});
+			if (
+				live.status === 200 &&
+				JSON.stringify(await live.json()) === JSON.stringify({ status: 'ok' }) &&
+				ready.status === 200 &&
+				JSON.stringify(await ready.json()) === JSON.stringify({ status: 'ready' }) &&
+				application.status === 200 &&
+				(await application.text()).length > 0
+			) return;
 		} catch {
 			// Retry until the bounded deadline.
 		}

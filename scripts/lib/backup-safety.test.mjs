@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { afterEach, describe, expect, it } from 'vitest';
-import { mkdtemp, mkdir, readdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import {
@@ -66,6 +66,20 @@ describe('backup destination safety', () => {
 		expect(`${result.stdout}${result.stderr}`).not.toContain(secret);
 		const entries = await readdir(root);
 		expect(entries).toHaveLength(1);
-		expect(await readdir(resolve(root, entries[0]))).toContain('INCOMPLETE');
+		const destination = resolve(root, entries[0]);
+		expect(await readdir(destination)).toContain('INCOMPLETE');
+		const manifest = JSON.parse(
+			await readFile(resolve(destination, 'manifest.json'), 'utf8')
+		);
+		expect(Object.keys(manifest).sort()).toEqual([
+			'databaseIdentifierHash',
+			'format',
+			'status',
+			'timestamp',
+			'toolVersion'
+		]);
+		expect(JSON.stringify(manifest)).not.toContain(secret);
+		expect(JSON.stringify(manifest)).not.toContain('fixture.invalid');
+		expect(JSON.stringify(manifest)).not.toContain(root);
 	});
 });

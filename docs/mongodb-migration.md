@@ -24,8 +24,8 @@ old runtime was removed.
 
 SQLite runtime code, Drizzle configuration, old migrations, dual-backend
 selection, executable migration/apply tools, rollback controllers, and their
-package dependencies were removed in M9. MongoDB is now the only application
-persistence backend.
+package dependencies were removed during the completed cutover. MongoDB is now
+the only application persistence backend.
 
 No migration command remains that can accidentally reapply the historical
 cutover. The completion marker is retained in MongoDB as historical evidence

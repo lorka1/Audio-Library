@@ -1,9 +1,34 @@
 import { serverConfig } from '../config';
-import { connectMongoDevelopment } from '../mongodb/client';
+import {
+	configureMongoApplicationConfig,
+	connectMongoDevelopment
+} from '../mongodb/client';
 import { verifyMongoOperationalState } from '../mongodb/verification';
 import { checkPrivateAudioStorage } from './config';
 
 export const READINESS_TIMEOUT_MS = 5_000;
+
+export type ReadinessFailureCategory = 'mongodb' | 'filesystem';
+export type ReadinessFailureCode =
+	| 'readiness_mongodb_unavailable'
+	| 'readiness_mongodb_incompatible'
+	| 'readiness_storage_unavailable'
+	| 'readiness_timeout';
+
+export class ReadinessError extends Error {
+	readonly category: ReadinessFailureCategory;
+	readonly safeCode: ReadinessFailureCode;
+
+	constructor(
+		category: ReadinessFailureCategory,
+		safeCode: ReadinessFailureCode
+	) {
+		super('Application readiness verification failed.');
+		this.name = 'ReadinessError';
+		this.category = category;
+		this.safeCode = safeCode;
+	}
+}
 
 export interface ReadinessDependencies {
 	verify(): Promise<void>;
@@ -13,11 +38,35 @@ export interface ReadinessDependencies {
 function defaultReadinessDependencies(): ReadinessDependencies {
 	return {
 		async verify() {
-			const { client, database } = await connectMongoDevelopment();
-			await Promise.all([
-				verifyMongoOperationalState(client, database),
-				checkPrivateAudioStorage(serverConfig.audioStoragePath)
-			]);
+			let connection: Awaited<ReturnType<typeof connectMongoDevelopment>>;
+			try {
+				configureMongoApplicationConfig(serverConfig.mongo);
+				connection = await connectMongoDevelopment();
+			} catch {
+				throw new ReadinessError(
+					'mongodb',
+					'readiness_mongodb_unavailable'
+				);
+			}
+			try {
+				await verifyMongoOperationalState(
+					connection.client,
+					connection.database
+				);
+			} catch {
+				throw new ReadinessError(
+					'mongodb',
+					'readiness_mongodb_incompatible'
+				);
+			}
+			try {
+				await checkPrivateAudioStorage(serverConfig.audioStoragePath);
+			} catch {
+				throw new ReadinessError(
+					'filesystem',
+					'readiness_storage_unavailable'
+				);
+			}
 		}
 	};
 }
@@ -31,7 +80,7 @@ export async function checkApplicationReadiness(
 			dependencies.verify(),
 			new Promise<never>((_, reject) => {
 				timer = setTimeout(
-					() => reject(new Error('Readiness check timed out.')),
+					() => reject(new ReadinessError('mongodb', 'readiness_timeout')),
 					dependencies.timeoutMs ?? READINESS_TIMEOUT_MS
 				);
 				timer.unref();

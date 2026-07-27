@@ -1,6 +1,9 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { checkApplicationReadiness } from '$lib/server/operational/readiness';
+import {
+	checkApplicationReadiness,
+	ReadinessError
+} from '$lib/server/operational/readiness';
 import { safeErrorFields, writeSafeLog } from '$lib/server/operational/logging';
 
 export const GET: RequestHandler = async ({ locals }) => {
@@ -10,8 +13,10 @@ export const GET: RequestHandler = async ({ locals }) => {
 	} catch (error) {
 		writeSafeLog({
 			severity: 'warn',
-			category: 'mongodb',
-			...safeErrorFields(error),
+			category: error instanceof ReadinessError ? error.category : 'mongodb',
+			...(error instanceof ReadinessError
+				? { code: error.safeCode, errorType: error.name }
+				: safeErrorFields(error)),
 			requestId: locals.requestId
 		});
 		return json({ status: 'unavailable' }, { status: 503 });

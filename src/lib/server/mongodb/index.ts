@@ -1,5 +1,6 @@
 export {
 	closeMongoClient,
+	configureMongoApplicationConfig,
 	connectMongoDevelopment,
 	connectMongoTest,
 	MongoClientManager

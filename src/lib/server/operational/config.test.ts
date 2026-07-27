@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
 	assertPrivateAudioStoragePath,
 	assertProductionRuntimeConfig,
+	checkPrivateAudioStorage,
 	parseOperationalConfig,
 	preparePrivateAudioStorage,
 	type OperationalEnvironment
@@ -79,6 +80,16 @@ describe('operational startup configuration', () => {
 		const path = resolve(root, 'not-a-directory');
 		await writeFile(path, 'fixture');
 		await expect(preparePrivateAudioStorage(path)).rejects.toThrow();
+		await expect(checkPrivateAudioStorage(path)).rejects.toThrow(
+			'Private audio storage is unavailable.'
+		);
+	});
+
+	it('reports inaccessible readiness storage without creating it', async () => {
+		const root = await mkdtemp(join(tmpdir(), 'audio-library-config-'));
+		roots.push(root);
+		const missing = resolve(root, 'missing');
+		await expect(checkPrivateAudioStorage(missing)).rejects.toThrow();
 	});
 
 	it('rejects filesystem roots as storage', () => {

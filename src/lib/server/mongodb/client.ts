@@ -101,6 +101,7 @@ const CLIENT_STATE_KEY = Symbol.for('audio-library.mongodb-client-state');
 interface ProcessClientState {
 	manager?: MongoClientManager;
 	configSignature?: string;
+	applicationConfig?: MongoConfig;
 }
 const processState = (
 	(globalThis as typeof globalThis & { [CLIENT_STATE_KEY]?: ProcessClientState })[
@@ -134,10 +135,25 @@ function processMongoManager(config: MongoConfig): MongoClientManager {
 	return processState.manager;
 }
 
+export function configureMongoApplicationConfig(config: MongoConfig): void {
+	const signature = configSignature(config);
+	if (
+		processState.applicationConfig &&
+		configSignature(processState.applicationConfig) !== signature
+	) {
+		throw new Error(
+			'MongoDB application configuration changed during the process lifetime.'
+		);
+	}
+	processState.applicationConfig = config;
+}
+
 export async function connectMongoDevelopment(
-	environment: MongoEnvironment = process.env
+	environment?: MongoEnvironment
 ): Promise<MongoConnection> {
-	const config = readMongoConfig(environment);
+	const config = environment
+		? readMongoConfig(environment)
+		: processState.applicationConfig ?? readMongoConfig(process.env);
 	const client = await processMongoManager(config).connect();
 	const database = client.db(config.databaseName);
 	return {
