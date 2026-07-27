@@ -10,7 +10,9 @@ const config: MongoConfig = {
 	uri: 'mongodb://fixture-host.example.invalid:27017',
 	databaseName: 'audio_library_dev',
 	testDatabaseName: 'audio_library_test_unit',
-	serverSelectionTimeoutMs: 8_000
+	serverSelectionTimeoutMs: 8_000,
+	connectTimeoutMs: 8_000,
+	socketTimeoutMs: 15_000
 };
 
 function fakeClient(connect: () => Promise<unknown>) {
@@ -45,7 +47,7 @@ describe('MongoClientManager', () => {
 			expect.objectContaining({
 				serverSelectionTimeoutMS: 8_000,
 				connectTimeoutMS: 8_000,
-				socketTimeoutMS: 8_000
+				socketTimeoutMS: 15_000
 			})
 		);
 
@@ -76,5 +78,24 @@ describe('MongoClientManager', () => {
 
 		await manager.close(true);
 		expect(recoveredClient.close).toHaveBeenCalledWith(true);
+	});
+
+	it('closes an owned client exactly once across repeated shutdown calls', async () => {
+		const client = fakeClient(async () => client);
+		const manager = new MongoClientManager(config, () => client);
+		await manager.connect();
+		await Promise.all([manager.close(true), manager.close(true), manager.close(true)]);
+		expect(client.close).toHaveBeenCalledOnce();
+	});
+
+	it('preserves connection failure and reports close failure separately', async () => {
+		const client = fakeClient(async () => {
+			throw new Error('primary connection failure');
+		});
+		vi.mocked(client.close).mockRejectedValue(new Error('cleanup failure'));
+		const reportCleanup = vi.fn();
+		const manager = new MongoClientManager(config, () => client, reportCleanup);
+		await expect(manager.connect()).rejects.toThrow('primary connection failure');
+		expect(reportCleanup).toHaveBeenCalledOnce();
 	});
 });

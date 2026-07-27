@@ -17,6 +17,8 @@ import type {
 	CreateSessionRecordInput,
 	CreateUserInput
 } from './types';
+import { logAuthError } from './logging';
+import { cleanupPreservingPrimaryFailure } from '../operational/cleanup';
 
 const TRANSACTION_TIMEOUT_MS = 8_000;
 
@@ -70,6 +72,7 @@ function mongoAuthPersistence(): Promise<AuthPersistence> {
 				let result:
 					| { user: CurrentUser; session: AuthSession }
 					| undefined;
+				let primaryFailure: unknown;
 				try {
 					await clientSession.withTransaction(
 						async () => {
@@ -89,8 +92,16 @@ function mongoAuthPersistence(): Promise<AuthPersistence> {
 							writeConcern: { w: 'majority' }
 						}
 					);
+				} catch (error) {
+					primaryFailure = error;
+					throw error;
 				} finally {
-					await clientSession.endSession();
+					await cleanupPreservingPrimaryFailure(
+						primaryFailure,
+						() => clientSession.endSession(),
+						(cleanupError) =>
+							logAuthError('Unable to close a MongoDB transaction session.', cleanupError)
+					);
 				}
 				if (!result) {
 					throw new Error(

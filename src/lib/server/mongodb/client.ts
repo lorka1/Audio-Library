@@ -8,16 +8,22 @@ import {
 	assertMongoTestDatabaseName,
 	readMongoConfig
 } from './config.ts';
-import { getMongoCollections } from './collections.ts';
-import { ensureMongoIndexes } from './indexes.ts';
+import { safeErrorFields, writeSafeLog } from '../operational/logging.ts';
 
 export type MongoClientFactory = (
 	uri: string,
 	options: MongoClientOptions
 ) => MongoClient;
+export type MongoCleanupFailureReporter = (error: unknown) => void;
 
 const defaultMongoClientFactory: MongoClientFactory = (uri, options) =>
 	new MongoClient(uri, options);
+const defaultCleanupFailureReporter: MongoCleanupFailureReporter = (error) =>
+	writeSafeLog({
+		severity: 'error',
+		category: 'shutdown',
+		...safeErrorFields(error)
+	});
 
 export interface MongoConnection {
 	client: MongoClient;
@@ -27,15 +33,19 @@ export interface MongoConnection {
 export class MongoClientManager {
 	readonly #config: MongoConfig;
 	readonly #factory: MongoClientFactory;
+	readonly #reportCleanupFailure: MongoCleanupFailureReporter;
 	#client: MongoClient | undefined;
 	#connectionPromise: Promise<MongoClient> | undefined;
+	#closePromises = new WeakMap<MongoClient, Promise<void>>();
 
 	constructor(
 		config: MongoConfig,
-		factory: MongoClientFactory = defaultMongoClientFactory
+		factory: MongoClientFactory = defaultMongoClientFactory,
+		reportCleanupFailure: MongoCleanupFailureReporter = defaultCleanupFailureReporter
 	) {
 		this.#config = config;
 		this.#factory = factory;
+		this.#reportCleanupFailure = reportCleanupFailure;
 	}
 
 	connect(): Promise<MongoClient> {
@@ -46,8 +56,9 @@ export class MongoClientManager {
 		const client = this.#factory(this.#config.uri, {
 			appName: 'audio-library',
 			serverSelectionTimeoutMS: this.#config.serverSelectionTimeoutMs,
-			connectTimeoutMS: this.#config.serverSelectionTimeoutMs,
-			socketTimeoutMS: this.#config.serverSelectionTimeoutMs
+			connectTimeoutMS: this.#config.connectTimeoutMs,
+			socketTimeoutMS: this.#config.socketTimeoutMs,
+			retryWrites: true
 		});
 		this.#client = client;
 
@@ -58,7 +69,9 @@ export class MongoClientManager {
 				this.#client = undefined;
 			}
 
-			await client.close(true).catch(() => undefined);
+			await this.#closeOnce(client, true).catch((cleanupError) => {
+				this.#reportCleanupFailure(cleanupError);
+			});
 			throw error;
 		});
 		this.#connectionPromise = attempt;
@@ -71,37 +84,54 @@ export class MongoClientManager {
 		this.#connectionPromise = undefined;
 
 		if (client) {
-			await client.close(force);
+			await this.#closeOnce(client, force);
 		}
+	}
+
+	#closeOnce(client: MongoClient, force: boolean): Promise<void> {
+		const existing = this.#closePromises.get(client);
+		if (existing) return existing;
+		const closing = client.close(force);
+		this.#closePromises.set(client, closing);
+		return closing;
 	}
 }
 
-let processManager: MongoClientManager | undefined;
-let processConfigSignature: string | undefined;
-let developmentInitializationPromise: Promise<void> | undefined;
+const CLIENT_STATE_KEY = Symbol.for('audio-library.mongodb-client-state');
+interface ProcessClientState {
+	manager?: MongoClientManager;
+	configSignature?: string;
+}
+const processState = (
+	(globalThis as typeof globalThis & { [CLIENT_STATE_KEY]?: ProcessClientState })[
+		CLIENT_STATE_KEY
+	] ??= {}
+);
 
 function configSignature(config: MongoConfig): string {
 	return JSON.stringify([
 		config.uri,
 		config.databaseName,
 		config.testDatabaseName,
-		config.serverSelectionTimeoutMs
+		config.serverSelectionTimeoutMs,
+		config.connectTimeoutMs,
+		config.socketTimeoutMs
 	]);
 }
 
 function processMongoManager(config: MongoConfig): MongoClientManager {
 	const signature = configSignature(config);
 
-	if (!processManager) {
-		processManager = new MongoClientManager(config);
-		processConfigSignature = signature;
-	} else if (processConfigSignature !== signature) {
+	if (!processState.manager) {
+		processState.manager = new MongoClientManager(config);
+		processState.configSignature = signature;
+	} else if (processState.configSignature !== signature) {
 		throw new Error(
 			'MongoDB configuration changed while an owned client was active.'
 		);
 	}
 
-	return processManager;
+	return processState.manager;
 }
 
 export async function connectMongoDevelopment(
@@ -110,20 +140,6 @@ export async function connectMongoDevelopment(
 	const config = readMongoConfig(environment);
 	const client = await processMongoManager(config).connect();
 	const database = client.db(config.databaseName);
-	if (!developmentInitializationPromise) {
-		const attempt = ensureMongoIndexes(getMongoCollections(database)).then(
-			() => undefined
-		);
-		let cached: Promise<void>;
-		cached = attempt.catch((error) => {
-			if (developmentInitializationPromise === cached) {
-				developmentInitializationPromise = undefined;
-			}
-			throw error;
-		});
-		developmentInitializationPromise = cached;
-	}
-	await developmentInitializationPromise;
 	return {
 		client,
 		database
@@ -146,10 +162,9 @@ export async function connectMongoTest(
 }
 
 export async function closeMongoClient(force = false): Promise<void> {
-	const manager = processManager;
-	processManager = undefined;
-	processConfigSignature = undefined;
-	developmentInitializationPromise = undefined;
+	const manager = processState.manager;
+	processState.manager = undefined;
+	processState.configSignature = undefined;
 
 	if (manager) {
 		await manager.close(force);

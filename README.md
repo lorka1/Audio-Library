@@ -10,7 +10,9 @@ IDs, and private storage references.
 
 - Node.js `^22.12.0` or `>=24`
 - npm `>=10`
-- MongoDB reachable as a replica set, sharded deployment, or Atlas cluster
+- MongoDB reachable as a transaction-capable replica set (a local single-node
+  replica set is the supported self-hosted setup)
+- MongoDB Database Tools (`mongodump` and `mongorestore`) for recovery tooling
 
 Registration creates a user and initial session in one transaction. A
 standalone MongoDB server without transaction support is rejected.
@@ -50,8 +52,16 @@ npm run dev
 
 ## MongoDB initialization
 
-Server startup connects through one centralized server-only client and
-idempotently ensures required indexes for:
+Initialize a new database explicitly:
+
+```powershell
+npm run db:mongodb:init
+```
+
+Server startup uses one shared server-only client and refuses to serve traffic
+unless the writable PRIMARY, transaction topology, collections, exact indexes,
+public-ID counter, cookie/request limits, and private audio storage are valid.
+Index initialization is separate from read-only startup/readiness verification:
 
 - unique usernames and emails;
 - unique session token hashes, session ownership, and expiration;
@@ -62,7 +72,7 @@ Check connectivity, database selection, and indexes without modifying
 application documents:
 
 ```powershell
-npm run db:mongodb:check
+npm run db:mongodb:verify
 ```
 
 Run the complete read-only data/audio safety audit:
@@ -96,9 +106,15 @@ server-only persistence modules provide the MongoDB repositories.
 | `npm run check` | Run Svelte and TypeScript diagnostics. |
 | `npm test` | Run all Vitest tests once. |
 | `npm run build` | Create the production Node build. |
+| `npm start` | Start the hardened production listener with graceful shutdown. |
 | `npm run preview` | Preview the production build through Vite. |
-| `npm run db:mongodb:check` | Check connectivity, target selection, and indexes read-only. |
+| `npm run db:mongodb:init` | Explicitly initialize a new database's indexes and counter. |
+| `npm run db:mongodb:verify` | Verify connectivity, topology, PRIMARY, collections, exact indexes, counter, and marker structure read-only. |
 | `npm run db:mongodb:audit` | Audit MongoDB and audio using safe aggregates only. |
+| `npm run backup:mongodb` | Create a timestamped native MongoDB dump in an explicit private root. |
+| `npm run backup:audio` | Create and aggregate-verify a timestamped private audio copy. |
+| `npm run verify:mongodb:restore` | Verify a supplied synthetic recovery pair in an owned database and temporary audio root. |
+| `npm run test:mongodb:recovery` | Create, back up, restore, probe, and exactly clean a synthetic recovery set. |
 | `npm run test:mongodb:users` | Verify the user repository contract in a uniquely owned database. |
 | `npm run test:mongodb:auth` | Verify transactions, duplicate conflicts, sessions, expiration, logout, and cleanup. |
 | `npm run test:mongodb:tracks` | Verify public IDs, projections, owner CRUD, filesystem consistency, failure recovery, and cleanup. |
@@ -121,19 +137,31 @@ npm run build
 $env:HOST='127.0.0.1'
 $env:PORT='3000'
 $env:ORIGIN='https://your-host.example'
-node build/index.js
+npm start
 ```
 
-Provide all environment values through the deployment platform. Keep
-`AUDIO_STORAGE_PATH` on persistent private storage, back up MongoDB and audio
-independently, and never expose the storage directory through a static file
-server.
+`GET /api/health/live` checks only the process. `GET /api/health/ready`
+performs bounded read-only MongoDB/index/counter and private-storage checks.
+Neither exposes contents, paths, counts, credentials, or identifiers. SIGINT
+and SIGTERM stop the listener, allow bounded in-flight completion, then close
+the application-owned listener and shared MongoDB client once.
+
+Keep `AUDIO_STORAGE_PATH` on persistent private storage and never expose it
+through a static file server. MongoDB and audio backups are separate artifacts
+but one logical recovery set. Pair their timestamps, verify restores
+periodically, and never commit backups or `.env`. The complete same-computer
+Windows runbook is in [`docs/operations.md`](docs/operations.md).
 
 ## Privacy and storage
 
 Browser payloads never receive password hashes, raw or hashed session tokens,
 internal user/track identifiers, owner IDs, storage keys, absolute paths,
 database names, connection strings, or private audit information.
+
+Operational logs are structured and limited to safe categories, codes,
+request/correlation IDs, route categories, status, and duration. Raw errors,
+request bodies, identities, filenames, storage keys, private paths, cookies,
+authorization headers, documents, URIs, and migration fingerprints are omitted.
 
 Audio is not stored in MongoDB or GridFS. Upload metadata and filesystem writes
 use compensating cleanup, while deletion uses quarantine/restore semantics to

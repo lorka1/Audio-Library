@@ -11,6 +11,7 @@
   "scripts": {
     "dev": "vite dev",
     "build": "vite build",
+    "start": "node --experimental-strip-types scripts/start-production.mjs",
     "preview": "vite preview",
     "prepare": "svelte-kit sync",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
@@ -24,8 +25,14 @@
     "test:mongodb:regression": "node --experimental-strip-types scripts/mongodb-cutover-regression.mjs",
     "verify:mongodb:clean-clone": "node --experimental-strip-types scripts/mongodb-clean-clone-check.mjs",
     "db:mongodb:audit": "node --experimental-strip-types scripts/mongodb-cutover-audit.mjs",
+    "db:mongodb:init": "node --experimental-strip-types scripts/mongodb-initialize.mjs",
+    "db:mongodb:verify": "node --experimental-strip-types scripts/mongodb-verify.mjs",
+    "backup:mongodb": "node --experimental-strip-types scripts/mongodb-backup.mjs",
+    "backup:audio": "node --experimental-strip-types scripts/audio-backup.mjs",
+    "verify:mongodb:restore": "node --experimental-strip-types scripts/mongodb-restore-verification.mjs",
+    "test:mongodb:recovery": "node --experimental-strip-types scripts/mongodb-recovery-integration.mjs",
     "test:watch": "vitest",
-    "db:mongodb:check": "node --experimental-strip-types scripts/mongodb-check.mjs"
+    "db:mongodb:check": "npm run db:mongodb:verify"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

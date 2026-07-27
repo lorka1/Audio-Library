@@ -259,22 +259,29 @@ try {
 	});
 	await runNode(npmArgs('run', 'check'), { cwd: cleanRoot, env: environment, label: 'npm run check' });
 	await runNode(npmArgs('run', 'test'), { cwd: cleanRoot, env: environment, label: 'npm test' });
+	await runNode(npmArgs('run', 'db:mongodb:init'), { cwd: cleanRoot, env: environment, label: 'MongoDB explicit initialization' });
+	await runNode(npmArgs('run', 'db:mongodb:verify'), { cwd: cleanRoot, env: environment, label: 'MongoDB read-only verification' });
+	await runNode(npmArgs('run', 'test:mongodb:users'), { cwd: cleanRoot, env: environment, label: 'MongoDB users integration' });
 	await runNode(npmArgs('run', 'test:mongodb:auth'), { cwd: cleanRoot, env: environment, label: 'MongoDB auth integration' });
 	await runNode(npmArgs('run', 'test:mongodb:tracks'), { cwd: cleanRoot, env: environment, label: 'MongoDB tracks integration' });
 	await runNode(npmArgs('run', 'test:mongodb:queries'), { cwd: cleanRoot, env: environment, label: 'MongoDB queries integration' });
 	await runNode(npmArgs('run', 'test:mongodb:regression'), { cwd: cleanRoot, env: environment, label: 'MongoDB regression' });
+	await runNode(npmArgs('run', 'test:mongodb:recovery'), { cwd: cleanRoot, env: environment, label: 'Synthetic MongoDB/audio recovery integration' });
 	await runNode(npmArgs('run', 'build'), { cwd: cleanRoot, env: environment, label: 'npm run build' });
 	await deadReferenceAudit(cleanRoot);
 
 	serverPort = await reservePort();
 	const baseUrl = `http://127.0.0.1:${serverPort}`;
-	server = spawn(process.execPath, [join(cleanRoot, 'build', 'index.js')], {
+	server = spawn(process.execPath, [
+		'--experimental-strip-types',
+		join(cleanRoot, 'scripts', 'start-production.mjs')
+	], {
 		cwd: cleanRoot,
 		env: {
 			...environment,
 			HOST: '127.0.0.1',
 			NODE_ENV: 'production',
-			ORIGIN: baseUrl,
+			ORIGIN: `https://127.0.0.1:${serverPort}`,
 			PORT: String(serverPort)
 		},
 		stdio: 'ignore',

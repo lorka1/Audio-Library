@@ -6,6 +6,7 @@ declare global {
 		interface Locals {
 			user: CurrentUser | null;
 			session: AuthSession | null;
+			requestId: string;
 		}
 	}
 }

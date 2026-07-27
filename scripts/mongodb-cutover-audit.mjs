@@ -167,7 +167,15 @@ try {
 					aggregateStableDuringAudit: aggregateAfter === aggregateBefore,
 					indexesVerified
 				},
-				audio
+				audio: {
+					fileCount: audio.fileCount,
+					byteSize: audio.byteSize,
+					contentHashComputed: audio.contentHash.length > 0,
+					contained: audio.contained,
+					existingReferences: audio.existingReferences,
+					missingReferences: audio.missingReferences,
+					unexpectedFiles: audio.unexpectedFiles
+				}
 			},
 			null,
 			2

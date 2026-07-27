@@ -284,6 +284,11 @@ async function main() {
 		database = client.db(ownedName);
 		collections = getMongoCollections(database);
 		await ensureMongoIndexes(collections, { maxTimeMS: 5_000 });
+		await collections.counters.updateOne(
+			{ _id: TRACK_PUBLIC_ID_COUNTER },
+			{ $setOnInsert: { value: 0 } },
+			{ upsert: true }
+		);
 
 		testPort = await reservePort();
 		const baseUrl = `http://127.0.0.1:${testPort}`;
