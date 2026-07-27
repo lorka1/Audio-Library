@@ -298,7 +298,7 @@ The current migrations create users, hashed sessions, track metadata and
 ownership, public/private visibility, storage references, metadata constraints,
 and the numeric public route ID while preserving the server-only track UUID.
 
-### MongoDB migration M1–M7
+### MongoDB migration M1–M8
 
 The MongoDB migration is being introduced in phases. M1 adds the official
 MongoDB Node.js driver, validated environment settings, typed document and
@@ -350,12 +350,16 @@ ownership, public IDs, storage references, visibility, nullable metadata, and
 timestamps preserved. Active sessions were intentionally not migrated, so
 users must sign in again. Audio bytes stayed in private filesystem storage.
 
-The local untracked `.env` now selects `DATABASE_BACKEND=mongodb`. SQLite,
-Drizzle, `DATABASE_URL`, the original database, and a verified external backup
-remain available for rollback. SQLite removal has not happened. M8 will run the
-complete cutover regression before any removal work is considered. See
+M8 adds the complete MongoDB cutover regression, a fresh isolated SQLite
+rollback regression, explicit test-database ownership auditing, and MongoDB
+clean-clone verification. The local untracked `.env` still selects
+`DATABASE_BACKEND=mongodb`. SQLite, Drizzle, `DATABASE_URL`, the original
+database, and a verified external backup remain available for rollback.
+SQLite removal has not happened. See
 [`docs/mongodb-migration.md`](docs/mongodb-migration.md) for verification and
-rollback details.
+rollback details and
+[`docs/persistence-feature-matrix.md`](docs/persistence-feature-matrix.md) for
+the traceable backend matrix.
 
 With all three MongoDB environment variables configured, verify connectivity,
 database selection, and indexes without reading or writing application
@@ -393,6 +397,10 @@ it is not the server itself and is not required by the application.
 | `npm run test:mongodb:queries` | Verify M5 SQLite/MongoDB public-query parity, safe backend selection, development integrity, and isolated cleanup. |
 | `npm run test:mongodb:migration` | Verify M6 dry-run, transactional migration, rollback, verification, rerun safety, and isolated cleanup using synthetic data only. |
 | `npm run test:mongodb:cutover` | Run the isolated M7 full-application MongoDB registration, login, upload, media, owner-management, logout, and exact-cleanup checks. |
+| `npm run test:mongodb:regression` | Run the aggregate M8 MongoDB contract, parity, failure-path, privacy, migration, full-app cutover, and ownership-cleanup regression. |
+| `npm run test:sqlite:rollback` | Run the M8 rollback application regression against a fresh temporary SQLite database and prove real MongoDB, SQLite, audio, and `.env` are unchanged. |
+| `npm run verify:mongodb:clean-clone` | Install and verify a clean release-candidate copy with MongoDB, a newly owned test database, the full regression, build, production HTTP probes, and exact cleanup. |
+| `npm run audit:mongodb:cutover` | Read only safe MongoDB and audio aggregates, verify indexes/counter/migration fingerprint, and report missing or unexpected file-reference counts. |
 | `npm run db:migrate:mongodb:dry-run` | Analyze the real SQLite source and development MongoDB target read-only, reporting safe aggregates only. |
 | `npm run db:migrate:mongodb:apply -- --confirm=MIGRATE_SQLITE_TO_MONGODB` | Explicitly authorize the guarded transactional development-target migration. Do not run casually. |
 | `npm run db:migrate:mongodb:verify` | Compare SQLite and MongoDB migration results read-only using aggregate checks and safe fingerprints. |

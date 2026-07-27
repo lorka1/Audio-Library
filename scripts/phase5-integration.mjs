@@ -1575,6 +1575,7 @@ async function runIntegration() {
 			cwd: PROJECT_ROOT,
 			env: {
 				...process.env,
+				DATABASE_BACKEND: 'sqlite',
 				DATABASE_URL: temporaryDatabase,
 				AUDIO_STORAGE_PATH: temporaryAudioRoot,
 				SESSION_COOKIE_NAME: cookieName

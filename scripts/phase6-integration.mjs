@@ -1479,7 +1479,33 @@ async function runIntegration() {
 	stdoutPath = join(temporaryRoot, 'vite.out.log');
 	stderrPath = join(temporaryRoot, 'vite.err.log');
 	await Promise.all([writeFile(stdoutPath, ''), writeFile(stderrPath, '')]);
-	await copyDatabaseSnapshot(realDatabase, temporaryDatabase);
+	if (process.env.PHASE6_FRESH_DATABASE === '1') {
+		const migrationClient = createClient({
+			url: pathToFileURL(temporaryDatabase).href
+		});
+		try {
+			const migrationFiles = (await readdir(join(PROJECT_ROOT, 'drizzle')))
+				.filter((name) => /^\d+_.+\.sql$/.test(name))
+				.sort();
+			for (const name of migrationFiles) {
+				const sql = await readFile(join(PROJECT_ROOT, 'drizzle', name), 'utf8');
+				const statements = sql
+					.split('--> statement-breakpoint')
+					.map((statement) => statement.trim())
+					.filter(Boolean);
+				if (statements.length > 0) {
+					await migrationClient.batch(
+						statements.map((statement) => ({ sql: statement, args: [] })),
+						'write'
+					);
+				}
+			}
+		} finally {
+			migrationClient.close();
+		}
+	} else {
+		await copyDatabaseSnapshot(realDatabase, temporaryDatabase);
+	}
 
 	const seed = await seedTemporaryData(temporaryDatabase, temporaryAudioRoot);
 	testPort = await reservePort();
@@ -1487,7 +1513,11 @@ async function runIntegration() {
 	const cookieName = `phase6_integration_${randomBytes(4).toString('hex')}`;
 
 	console.log(`[setup] isolated port: ${testPort}`);
-	console.log('[setup] temporary database copy and audio storage are ready');
+	console.log(
+		process.env.PHASE6_FRESH_DATABASE === '1'
+			? '[setup] fresh temporary SQLite database and audio storage are ready'
+			: '[setup] temporary database copy and audio storage are ready'
+	);
 
 	child = spawn(
 		process.execPath,
@@ -1504,6 +1534,7 @@ async function runIntegration() {
 			cwd: PROJECT_ROOT,
 			env: {
 				...process.env,
+				DATABASE_BACKEND: 'sqlite',
 				DATABASE_URL: temporaryDatabase,
 				AUDIO_STORAGE_PATH: temporaryAudioRoot,
 				SESSION_COOKIE_NAME: cookieName

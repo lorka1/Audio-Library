@@ -23,7 +23,8 @@ import {
 	resolve,
 	sep
 } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { createClient } from '@libsql/client';
 import { config as loadEnvironment } from 'dotenv';
 
 const PROJECT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -611,7 +612,7 @@ async function stopOwnedProcess(record) {
 		`Owned process "${record.label}" did not stop.`
 	);
 
-	if (terminationError) {
+	if (terminationError && isProcessAlive(record.child.pid)) {
 		throw terminationError;
 	}
 }
@@ -1093,6 +1094,30 @@ function isolatedEnvironment() {
 	return environment;
 }
 
+async function migrateFreshSqlite(databasePath) {
+	const client = createClient({ url: pathToFileURL(databasePath).href });
+	try {
+		const migrationNames = (await readdir(join(sourceRoot, 'drizzle')))
+			.filter((name) => /^\d+_.+\.sql$/.test(name))
+			.sort();
+		for (const name of migrationNames) {
+			const sql = await readFile(join(sourceRoot, 'drizzle', name), 'utf8');
+			const statements = sql
+				.split('--> statement-breakpoint')
+				.map((statement) => statement.trim())
+				.filter(Boolean);
+			if (statements.length > 0) {
+				await client.batch(
+					statements.map((statement) => ({ sql: statement, args: [] })),
+					'write'
+				);
+			}
+		}
+	} finally {
+		client.close();
+	}
+}
+
 async function runReleaseVerification() {
 	beginStep(1, 'creating temporary clone');
 	const realDatabase = resolveConfiguredPath(
@@ -1182,12 +1207,7 @@ async function runReleaseVerification() {
 	completeStep(4);
 
 	beginStep(5, 'database migration');
-	await runNpm(
-		['run', 'db:migrate'],
-		'fresh database migration',
-		MIGRATION_TIMEOUT_MS,
-		environment
-	);
+	await migrateFreshSqlite(isolatedDatabase);
 	const migratedDatabase = await stat(isolatedDatabase);
 	assert(
 		migratedDatabase.isFile() && migratedDatabase.size > 0,
@@ -1211,6 +1231,27 @@ async function runReleaseVerification() {
 		TEST_TIMEOUT_MS,
 		environment
 	);
+	if (process.env.CLEAN_CLONE_MONGODB === '1') {
+		await runNpm(
+			['run', 'test:mongodb:regression'],
+			'MongoDB cutover regression',
+			Math.max(TEST_TIMEOUT_MS, 5 * 60_000),
+			environment
+		);
+		for (const [script, label] of [
+			['test:sqlite:rollback', 'SQLite rollback integration'],
+			['test:integration', 'Phase 4 HTTP integration'],
+			['test:integration:phase5', 'Phase 5 HTTP integration'],
+			['test:integration:phase6', 'Phase 6 HTTP integration']
+		]) {
+			await runNpm(
+				['run', script],
+				label,
+				Math.max(TEST_TIMEOUT_MS, 3 * 60_000),
+				environment
+			);
+		}
+	}
 	completeStep(7);
 
 	beginStep(8, 'npm run build');

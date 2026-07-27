@@ -1093,6 +1093,7 @@ async function runIntegration() {
 			cwd: PROJECT_ROOT,
 			env: {
 				...process.env,
+				DATABASE_BACKEND: 'sqlite',
 				DATABASE_URL: temporaryDatabase,
 				AUDIO_STORAGE_PATH: temporaryAudioRoot,
 				MAX_AUDIO_FILE_SIZE_MB: '2',
