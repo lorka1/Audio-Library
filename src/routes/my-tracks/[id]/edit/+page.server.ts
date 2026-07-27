@@ -7,7 +7,7 @@ import {
 } from '$lib/server/tracks/management';
 import { parseTrackId } from '$lib/server/tracks/id';
 import { logTrackStorageError } from '$lib/server/tracks/logging';
-import { findOwnedTrackByPublicId } from '$lib/server/tracks/repository';
+import { getApplicationTrackRepository } from '$lib/server/tracks/persistence';
 import {
 	emptyTrackMetadataFormValues,
 	type TrackMetadataErrors
@@ -22,7 +22,10 @@ export const load = (async (event) => {
 	}
 
 	try {
-		const track = await findOwnedTrackByPublicId(publicId, user.id);
+		const track = await (await getApplicationTrackRepository()).findOwnerTrack(
+			publicId,
+			user.id
+		);
 
 		if (!track) {
 			error(404, 'Track not found.');

@@ -541,6 +541,38 @@ used for any real service.
 - [ ] Inspect the HTML and SvelteKit page data for `/my-tracks` and an owned edit page.
 - [ ] Expected: No internal UUID, owner ID or email, generated stored filename, storage root, physical path, session token, or password data appears.
 
+## Persistent playback and compact navigation
+
+### PLY-001 — Start playback from Browse
+
+- [ ] Open `/tracks` and activate Play on a public track card.
+- [ ] Expected: The compact bottom player appears, playback begins through the existing stream endpoint, and the card reports Playing without navigating away.
+
+### PLY-002 — Pause, resume, and switch
+
+- [ ] Pause and resume the selected card, then activate Play on a different card.
+- [ ] Expected: Labels change between Pause and Resume, the new track replaces the old selection, and only one audio element plays.
+
+### PLY-003 — Persistent internal navigation
+
+- [ ] While signed in and audio is playing, note its seek position and volume, then navigate through Home, Browse, Upload, My Tracks, Account, and a public track detail page.
+- [ ] Expected: The selected track, position, duration, volume, and playing or paused state remain intact without a second audio element.
+
+### PLY-004 — Seek, details, close, and failure recovery
+
+- [ ] Seek from the bottom player, open its track-details link, then close the player. In a disposable environment, make a selected stream unavailable and retry it.
+- [ ] Expected: Seeking works, the numeric public detail URL opens, Close clears the player, and failure feedback is safe and recoverable.
+
+### NAV-006 — Compact authenticated navigation
+
+- [ ] Sign in and inspect desktop and mobile navigation using keyboard, pointer, Escape, and an outside click.
+- [ ] Expected: Browse and Upload remain primary; the far-right profile icon exposes the username, My Tracks, Account, and POST Logout; the mobile menu does not wrap or overflow.
+
+### NAV-007 — Compact signed-out navigation
+
+- [ ] Sign out and inspect desktop and mobile navigation.
+- [ ] Expected: The linked brand replaces Home; Browse, Login, and Register remain available; Login and Register have equal neutral styling.
+
 ## Scope confirmation
 
 - [ ] Confirm upload is available only to signed-in users.

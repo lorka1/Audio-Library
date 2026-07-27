@@ -8,12 +8,10 @@ import {
 } from './files';
 import { logTrackStorageError } from './logging';
 import {
-	deleteOwnedTrackRecord,
-	findOwnedTrackFileByPublicId,
-	updateOwnedTrackMetadata,
-	type OwnedTrackFile,
-	type UpdateOwnedTrackMetadataInput
-} from './repository';
+	type OwnerTrackStorage,
+	type UpdateOwnerTrackMetadataInput
+} from './contract';
+import { getApplicationTrackRepository } from './persistence';
 import {
 	validateTrackMetadataFormData,
 	type TrackMetadataErrors,
@@ -29,9 +27,9 @@ export interface TrackManagementDependencies {
 	updateMetadata(
 		publicId: number,
 		ownerId: string,
-		metadata: UpdateOwnedTrackMetadataInput
+		metadata: UpdateOwnerTrackMetadataInput
 	): Promise<OwnerTrack | null>;
-	findFile(publicId: number, ownerId: string): Promise<OwnedTrackFile | null>;
+	findFile(publicId: number, ownerId: string): Promise<OwnerTrackStorage | null>;
 	deleteRecord(publicId: number, ownerId: string): Promise<boolean>;
 	quarantineFile(storedFilename: string): Promise<QuarantineStoredAudioFileResult>;
 	deleteQuarantinedFile(file: QuarantinedAudioFile): Promise<void>;
@@ -72,9 +70,16 @@ export type DeleteTrackResult =
 	  };
 
 const defaultDependencies: TrackManagementDependencies = {
-	updateMetadata: updateOwnedTrackMetadata,
-	findFile: findOwnedTrackFileByPublicId,
-	deleteRecord: deleteOwnedTrackRecord,
+	updateMetadata: async (publicId, ownerId, metadata) =>
+		(await getApplicationTrackRepository()).updateOwnerTrackMetadata(
+			publicId,
+			ownerId,
+			metadata
+		),
+	findFile: async (publicId, ownerId) =>
+		(await getApplicationTrackRepository()).getOwnerTrackStorage(publicId, ownerId),
+	deleteRecord: async (publicId, ownerId) =>
+		(await getApplicationTrackRepository()).deleteOwnerTrack(publicId, ownerId),
 	quarantineFile: quarantineStoredAudioFile,
 	deleteQuarantinedFile: deleteQuarantinedAudioFile,
 	restoreQuarantinedFile: restoreQuarantinedAudioFile,
@@ -138,7 +143,7 @@ export async function deleteTrack(
 	input: DeleteTrackInput,
 	dependencies: TrackManagementDependencies = defaultDependencies
 ): Promise<DeleteTrackResult> {
-	let trackFile: OwnedTrackFile | null;
+	let trackFile: OwnerTrackStorage | null;
 
 	try {
 		trackFile = await dependencies.findFile(input.publicId, input.ownerId);

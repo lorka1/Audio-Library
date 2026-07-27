@@ -2,14 +2,16 @@ import { error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { requireUser } from '$lib/server/auth/guards';
 import { logTrackStorageError } from '$lib/server/tracks/logging';
-import { listTracksByOwner } from '$lib/server/tracks/repository';
+import { getApplicationTrackRepository } from '$lib/server/tracks/persistence';
 
 export const load = (async (event) => {
 	const user = requireUser(event);
 
 	try {
 		return {
-			tracks: await listTracksByOwner(user.id),
+			tracks: await (
+				await getApplicationTrackRepository()
+			).listTracksForOwner(user.id),
 			updated: event.url.searchParams.get('updated') === '1',
 			deleted: event.url.searchParams.get('deleted') === '1'
 		};

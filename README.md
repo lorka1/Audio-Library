@@ -1,377 +1,200 @@
 # Audio Library
 
-Audio Library is a server-rendered SvelteKit application for uploading,
-organizing, discovering, and listening to audio tracks. It combines secure
-account sessions and private file storage with public search, byte-range
-playback, safe downloads, and owner-only track management.
-
-## Features
-
-- Register, log in, log out, and keep a secure cookie-backed session.
-- Upload MP3, WAV, and OGG files with validated metadata and size limits.
-- Browse public tracks and open detailed listening pages without signing in.
-- Search titles, artists, and descriptions; filter by BPM, key, and genre; and
-  use deterministic server-side sorting.
-- Play and seek through audio with HTTP byte-range responses.
-- Download tracks with sanitized user-facing filenames.
-- Review public and private owned tracks in My Tracks.
-- Edit owned track metadata without changing identity, ownership, visibility,
-  filenames, or audio bytes.
-- Confirm owner-only deletion with coordinated database and filesystem cleanup.
-- Use the core forms, filters, navigation, and media links without client-side
-  JavaScript.
-
-## Tech stack
-
-- Svelte 5 and SvelteKit 2
-- TypeScript 6, Vite 8, and the SvelteKit Node adapter
-- Drizzle ORM with SQLite through `@libsql/client`
-- `bcryptjs` password hashing and SHA-256 session-token hashing
-- Vitest, `svelte-check`, and bounded HTTP integration controllers
-
-## Screenshots
-
-Screenshots are intentionally not fabricated or committed yet. The prepared
-directory is `docs/screenshots`, with these expected filenames:
-
-- `docs/screenshots/home.png`
-- `docs/screenshots/tracks.png`
-- `docs/screenshots/track-details.png`
-- `docs/screenshots/upload.png`
-- `docs/screenshots/my-tracks.png`
-
-After safe captures are added, the corresponding Markdown can be enabled:
-
-```markdown
-<!-- ![Audio Library home page](docs/screenshots/home.png) -->
-<!-- ![Public track browser](docs/screenshots/tracks.png) -->
-<!-- ![Track details and player](docs/screenshots/track-details.png) -->
-<!-- ![Audio upload form](docs/screenshots/upload.png) -->
-<!-- ![Owner track management](docs/screenshots/my-tracks.png) -->
-```
-
-Safe screenshot checklist:
-
-- Use an isolated database and storage directory with synthetic accounts and
-  disposable audio.
-- Keep real email addresses, metadata, and audio out of every capture.
-- Capture the application viewport only; exclude DevTools, cookies, session
-  values, local paths, and terminal output.
-- Inspect the final pixels and PNG metadata for internal UUIDs, owner IDs,
-  emails, stored filenames, and filesystem paths.
-- Sign out and remove the disposable runtime data after capturing desktop and
-  mobile views.
+Audio Library is a SvelteKit application for uploading, browsing, searching,
+streaming, downloading, and managing privately stored audio. MongoDB is the
+only persistence backend. Audio bytes remain in a private filesystem directory;
+MongoDB stores users, hashed sessions, track metadata, ownership, public route
+IDs, and private storage references.
 
 ## Requirements
 
-- Node.js `^22.12.0` or `>=24.0.0`
-- npm `>=10.0.0`
+- Node.js `^22.12.0` or `>=24`
+- npm `>=10`
+- MongoDB reachable as a transaction-capable replica set (a local single-node
+  replica set is the supported self-hosted setup)
+- MongoDB Database Tools (`mongodump` and `mongorestore`) for recovery tooling
+
+Registration creates a user and initial session in one transaction. A
+standalone MongoDB server without transaction support is rejected.
+
+## Technology stack
+
+- SvelteKit and Svelte with the Node adapter;
+- TypeScript and Vite;
+- MongoDB as the only persistence service;
+- private local filesystem storage for audio bytes;
+- Vitest plus isolated MongoDB/HTTP/recovery integration controllers.
 
 ## Setup
 
+Install the lockfile dependencies:
+
 ```powershell
 npm ci
+```
+
+Create the local environment file:
+
+```powershell
 Copy-Item .env.example .env
-npm run db:migrate
-npm run dev
 ```
 
-On macOS or Linux, copy the environment file with:
-
-```sh
-cp .env.example .env
-```
-
-The development server prints its local URL. Register a disposable account to
-upload a track, or open `/tracks` to browse the public library.
-
-## Configuration
-
-`.env.example` documents every application setting:
-
-```dotenv
-DATABASE_URL=./data/app.db
-AUDIO_STORAGE_PATH=storage/audio
-MAX_AUDIO_FILE_SIZE_MB=50
-BODY_SIZE_LIMIT=55M
-SESSION_COOKIE_NAME=audio_library_session
-SESSION_DURATION_DAYS=7
-```
+Configure these values in the untracked `.env`:
 
 | Variable | Purpose |
 | --- | --- |
-| `DATABASE_URL` | Required path to the SQLite database file. |
-| `AUDIO_STORAGE_PATH` | Private audio directory, resolved from the project working directory when relative. Blank values fall back to `storage/audio`. |
-| `MAX_AUDIO_FILE_SIZE_MB` | Maximum application-level size of one upload. Invalid or blank values use 50 MB. |
-| `BODY_SIZE_LIMIT` | Request-body limit used by the production Node adapter. It must exceed the audio limit enough to allow multipart overhead. |
-| `SESSION_COOKIE_NAME` | Name of the private authentication cookie. |
-| `SESSION_DURATION_DAYS` | Session and cookie lifetime. Valid values are whole days from 1 through 30; the default is 7. |
+| `MONGODB_URI` | Private connection string for the transaction-capable deployment; the local production URI includes `replicaSet=rs0`. Never commit credentials. |
+| `MONGODB_DB_NAME` | Application database name. |
+| `MONGODB_TEST_DB_NAME` | Base name for uniquely owned integration databases. It must start with `audio_library_test_` and differ from the application database. |
+| `AUDIO_STORAGE_PATH` | Private filesystem directory for audio bytes. |
+| `MAX_AUDIO_FILE_SIZE_MB` | Application upload limit. |
+| `BODY_SIZE_LIMIT` | Adapter request limit, including multipart overhead. |
+| `SESSION_COOKIE_NAME` | HttpOnly session cookie name. |
+| `SESSION_DURATION_DAYS` | Session lifetime from 1 through 30 days. |
+| `MONGODB_BACKUP_ROOT` | Explicit private destination root used only by the MongoDB backup command. |
+| `AUDIO_BACKUP_ROOT` | Explicit private destination root used only by the audio backup command. |
 
-Keep production secrets and deployment-specific paths in the untracked `.env`
-file or the hosting environment. Reverse proxies and hosting platforms may
-apply independent request-size limits.
+Production additionally supplies `HOST`, `PORT`, and an HTTPS `ORIGIN` through
+its private process environment. Production configuration is validated at
+startup and does not rely on development defaults.
 
-## Authentication and authorization
-
-Registration and login use SvelteKit server form actions. Validation is
-repeated on the server, passwords never return in form data, and passwords are
-hashed with a fresh bcrypt salt. Inputs that bcrypt would truncate after 72
-UTF-8 bytes are rejected.
-
-A session starts with a cryptographically random 32-byte token. The browser
-receives the raw token only in an HttpOnly, SameSite=Lax cookie; the database
-stores its SHA-256 hash. Production cookies are also Secure. The server hook
-validates the session for every request and deletes expired or invalid session
-cookies safely.
-
-`/account`, `/upload`, and every `/my-tracks` route require authentication.
-Signed-out visitors are redirected to login with a validated local return
-path. Login and registration redirect an already authenticated user home, and
-logout accepts POST only.
-
-The root layout receives only the signed-in username. The account page uses a
-separate projection containing the authenticated user's own username, email,
-and join date, without the internal user UUID. Public and owner-management
-page data never includes internal track UUIDs, owner IDs or emails, storage
-keys, session data, or physical paths.
-Email may be returned only on the authenticated user's own account page.
-
-## Upload and private storage
-
-The protected upload form accepts:
-
-- a non-empty MP3, WAV, or OGG file
-- required title and artist values, each up to 120 characters
-- optional integer BPM from 20 through 300
-- an optional musical key and genre from centralized allowlists
-- an optional description up to 2,000 characters
-
-Accepted extension and declared MIME-type combinations are:
-
-| Format | Extension | MIME types |
-| --- | --- | --- |
-| MP3 | `.mp3` | `audio/mpeg` |
-| WAV | `.wav` | `audio/wav`, `audio/x-wav`, `audio/wave`, `audio/vnd.wave` |
-| OGG | `.ogg` | `audio/ogg` |
-
-The server validates every field even when browser constraints are bypassed.
-Audio is stored outside `static` under `AUDIO_STORAGE_PATH`. The physical
-filename is a random version 4 UUID plus the validated lowercase extension;
-the original filename is retained only as metadata and never constructs a
-path.
-
-Storage paths are checked lexically and canonically to remain under the
-configured root. Regular files are opened with private filesystem
-permissions. The upload flow writes the file before inserting metadata; if the
-database insert fails, it removes the new file. Successful uploads are public
-and use Post/Redirect/Get to reach the numeric public track URL.
-
-## Public browsing, search, and filters
-
-`/tracks` and `/tracks/{publicId}` are public. Their explicit view model
-contains only the numeric route ID, display metadata, file size, owner
-username, and timestamps. Private, invalid, missing, and unauthorized records
-do not expose their internal existence.
-
-The filter form uses GET, making results refreshable, bookmarkable, shareable,
-and usable without JavaScript.
-
-| Parameter | Behavior |
-| --- | --- |
-| `q` | Trimmed partial match across title, artist, and description; maximum 100 characters. |
-| `bpmMin` | Inclusive minimum BPM from 20 through 300. |
-| `bpmMax` | Inclusive maximum BPM from 20 through 300. |
-| `musicalKey` | Exact value from the musical-key allowlist. |
-| `genre` | Exact value from the genre allowlist. |
-| `sort` | `newest`, `oldest`, `title_asc`, `bpm_asc`, or `bpm_desc`. |
-
-Search values are parameter-bound. `%`, `_`, and backslash are escaped as
-literal SQL `LIKE` text, and the public visibility condition is grouped
-separately from the title/artist/description OR expression. BPM filters
-exclude unspecified BPM values. BPM sorting keeps unspecified values last in
-both directions, and every sort has a public-ID tie-breaker for stable results.
-
-Invalid filter values produce accessible validation messages and no misleading
-query. Submitted safe values remain visible, and Reset filters returns exactly
-to `/tracks`.
-
-## Streaming, seeking, and downloads
-
-The native player requests:
-
-```text
-GET /api/tracks/{publicId}/stream
-```
-
-A full response uses status 200. A valid single byte range uses status 206
-with exact `Content-Range`, `Content-Length`, and `Accept-Ranges: bytes`
-headers. Open-ended and suffix ranges are supported. Malformed, multiple,
-reversed, or unsatisfiable ranges return 416 with
-`Content-Range: bytes */TOTAL`.
-
-Downloads use:
-
-```text
-GET /api/tracks/{publicId}/download
-```
-
-The response streams the same private file with
-`Content-Disposition: attachment`. It includes a sanitized ASCII fallback and
-an RFC-compatible UTF-8 `filename*` derived from the original filename. Path
-components and control characters are removed, and generated storage names
-are never returned.
-
-Both endpoints validate public visibility, stored filenames, canonical path
-containment, and regular-file status. Responses use `private, no-store` and
-`X-Content-Type-Options: nosniff`. Expected missing files return a safe 404;
-unexpected failures return generic text and sanitized log metadata.
-
-## My Tracks, editing, and deletion
-
-`/my-tracks` lists only the authenticated owner's tracks, including existing
-public and private records. Visibility is a read-only text badge. Public
-tracks link to their public detail pages; private tracks do not.
-
-Owners can edit title, artist, BPM, musical key, genre, and description.
-Repository reads and updates match both the numeric public ID and the owner ID
-from the authenticated session. Submitted owner IDs, visibility, storage keys,
-or alternate track IDs have no effect. Editing preserves audio bytes,
-filenames, ownership, visibility, creation time, and both internal and public
-identities.
-
-Deletion has a dedicated confirmation page and requires POST. For an existing
-regular file, the service:
-
-1. validates and moves the file to a server-generated quarantine name inside
-   the same storage directory;
-2. deletes the row with the authenticated owner condition;
-3. removes the quarantined file;
-4. restores the original generated filename when a database or final-unlink
-   failure permits recovery.
-
-An already missing physical file is treated as cleaned so its owned row can
-still be removed. Non-files, symbolic links, unsafe paths, and non-owned rows
-fail closed. Successful updates and deletions redirect with HTTP 303, so
-refreshing the result page does not repeat a mutation.
-
-## Database and migrations
-
-The schema and five historical SQL migrations are committed under `drizzle/`.
-Apply them to a new or existing database with:
+Start development:
 
 ```powershell
-npm run db:migrate
+npm run dev
 ```
 
-Generate a new migration only after an intentional schema change:
+## MongoDB initialization
+
+Initialize a new database explicitly:
 
 ```powershell
-npm run db:generate
+npm run db:mongodb:init
 ```
 
-Open Drizzle Studio for local inspection with:
+Server startup uses one shared server-only client and refuses to serve traffic
+unless the writable PRIMARY, transaction topology, collections, exact indexes,
+public-ID counter, cookie/request limits, and private audio storage are valid.
+Index initialization is separate from read-only startup/readiness verification:
+
+- unique usernames and emails;
+- unique session token hashes, session ownership, and expiration;
+- unique track public IDs and storage keys;
+- owner/public query paths, BPM, musical key, and genre.
+
+Check connectivity, database selection, and indexes without modifying
+application documents:
 
 ```powershell
-npm run db:studio
+npm run db:mongodb:verify
 ```
 
-The current migrations create users, hashed sessions, track metadata and
-ownership, public/private visibility, storage references, metadata constraints,
-and the numeric public route ID while preserving the server-only track UUID.
+Run the complete read-only data/audio safety audit:
+
+```powershell
+npm run db:mongodb:audit
+```
+
+## Features
+
+- registration, login, logout, session validation, and session expiration;
+- transactional user/session creation;
+- public Browse with literal substring search;
+- inclusive BPM bounds, key and genre filters, and combined filters;
+- newest, oldest, title ascending/descending, and BPM ascending/descending
+  ordering with deterministic tie handling;
+- public numeric detail URLs;
+- full streaming, byte Range seeking, invalid Range handling, and downloads;
+- private owner dashboard, metadata editing, and deletion;
+- quarantine-based filesystem deletion with database-failure restoration;
+- safe public, owner, account, navigation, and server-only projections.
+
+Route modules do not select or construct persistence implementations. Central
+server-only persistence modules provide the MongoDB repositories.
 
 ## Commands
 
 | Command | Purpose |
 | --- | --- |
 | `npm run dev` | Start the development server. |
-| `npm run build` | Create the production Node build. |
-| `npm run preview` | Preview the production build through Vite. |
 | `npm run check` | Run Svelte and TypeScript diagnostics. |
-| `npm run check:watch` | Run diagnostics in watch mode. |
-| `npm run test` | Run all Vitest tests once. |
-| `npm run test:watch` | Run Vitest in watch mode. |
-| `npm run test:integration` | Run 21 isolated public media and upload HTTP checks. |
-| `npm run test:integration:phase5` | Run 26 isolated search, filter, sort, and media checks. |
-| `npm run test:integration:phase6` | Run 31 isolated owner-management, privacy, and regression checks. |
-| `npm run verify:clean-clone` | Verify install, fresh migrations, diagnostics, tests, build, production startup, and cleanup from an isolated release-candidate copy. |
-| `npm run db:migrate` | Apply committed migrations. |
-| `npm run db:generate` | Generate a migration from an intentional schema change. |
-| `npm run db:studio` | Open Drizzle Studio. |
+| `npm test` | Run all Vitest tests once. |
+| `npm run build` | Create the production Node build. |
+| `npm start` | Start the hardened production listener with graceful shutdown. |
+| `npm run preview` | Preview the production build through Vite. |
+| `npm run db:mongodb:init` | Explicitly initialize a new database's indexes and counter. |
+| `npm run db:mongodb:verify` | Verify connectivity, topology, PRIMARY, collections, exact indexes, counter, and marker structure read-only. |
+| `npm run db:mongodb:audit` | Audit MongoDB and audio using safe aggregates only. |
+| `npm run backup:mongodb` | Create a timestamped native MongoDB dump in an explicit private root. |
+| `npm run backup:audio` | Create and aggregate-verify a timestamped private audio copy. |
+| `npm run verify:mongodb:restore` | Verify a supplied synthetic recovery pair in an owned database and temporary audio root. |
+| `npm run test:mongodb:recovery` | Create, back up, restore, probe, and exactly clean a synthetic recovery set. |
+| `npm run test:mongodb:users` | Verify the user repository contract in a uniquely owned database. |
+| `npm run test:mongodb:auth` | Verify transactions, duplicate conflicts, sessions, expiration, logout, and cleanup. |
+| `npm run test:mongodb:tracks` | Verify public IDs, projections, owner CRUD, filesystem consistency, failure recovery, and cleanup. |
+| `npm run test:mongodb:queries` | Verify search, filters, all six sorts, literal regex handling, projections, and cleanup. |
+| `npm run test:mongodb:cutover` | Run the isolated full-application registration, upload, media, owner-management, and cleanup flow. |
+| `npm run test:mongodb:regression` | Run the aggregate MongoDB contract, failure-path, privacy, query, and full-application regression. |
+| `npm run verify:mongodb:clean-clone` | Install and verify an isolated release-candidate copy with an owned test database and production probe. |
 
-There is no separate lint script. `npm run check` is the enforced Svelte and
-TypeScript static-analysis command.
+Integration controllers generate one unique safe test database, record its
+ownership, drop only that exact database, preserve every pre-existing database,
+use temporary audio storage and ports, and close their clients, sessions,
+processes, listeners, and timers.
 
-## Testing
+## Production
 
-The Vitest suite uses in-memory SQLite databases and disposable filesystem
-directories. It covers authentication, validation, safe projections, query
-parsing and SQL escaping, deterministic repository behavior, private path
-containment, file streaming, upload rollback, owner scoping, immutable
-metadata, deletion quarantine and recovery, and sanitized failures.
+Build and start the adapter-node output:
 
-The three HTTP controllers start exactly one owned Vite process on an isolated
-port, use copied database and separate audio storage, enforce bounded startup
-and overall timeouts, fully read media responses, and verify process, port,
-temporary-directory, and real-runtime postconditions during cleanup. The
-search and owner-management controllers are maintainer regression suites that
-seed only synthetic fixtures into a temporary database copy. They compare
-normalized snapshots of every pre-existing user, session, and track row, plus
-hash-based snapshots of the real database and audio storage, without depending
-on any real title, artist, username, or other row value.
-
-The clean-clone verification uses Git only for read-only enumeration. It copies
-the working-tree versions of tracked files that still exist and untracked,
-non-ignored release files into a temporary candidate without copying a `.git`
-directory. It never runs `git add` and does not modify the source repository
-index or object database. The verifier excludes ignored `.env`, database,
-audio, dependency, build, and instruction files; runs `npm ci`; copies
-`.env.example` to `.env`; applies migrations to a new empty SQLite database;
-runs checks, tests, and the production build; probes `/` and `/tracks` through
-the built Node server; and removes its process, port listener, and temporary
-directory.
-
-Run the complete browser checklist in [MANUAL_TESTS.md](MANUAL_TESTS.md).
-
-## Project structure
-
-```text
-docs/screenshots/           prepared location for safe product screenshots
-drizzle/                    versioned SQLite migrations and metadata
-scripts/                    bounded HTTP and clean-clone verification controllers
-src/
-  lib/
-    components/             reusable UI
-    constants/              musical-key and genre allowlists
-    server/
-      auth/                 passwords, sessions, repository, guards, and logging
-      db/                   Drizzle connection and schema
-      tracks/               validation, storage, search, media, and owner services
-  routes/
-    account/                protected account details
-    api/tracks/             public streaming and download endpoints
-    my-tracks/              owner list, metadata editing, and deletion
-    tracks/                 public list and detail pages
-    upload/                 protected multipart upload
-storage/audio/              private runtime audio; contents are ignored by Git
+```powershell
+npm run build
+$env:HOST='127.0.0.1'
+$env:PORT='3000'
+$env:ORIGIN='https://your-host.example'
+npm start
 ```
 
-## Current limitations
+`GET /api/health/live` checks only the process. `GET /api/health/ready`
+performs bounded read-only MongoDB/index/counter and private-storage checks.
+Neither exposes contents, paths, counts, credentials, or identifiers. SIGINT
+and SIGTERM stop the listener, allow bounded in-flight completion, then close
+the application-owned listener and shared MongoDB client once.
 
-- Upload parsing uses `request.formData()` and storage uses
-  `File.arrayBuffer()`, so complete upload bytes are buffered in memory.
-- Extension and declared MIME validation does not inspect file signatures,
-  decode codecs, scan for malware, transcode, or guarantee browser playback.
-- Browser support varies for the codecs stored inside WAV and OGG containers.
-- Local SQLite plus local filesystem storage is intended for a local or
-  single-node deployment unless shared infrastructure is added.
-- SQLite's built-in case folding is primarily ASCII-aware, so non-ASCII
-  case-insensitive search behavior is limited by SQLite.
-- Streaming supports one byte range per request, not multipart ranges.
-- SQLite and the filesystem cannot share one atomic transaction. Deletion uses
-  quarantine and recovery, but an exceptional double failure can leave an
-  unreferenced file for operator cleanup.
-- New uploads are public. Existing private records are owner-visible, but
-  visibility is read-only.
-- Audio replacement, visibility controls, pagination, playlists, comments,
-  ratings, recommendations, automatic BPM/key analysis, waveform generation,
-  transcoding, and administration features are not implemented.
+Keep `AUDIO_STORAGE_PATH` on persistent private storage and never expose it
+through a static file server. MongoDB and audio backups are separate artifacts
+but one logical recovery set. Pair their timestamps, verify restores
+periodically, and never commit backups or `.env`. The complete same-computer
+Windows runbook is in [`docs/operations.md`](docs/operations.md).
+The final operator commissioning checklist is in
+[`docs/production-commissioning-checklist.md`](docs/production-commissioning-checklist.md).
+
+## Privacy and storage
+
+Browser payloads never receive password hashes, raw or hashed session tokens,
+internal user/track identifiers, owner IDs, storage keys, absolute paths,
+database names, connection strings, or private audit information.
+
+Operational logs are structured and limited to safe categories, codes,
+request/correlation IDs, route categories, status, and duration. Raw errors,
+request bodies, identities, filenames, storage keys, private paths, cookies,
+authorization headers, documents, URIs, and migration fingerprints are omitted.
+
+Audio is not stored in MongoDB or GridFS. Upload metadata and filesystem writes
+use compensating cleanup, while deletion uses quarantine/restore semantics to
+keep metadata and files consistent across failure paths.
+
+## Historical migration
+
+The project originally used SQLite and Drizzle. Users and track metadata were
+migrated transactionally to MongoDB while preserving identifiers, password
+hashes, ownership, public IDs, visibility, nullable metadata, timestamps, and
+storage references. Sessions were intentionally not migrated, so users had to
+sign in again after cutover. Audio bytes were never migrated into MongoDB.
+
+SQLite and Drizzle are no longer application dependencies. A verified
+historical SQLite backup and sanitized cutover package remain outside Git; they
+are not required by setup, runtime, tests, or production operation. See
+[`docs/mongodb-migration.md`](docs/mongodb-migration.md).
+
+The active persistence coverage is documented in
+[`docs/persistence-feature-matrix.md`](docs/persistence-feature-matrix.md).

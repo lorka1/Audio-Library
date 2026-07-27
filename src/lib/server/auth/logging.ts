@@ -1,18 +1,9 @@
-function readErrorCode(error: unknown): string | number | undefined {
-	if (typeof error !== 'object' || error === null || !('code' in error)) {
-		return undefined;
-	}
+import { safeErrorFields, writeSafeLog } from '../operational/logging';
 
-	const code = (error as { code?: unknown }).code;
-	return typeof code === 'string' || typeof code === 'number' ? code : undefined;
-}
-
-export function logAuthError(context: string, error: unknown): void {
-	const errorType = error instanceof Error ? error.name : 'UnknownError';
-	const errorCode = readErrorCode(error);
-
-	console.error(`[auth] ${context}`, {
-		errorType,
-		...(errorCode === undefined ? {} : { errorCode })
+export function logAuthError(_context: string, error: unknown): void {
+	writeSafeLog({
+		severity: 'error',
+		category: 'authorization',
+		...safeErrorFields(error)
 	});
 }

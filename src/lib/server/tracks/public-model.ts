@@ -1,4 +1,4 @@
-import type { PublicTrack } from '$lib/types';
+import type { PublicTrack } from '../../types';
 
 export interface PublicTrackRecord {
 	publicId: number;

@@ -6,6 +6,7 @@ import {
 	getActiveTrackFilterSummary,
 	hasActiveTrackFilters,
 	isTrackSort,
+	escapeRegexSearchTerm,
 	TRACK_SORT_OPTIONS,
 	TRACK_SORTS,
 	type TrackSearchFilters,
@@ -24,12 +25,23 @@ describe('isTrackSort', () => {
 		expect(isTrackSort(sort)).toBe(true);
 	});
 
-	it.each(['', 'NEWEST', 'newest ', 'title_desc', 'bpm', 'unknown'])(
+	it.each(['', 'NEWEST', 'newest ', 'bpm', 'unknown'])(
 		'rejects unsupported sort %j',
 		(value) => {
 			expect(isTrackSort(value)).toBe(false);
 		}
 	);
+});
+
+describe('escapeRegexSearchTerm', () => {
+	it.each([
+		['ordinary text', 'ordinary text'],
+		['100%_mix', '100%_mix'],
+		[String.raw`back\slash`, String.raw`back\\slash`],
+		['.*+?^$()[]{}|', String.raw`\.\*\+\?\^\$\(\)\[\]\{\}\|`]
+	])('escapes %j as a literal regular-expression term', (input, expected) => {
+		expect(escapeRegexSearchTerm(input)).toBe(expected);
+	});
 });
 
 describe('buildCanonicalTrackQuery', () => {

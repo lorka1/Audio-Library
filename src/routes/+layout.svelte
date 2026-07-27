@@ -1,9 +1,17 @@
 <script lang="ts">
-	import { SiteHeader } from '$lib';
+	import {
+		createAudioPlayerController,
+		GlobalAudioPlayer,
+		SiteHeader
+	} from '$lib';
+	import { provideAudioPlayer } from '$lib/player/context';
 	import type { LayoutProps } from './$types';
 	import '../app.css';
 
 	let { data, children }: LayoutProps = $props();
+	const player = createAudioPlayerController();
+	provideAudioPlayer(player);
+	let playerState = $derived($player);
 </script>
 
 <svelte:head>
@@ -13,7 +21,7 @@
 	/>
 </svelte:head>
 
-<div class="site-shell">
+<div class:has-global-player={playerState.track !== null} class="site-shell">
 	<a class="skip-link" href="#main-content">Skip to main content</a>
 	<SiteHeader user={data.user} />
 
@@ -27,4 +35,6 @@
 			<p>Private storage · public discovery · owner controls</p>
 		</div>
 	</footer>
+
+	<GlobalAudioPlayer {player} />
 </div>

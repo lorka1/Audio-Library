@@ -1,0 +1,376 @@
+import {
+	MongoServerError,
+	type Collection,
+	type FindOptions
+} from 'mongodb';
+import type {
+	CounterDocument,
+	TrackDocument,
+	UserDocument
+} from '../mongodb/documents.ts';
+import { TRACK_PUBLIC_ID_COUNTER } from '../mongodb/documents.ts';
+import type {
+	CreateTrackInput,
+	DuplicateTrackField,
+	OwnerTrackStorage,
+	TrackForDownload,
+	TrackForStreaming,
+	TrackRepository,
+	UpdateOwnerTrackMetadataInput
+} from './contract.ts';
+import {
+	escapeRegexSearchTerm,
+	type TrackSearchFilters
+} from '../../tracks-query.ts';
+import {
+	assertPositivePublicTrackId,
+	DuplicateTrackError,
+	requireTrackOwnerId
+} from './contract.ts';
+import { toOwnerTrack, type OwnerTrackRecord } from './owner-model.ts';
+import { toPublicTrack, type PublicTrackRecord } from './public-model.ts';
+
+export const MONGODB_TRACK_OPERATION_TIMEOUT_MS = 5_000;
+export const MONGODB_BASIC_PUBLIC_TRACK_LIMIT = 200;
+
+export interface MongoTrackRepositoryOptions {
+	timeoutMS?: number;
+	signal?: AbortSignal;
+}
+
+interface PublicTrackAggregateRecord extends PublicTrackRecord {}
+
+const ownerProjection = {
+	_id: 0,
+	publicId: 1,
+	title: 1,
+	artist: 1,
+	bpm: 1,
+	musicalKey: 1,
+	genre: 1,
+	description: 1,
+	visibility: 1,
+	fileSizeBytes: 1,
+	mimeType: 1,
+	originalFilename: 1,
+	createdAt: 1,
+	updatedAt: 1
+} as const;
+
+const streamingProjection = {
+	_id: 0,
+	publicId: 1,
+	storageKey: 1,
+	mimeType: 1,
+	fileSizeBytes: 1,
+	visibility: 1
+} as const;
+
+const downloadProjection = {
+	...streamingProjection,
+	originalFilename: 1
+} as const;
+
+const ownerStorageProjection = {
+	_id: 0,
+	publicId: 1,
+	storageKey: 1
+} as const;
+
+const publicAggregateProjection = {
+	_id: 0,
+	publicId: 1,
+	title: 1,
+	artist: 1,
+	bpm: 1,
+	musicalKey: 1,
+	genre: 1,
+	description: 1,
+	fileSizeBytes: 1,
+	ownerUsername: '$owner.username',
+	createdAt: 1,
+	updatedAt: 1
+} as const;
+
+function duplicateTrackField(error: unknown): DuplicateTrackField | null {
+	if (!(error instanceof MongoServerError) || error.code !== 11000) {
+		return null;
+	}
+	const keyPattern = error.keyPattern as Record<string, unknown> | undefined;
+	if (keyPattern && Object.hasOwn(keyPattern, 'publicId')) return 'publicId';
+	if (keyPattern && Object.hasOwn(keyPattern, 'storageKey')) return 'storageKey';
+	if (keyPattern && Object.hasOwn(keyPattern, '_id')) return 'id';
+	return null;
+}
+
+function mapOwnerTrack(document: TrackDocument) {
+	return toOwnerTrack(document satisfies OwnerTrackRecord);
+}
+
+function mapStreaming(document: TrackDocument): TrackForStreaming | null {
+	if (document.visibility !== 'public') return null;
+	return {
+		id: document.publicId,
+		storedFilename: document.storageKey,
+		mimeType: document.mimeType,
+		fileSizeBytes: document.fileSizeBytes,
+		visibility: 'public'
+	};
+}
+
+function mapDownload(document: TrackDocument): TrackForDownload | null {
+	const stream = mapStreaming(document);
+	return stream
+		? { ...stream, originalFilename: document.originalFilename }
+		: null;
+}
+
+export async function initializeMongoPublicTrackIdCounter(
+	counters: Collection<CounterDocument>,
+	lastAllocatedPublicId = 0,
+	options: MongoTrackRepositoryOptions = {}
+): Promise<number> {
+	if (!Number.isSafeInteger(lastAllocatedPublicId) || lastAllocatedPublicId < 0) {
+		throw new Error('The initial public track ID counter must be a non-negative safe integer.');
+	}
+	const result = await counters.findOneAndUpdate(
+		{ _id: TRACK_PUBLIC_ID_COUNTER },
+		{ $max: { value: lastAllocatedPublicId } },
+		{
+			upsert: true,
+			returnDocument: 'after',
+			timeoutMS: options.timeoutMS ?? MONGODB_TRACK_OPERATION_TIMEOUT_MS,
+			projection: { _id: 0, value: 1 }
+		}
+	);
+	if (!result || !Number.isSafeInteger(result.value) || result.value < lastAllocatedPublicId) {
+		throw new Error('MongoDB did not initialize the public track ID counter safely.');
+	}
+	return result.value;
+}
+
+export function createMongoTrackRepository(
+	tracks: Collection<TrackDocument>,
+	counters: Collection<CounterDocument>,
+	users: Collection<UserDocument>,
+	options: MongoTrackRepositoryOptions = {}
+): TrackRepository {
+	const timeoutMS = options.timeoutMS ?? MONGODB_TRACK_OPERATION_TIMEOUT_MS;
+	const operationOptions = { timeoutMS, signal: options.signal };
+	const findOptions = (projection: FindOptions['projection']): FindOptions => ({
+		...operationOptions,
+		projection
+	});
+
+	async function allocatePublicTrackId(): Promise<number> {
+		const counter = await counters.findOneAndUpdate(
+			{ _id: TRACK_PUBLIC_ID_COUNTER },
+			{ $inc: { value: 1 } },
+			{
+				...operationOptions,
+				upsert: true,
+				returnDocument: 'after',
+				projection: { _id: 0, value: 1 }
+			}
+		);
+		if (!counter) {
+			throw new Error('MongoDB did not return the allocated public track ID.');
+		}
+		assertPositivePublicTrackId(counter.value);
+		return counter.value;
+	}
+
+	function publicQueryMatch(
+		query: TrackSearchFilters
+	): Record<string, unknown> {
+		const match: Record<string, unknown> = { visibility: 'public' };
+		if (query.q) {
+			const literalSubstring = new RegExp(escapeRegexSearchTerm(query.q), 'i');
+			match.$or = [
+				{ title: literalSubstring },
+				{ artist: literalSubstring },
+				{ description: literalSubstring }
+			];
+		}
+		if (query.bpmMin !== undefined || query.bpmMax !== undefined) {
+			match.bpm = {
+				...(query.bpmMin === undefined ? {} : { $gte: query.bpmMin }),
+				...(query.bpmMax === undefined ? {} : { $lte: query.bpmMax })
+			};
+		}
+		if (query.musicalKey) match.musicalKey = query.musicalKey;
+		if (query.genre) match.genre = query.genre;
+		return match;
+	}
+
+	function publicQuerySort(query: TrackSearchFilters) {
+		switch (query.sort) {
+			case 'oldest':
+				return { createdAt: 1, publicId: 1 } as const;
+			case 'title_asc':
+				return { __sortTitle: 1, publicId: 1 } as const;
+			case 'title_desc':
+				return { __sortTitle: -1, publicId: 1 } as const;
+			case 'bpm_asc':
+				return { __bpmMissing: 1, bpm: 1, publicId: 1 } as const;
+			case 'bpm_desc':
+				return { __bpmMissing: 1, bpm: -1, publicId: 1 } as const;
+			case 'newest':
+				return { createdAt: -1, publicId: -1 } as const;
+		}
+	}
+
+	async function publicAggregate(
+		match: Record<string, unknown>,
+		query: TrackSearchFilters = { sort: 'newest' }
+	): Promise<PublicTrackAggregateRecord[]> {
+		return tracks
+			.aggregate<PublicTrackAggregateRecord>(
+				[
+					{ $match: { ...match, visibility: 'public' } },
+					{
+						$set: {
+							__sortTitle: { $toLower: '$title' },
+							__bpmMissing: {
+								$cond: [{ $eq: ['$bpm', null] }, 1, 0]
+							}
+						}
+					},
+					{ $sort: publicQuerySort(query) },
+					{
+						$lookup: {
+							from: users.collectionName,
+							localField: 'ownerId',
+							foreignField: '_id',
+							as: 'owner',
+							pipeline: [{ $project: { _id: 0, username: 1 } }]
+						}
+					},
+					{ $unwind: '$owner' },
+					{ $project: publicAggregateProjection }
+				],
+				operationOptions
+			)
+			.toArray();
+	}
+
+	return {
+		async createTrack(input, createOptions) {
+			requireTrackOwnerId(input.ownerId);
+			const publicId = createOptions?.publicId ?? (await allocatePublicTrackId());
+			assertPositivePublicTrackId(publicId);
+			const document: TrackDocument = {
+				_id: input.id,
+				publicId,
+				ownerId: input.ownerId,
+				title: input.title,
+				artist: input.artist,
+				bpm: input.bpm,
+				musicalKey: input.musicalKey,
+				genre: input.genre,
+				description: input.description,
+				originalFilename: input.originalFilename,
+				storageKey: input.storageKey,
+				mimeType: input.mimeType,
+				fileSizeBytes: input.fileSizeBytes,
+				durationMs: null,
+				visibility: createOptions?.visibility ?? 'public',
+				createdAt: input.createdAt,
+				updatedAt: input.updatedAt
+			};
+			try {
+				await tracks.insertOne(document, operationOptions);
+			} catch (error) {
+				const field = duplicateTrackField(error);
+				if (field) throw new DuplicateTrackError(field);
+				throw error;
+			}
+			return { id: publicId, title: document.title, createdAt: document.createdAt };
+		},
+
+		allocatePublicTrackId,
+
+		async findPublicTrackByPublicId(publicId) {
+			assertPositivePublicTrackId(publicId);
+			const [record] = await publicAggregate({ publicId });
+			return record ? toPublicTrack(record) : null;
+		},
+
+		async listPublicTracks(query) {
+			const records = await publicAggregate(publicQueryMatch(query), query);
+			return records.map(toPublicTrack);
+		},
+
+		async findTrackForStreaming(publicId) {
+			assertPositivePublicTrackId(publicId);
+			const document = await tracks.findOne(
+				{ publicId, visibility: 'public' },
+				findOptions(streamingProjection)
+			);
+			return document ? mapStreaming(document) : null;
+		},
+
+		async findTrackForDownload(publicId) {
+			assertPositivePublicTrackId(publicId);
+			const document = await tracks.findOne(
+				{ publicId, visibility: 'public' },
+				findOptions(downloadProjection)
+			);
+			return document ? mapDownload(document) : null;
+		},
+
+		async listTracksForOwner(ownerId) {
+			requireTrackOwnerId(ownerId);
+			const documents = await tracks
+				.find({ ownerId }, findOptions(ownerProjection))
+				.sort({ createdAt: -1, publicId: -1 })
+				.limit(MONGODB_BASIC_PUBLIC_TRACK_LIMIT)
+				.toArray();
+			return documents.map(mapOwnerTrack);
+		},
+
+		async findOwnerTrack(publicId, ownerId) {
+			requireTrackOwnerId(ownerId);
+			assertPositivePublicTrackId(publicId);
+			const document = await tracks.findOne(
+				{ publicId, ownerId },
+				findOptions(ownerProjection)
+			);
+			return document ? mapOwnerTrack(document) : null;
+		},
+
+		async updateOwnerTrackMetadata(publicId, ownerId, metadata) {
+			requireTrackOwnerId(ownerId);
+			assertPositivePublicTrackId(publicId);
+			const document = await tracks.findOneAndUpdate(
+				{ publicId, ownerId },
+				{ $set: metadata satisfies UpdateOwnerTrackMetadataInput },
+				{
+					...operationOptions,
+					returnDocument: 'after',
+					projection: ownerProjection
+				}
+			);
+			return document ? mapOwnerTrack(document) : null;
+		},
+
+		async deleteOwnerTrack(publicId, ownerId) {
+			requireTrackOwnerId(ownerId);
+			assertPositivePublicTrackId(publicId);
+			const result = await tracks.deleteOne({ publicId, ownerId }, operationOptions);
+			return result.deletedCount === 1;
+		},
+
+		async getOwnerTrackStorage(publicId, ownerId): Promise<OwnerTrackStorage | null> {
+			requireTrackOwnerId(ownerId);
+			assertPositivePublicTrackId(publicId);
+			const document = await tracks.findOne(
+				{ publicId, ownerId },
+				findOptions(ownerStorageProjection)
+			);
+			return document
+				? { publicId: document.publicId, storedFilename: document.storageKey }
+				: null;
+		}
+	};
+}

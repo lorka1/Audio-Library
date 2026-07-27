@@ -4,6 +4,7 @@ export const TRACK_SORTS = [
 	'newest',
 	'oldest',
 	'title_asc',
+	'title_desc',
 	'bpm_asc',
 	'bpm_desc'
 ] as const;
@@ -16,6 +17,7 @@ export const TRACK_SORT_OPTIONS = [
 	{ value: 'newest', label: 'Newest first' },
 	{ value: 'oldest', label: 'Oldest first' },
 	{ value: 'title_asc', label: 'Title A\u2013Z' },
+	{ value: 'title_desc', label: 'Title Z\u2013A' },
 	{ value: 'bpm_asc', label: 'BPM low to high' },
 	{ value: 'bpm_desc', label: 'BPM high to low' }
 ] as const satisfies ReadonlyArray<{ value: TrackSort; label: string }>;
@@ -57,6 +59,10 @@ export interface ParsedTrackQuery {
 
 export function isTrackSort(value: string): value is TrackSort {
 	return TRACK_SORTS.some((sort) => sort === value);
+}
+
+export function escapeRegexSearchTerm(value: string): string {
+	return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 export function buildCanonicalTrackQuery(filters: TrackSearchFilters): string {

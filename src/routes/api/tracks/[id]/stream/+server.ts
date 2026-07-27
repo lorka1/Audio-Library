@@ -8,7 +8,7 @@ import {
 import { parseTrackId } from '$lib/server/tracks/id';
 import { logTrackStorageError } from '$lib/server/tracks/logging';
 import { parseByteRange } from '$lib/server/tracks/range';
-import { findPublicTrackFileById } from '$lib/server/tracks/repository';
+import { getApplicationTrackRepository } from '$lib/server/tracks/persistence';
 
 const CACHE_CONTROL = 'private, no-store';
 
@@ -32,7 +32,9 @@ export const GET = (async ({ params, request }) => {
 	let trackFile;
 
 	try {
-		trackFile = await findPublicTrackFileById(id);
+		trackFile = await (
+			await getApplicationTrackRepository()
+		).findTrackForStreaming(id);
 	} catch (error) {
 		logTrackStorageError('Public audio stream lookup failed.', error);
 		return unavailableResponse(500);

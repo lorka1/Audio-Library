@@ -1,9 +1,11 @@
 <script lang="ts">
-	import { AudioPlayer } from '$lib';
+	import { TrackPlayButton } from '$lib';
 	import { formatDate, formatFileSize } from '$lib/formatting';
+	import { toPublicPlayerTrack } from '$lib/player/model';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
+	let playerTrack = $derived(toPublicPlayerTrack(data.track));
 </script>
 
 <svelte:head>
@@ -31,9 +33,8 @@
 				<p class="track-detail__artist">by {data.track.artist}</p>
 			</header>
 
-			<AudioPlayer trackId={data.track.id} title={data.track.title} />
-
 			<div class="track-detail__actions">
+				<TrackPlayButton track={playerTrack} variant="detail" />
 				<a class="primary-button" href={`/api/tracks/${data.track.id}/download`}>
 					Download audio
 				</a>

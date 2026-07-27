@@ -1,14 +1,24 @@
 <script lang="ts">
 	import { formatDate } from '$lib/formatting';
+	import type { AudioPlayerController } from '$lib/player/controller';
+	import { toPublicPlayerTrack } from '$lib/player/model';
 	import type { PublicTrack } from '$lib/types';
+	import TrackPlayButton from './TrackPlayButton.svelte';
 
-	let { track }: { track: PublicTrack } = $props();
+	let {
+		track,
+		player
+	}: { track: PublicTrack; player?: AudioPlayerController } = $props();
+	let playerTrack = $derived(toPublicPlayerTrack(track));
 </script>
 
 <article class="track-card">
 	<header>
-		<p class="track-card__artist">{track.artist}</p>
-		<h2><a href={`/tracks/${track.id}`}>{track.title}</a></h2>
+		<div>
+			<p class="track-card__artist">{track.artist}</p>
+			<h2><a href={`/tracks/${track.id}`}>{track.title}</a></h2>
+		</div>
+		<TrackPlayButton track={playerTrack} {player} />
 	</header>
 
 	<dl class="track-card__metadata">
@@ -47,6 +57,14 @@
 	}
 
 	header {
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: 1rem;
+		min-width: 0;
+	}
+
+	header > div {
 		min-width: 0;
 	}
 
@@ -124,6 +142,15 @@
 	}
 
 	@media (max-width: 28rem) {
+		header {
+			align-items: stretch;
+			flex-direction: column;
+		}
+
+		header :global(button) {
+			align-self: flex-start;
+		}
+
 		.track-card__metadata {
 			grid-template-columns: 1fr;
 		}

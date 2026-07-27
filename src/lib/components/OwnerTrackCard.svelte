@@ -1,8 +1,17 @@
 <script lang="ts">
 	import { formatDate } from '$lib/formatting';
+	import { toPublicPlayerTrack } from '$lib/player/model';
 	import type { OwnerTrack } from '$lib/types';
+	import TrackPlayButton from './TrackPlayButton.svelte';
 
 	let { track }: { track: OwnerTrack } = $props();
+	let playerTrack = $derived(
+		toPublicPlayerTrack({
+			id: track.publicId,
+			title: track.title,
+			artist: track.artist
+		})
+	);
 </script>
 
 <article class="owner-track-card">
@@ -36,6 +45,9 @@
 	</p>
 
 	<footer>
+		{#if track.visibility === 'public'}
+			<TrackPlayButton track={playerTrack} />
+		{/if}
 		<a href={`/my-tracks/${track.publicId}/edit`}>Edit metadata</a>
 		<a class="delete-link" href={`/my-tracks/${track.publicId}/delete`}>Delete</a>
 		{#if track.visibility === 'public'}
@@ -135,6 +147,7 @@
 
 	footer {
 		display: flex;
+		align-items: center;
 		flex-wrap: wrap;
 		gap: 0.55rem;
 		padding-top: 1rem;

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { createTrack, type CreatedTrack, type CreateTrackInput } from './repository';
+import type { CreatedTrack, CreateTrackInput } from './contract';
 import {
 	deleteStoredAudioFile,
 	saveAudioFile,
@@ -11,6 +11,7 @@ import {
 	type UploadErrors,
 	type UploadFormValues
 } from './validation';
+import { getApplicationTrackRepository } from './persistence';
 
 export const GENERIC_UPLOAD_ERROR = 'Unable to upload the audio track. Please try again.';
 
@@ -49,7 +50,8 @@ export type UploadTrackResult =
 const defaultDependencies: TrackUploadDependencies = {
 	saveFile: saveAudioFile,
 	deleteFile: deleteStoredAudioFile,
-	insertTrack: createTrack,
+	insertTrack: async (input) =>
+		(await getApplicationTrackRepository()).createTrack(input),
 	generateId: randomUUID,
 	now: () => new Date()
 };

@@ -4,10 +4,7 @@ import type { Actions, PageServerLoad } from './$types';
 import { requireGuest } from '$lib/server/auth/guards';
 import { logAuthError } from '$lib/server/auth/logging';
 import { hashPassword } from '$lib/server/auth/password';
-import {
-	createUserWithSession,
-	findRegistrationConflicts
-} from '$lib/server/auth/repository';
+import { getAuthPersistence } from '$lib/server/auth/persistence';
 import { prepareSession, setSessionCookie } from '$lib/server/auth/session';
 import {
 	readFormString,
@@ -57,7 +54,11 @@ export const actions = {
 		};
 
 		try {
-			const conflicts = await findRegistrationConflicts(values.username, values.email);
+			const persistence = await getAuthPersistence();
+			const conflicts = await persistence.users.findRegistrationConflicts(
+				values.username,
+				values.email
+			);
 			const errors: RegistrationErrors = {};
 
 			if (conflicts.usernameTaken) {
@@ -75,7 +76,7 @@ export const actions = {
 			const userId = randomUUID();
 			const passwordHash = await hashPassword(validation.data.password);
 			const preparedSession = prepareSession(userId);
-			const { session } = await createUserWithSession(
+			const { session } = await persistence.createUserWithSession(
 				{
 					id: userId,
 					username: values.username,
@@ -88,7 +89,12 @@ export const actions = {
 			setSessionCookie(event.cookies, preparedSession.token, session.expiresAt);
 		} catch (error) {
 			try {
-				const conflicts = await findRegistrationConflicts(values.username, values.email);
+				const persistence = await getAuthPersistence();
+				const conflicts =
+					await persistence.users.findRegistrationConflicts(
+						values.username,
+						values.email
+					);
 				const errors: RegistrationErrors = {};
 
 				if (conflicts.usernameTaken) {
