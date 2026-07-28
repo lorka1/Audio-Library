@@ -108,6 +108,8 @@
 		position: sticky;
 		z-index: 20;
 		top: 0;
+		width: 100%;
+		isolation: isolate;
 		color: #f9fafb;
 		background: rgb(17 24 39 / 96%);
 		border-bottom: 1px solid rgb(255 255 255 / 10%);
@@ -184,6 +186,13 @@
 	.mobile-navigation a:hover {
 		color: white;
 		background: rgb(255 255 255 / 8%);
+	}
+
+	.nav-link:focus-visible,
+	.mobile-navigation a:focus-visible,
+	.brand:focus-visible,
+	.mobile-menu-trigger:focus-visible {
+		outline-color: #a59dff;
 	}
 
 	.mobile-actions,

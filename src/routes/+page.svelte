@@ -98,8 +98,8 @@
 	.hero {
 		display: grid;
 		align-items: center;
-		min-height: min(39rem, calc(100vh - 4.25rem));
-		padding-block: clamp(5rem, 11vw, 8.5rem);
+		min-height: clamp(31rem, 66vh, 36rem);
+		padding-block: clamp(4.5rem, 8vw, 7rem);
 		color: white;
 		background:
 			linear-gradient(120deg, rgb(17 24 39 / 98%), rgb(32 38 75 / 94%)),
@@ -107,7 +107,7 @@
 	}
 
 	.hero__inner {
-		max-width: 64rem;
+		max-width: calc(64rem + (2 * var(--page-gutter)));
 	}
 
 	.eyebrow {
@@ -130,7 +130,7 @@
 
 	.lead {
 		max-width: 42rem;
-		margin: 2rem 0;
+		margin: clamp(1.5rem, 3vw, 2rem) 0;
 		color: #cbd5e1;
 		font-size: clamp(1rem, 2vw, 1.25rem);
 		line-height: 1.75;
@@ -156,7 +156,7 @@
 	.hero__actions {
 		display: flex;
 		flex-wrap: wrap;
-		gap: 0.75rem;
+		gap: 0.75rem 0.85rem;
 	}
 
 	.hero__link--primary {
@@ -174,7 +174,7 @@
 	}
 
 	.features {
-		padding-block: clamp(4.5rem, 9vw, 7rem);
+		padding-block: clamp(4rem, 8vw, 6.5rem);
 		scroll-margin-top: 5rem;
 	}
 
@@ -274,6 +274,11 @@
 	}
 
 	@media (max-width: 48rem) {
+		.hero {
+			min-height: auto;
+			padding-block: clamp(4rem, 14vw, 5.5rem);
+		}
+
 		.card-grid {
 			grid-template-columns: 1fr;
 		}

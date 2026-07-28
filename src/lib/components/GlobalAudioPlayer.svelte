@@ -55,14 +55,6 @@
 		audio.volume = nextVolume;
 		player.setVolume(nextVolume);
 	}
-
-	function clearPlayer(): void {
-		audio.pause();
-		audio.removeAttribute('src');
-		audio.load();
-		player.clear();
-		handledRequestVersion = -1;
-	}
 </script>
 
 <audio
@@ -101,40 +93,47 @@
 				<p>{state.track.artist}</p>
 			</div>
 
-			<button
-				class="global-player__toggle"
-				type="button"
-				aria-label={toggleLabel}
-				onclick={() => player.toggleTrack(state.track!)}
-			>
-				{#if state.wantsToPlay}
-					<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-						<path d="M7 5h4v14H7zM13 5h4v14h-4z"></path>
-					</svg>
-				{:else}
-					<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-						<path d="m8 5 11 7-11 7z"></path>
-					</svg>
-				{/if}
-			</button>
+			<div class="global-player__playback">
+				<button
+					class="global-player__toggle"
+					type="button"
+					aria-label={toggleLabel}
+					onclick={() => player.toggleTrack(state.track!)}
+				>
+					{#if state.wantsToPlay}
+						<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+							<path d="M7 5h4v14H7zM13 5h4v14h-4z"></path>
+						</svg>
+					{:else}
+						<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+							<path d="m8 5 11 7-11 7z"></path>
+						</svg>
+					{/if}
+				</button>
 
-			<div class="global-player__timeline">
-				<span>{formatPlaybackTime(state.currentTime)}</span>
-				<input
-					type="range"
-					min="0"
-					max={state.duration || 0}
-					step="0.1"
-					value={Math.min(state.currentTime, state.duration || 0)}
-					disabled={state.duration === 0}
-					aria-label={`Seek ${state.track.title}`}
-					oninput={seek}
-				/>
-				<span>{formatPlaybackTime(state.duration)}</span>
+				<div class="global-player__timeline">
+					<span>{formatPlaybackTime(state.currentTime)}</span>
+					<input
+						type="range"
+						min="0"
+						max={state.duration || 0}
+						step="0.1"
+						value={Math.min(state.currentTime, state.duration || 0)}
+						disabled={state.duration === 0}
+						aria-label={`Seek ${state.track.title}`}
+						oninput={seek}
+					/>
+					<span>{formatPlaybackTime(state.duration)}</span>
+				</div>
 			</div>
 
 			<label class="global-player__volume">
-				<span>Volume</span>
+				<span class="global-player__volume-label">
+					<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+						<path d="M4 9v6h4l5 4V5L8 9zm11.5-.5v7a4 4 0 0 0 0-7z"></path>
+					</svg>
+					Volume
+				</span>
 				<input
 					type="range"
 					min="0"
@@ -145,17 +144,6 @@
 					oninput={changeVolume}
 				/>
 			</label>
-
-			<button
-				class="global-player__close"
-				type="button"
-				aria-label="Close audio player"
-				onclick={clearPlayer}
-			>
-				<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-					<path d="M6.4 5 5 6.4l5.6 5.6L5 17.6 6.4 19l5.6-5.6 5.6 5.6 1.4-1.4-5.6-5.6L19 6.4 17.6 5 12 10.6z"></path>
-				</svg>
-			</button>
 		</div>
 
 		{#if state.errorMessage}
@@ -179,21 +167,23 @@
 		right: 0;
 		bottom: 0;
 		left: 0;
-		padding: 0.75rem max(1rem, env(safe-area-inset-right))
-			calc(0.75rem + env(safe-area-inset-bottom))
-			max(1rem, env(safe-area-inset-left));
+		width: 100%;
+		min-height: var(--player-height);
+		padding: 0.7rem max(var(--page-gutter), env(safe-area-inset-right))
+			calc(0.7rem + env(safe-area-inset-bottom))
+			max(var(--page-gutter), env(safe-area-inset-left));
 		color: #f9fafb;
 		border-top: 1px solid rgb(255 255 255 / 12%);
-		background: rgb(17 24 39 / 97%);
+		background: rgb(17 24 39 / 98%);
 		box-shadow: 0 -0.75rem 2.5rem rgb(17 24 39 / 20%);
 		backdrop-filter: blur(0.8rem);
 	}
 
 	.global-player__inner {
 		display: grid;
-		grid-template-columns: minmax(10rem, 1.2fr) auto minmax(14rem, 2fr) minmax(7rem, 0.8fr) auto;
+		grid-template-columns: minmax(11.25rem, 1fr) minmax(22.5rem, 2fr) minmax(9.375rem, 0.7fr);
 		align-items: center;
-		gap: 0.75rem 1rem;
+		gap: 1rem 1.5rem;
 		width: min(100%, var(--content-width));
 		margin-inline: auto;
 	}
@@ -237,11 +227,19 @@
 		text-transform: uppercase;
 	}
 
+	.global-player__playback {
+		display: grid;
+		grid-template-columns: auto minmax(0, 1fr);
+		align-items: center;
+		gap: 0.9rem;
+		min-width: 0;
+	}
+
 	button {
 		display: inline-grid;
 		place-items: center;
-		width: 2.75rem;
-		height: 2.75rem;
+		width: 2.625rem;
+		height: 2.625rem;
 		padding: 0;
 		color: white;
 		border: 1px solid rgb(255 255 255 / 16%);
@@ -271,7 +269,7 @@
 
 	.global-player__timeline {
 		display: grid;
-		grid-template-columns: 2.8rem minmax(5rem, 1fr) 2.8rem;
+		grid-template-columns: 2.65rem minmax(5rem, 1fr) 2.65rem;
 		align-items: center;
 		gap: 0.5rem;
 		color: #cbd5e1;
@@ -285,6 +283,7 @@
 
 	input[type='range'] {
 		width: 100%;
+		height: 1.25rem;
 		min-width: 0;
 		accent-color: #8f86ff;
 		cursor: pointer;
@@ -297,10 +296,23 @@
 
 	.global-player__volume {
 		display: grid;
-		gap: 0.2rem;
+		gap: 0.35rem;
+		min-width: 0;
 		color: #cbd5e1;
 		font-size: 0.65rem;
 		font-weight: 700;
+	}
+
+	.global-player__volume-label {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.3rem;
+	}
+
+	.global-player__volume-label svg {
+		width: 0.9rem;
+		height: 0.9rem;
+		fill: currentColor;
 	}
 
 	.global-player__message {
@@ -313,28 +325,41 @@
 
 	@media (max-width: 48rem) {
 		.global-player__inner {
-			grid-template-columns: minmax(0, 1fr) auto auto;
+			grid-template-columns: minmax(10rem, 0.8fr) minmax(20rem, 2fr);
+		}
+
+		.global-player__volume {
+			display: none;
+		}
+	}
+
+	@media (max-width: 43.75rem) {
+		.global-player {
+			min-height: calc(var(--player-height) + 2.75rem);
+			padding-block: 0.65rem calc(0.65rem + env(safe-area-inset-bottom));
+		}
+
+		.global-player__inner {
+			grid-template-columns: minmax(0, 1fr) auto;
+			gap: 0.55rem 0.75rem;
 		}
 
 		.global-player__identity {
 			grid-column: 1;
 		}
 
-		.global-player__toggle {
-			grid-column: 2;
+		.global-player__playback {
+			display: contents;
 		}
 
-		.global-player__close {
-			grid-column: 3;
+		.global-player__toggle {
+			grid-column: 2;
+			grid-row: 1;
 		}
 
 		.global-player__timeline {
 			grid-column: 1 / -1;
 			grid-row: 2;
-		}
-
-		.global-player__volume {
-			display: none;
 		}
 	}
 </style>

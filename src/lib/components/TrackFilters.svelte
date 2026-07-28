@@ -32,7 +32,6 @@
 			<p class="auth-eyebrow">Refine the library</p>
 			<h2 id="track-filters-title">Search and filters</h2>
 		</div>
-		<a class="track-filters__reset" href="/tracks">Reset filters</a>
 	</div>
 
 	{#if errorMessages.length > 0}
@@ -67,61 +66,63 @@
 			{/if}
 		</div>
 
-		<div class="form-field">
-			<label for="track-bpm-min">Minimum BPM</label>
-			<input
-				id="track-bpm-min"
-				name="bpmMin"
-				type="number"
-				inputmode="numeric"
-				min="20"
-				max="300"
-				step="1"
-				value={values.bpmMin}
-				aria-invalid={errors.bpmMin || errors.bpmRange ? 'true' : undefined}
-				aria-describedby={errors.bpmMin
-					? 'track-bpm-help track-bpm-min-error'
-					: errors.bpmRange
-						? 'track-bpm-help track-bpm-range-error'
-						: 'track-bpm-help'}
-			/>
-			{#if errors.bpmMin}
-				<p class="field-error" id="track-bpm-min-error">{errors.bpmMin}</p>
-			{/if}
-		</div>
+		<div class="track-filters__bpm-group">
+			<div class="form-field">
+				<label for="track-bpm-min">Minimum BPM</label>
+				<input
+					id="track-bpm-min"
+					name="bpmMin"
+					type="number"
+					inputmode="numeric"
+					min="20"
+					max="300"
+					step="1"
+					value={values.bpmMin}
+					aria-invalid={errors.bpmMin || errors.bpmRange ? 'true' : undefined}
+					aria-describedby={errors.bpmMin
+						? 'track-bpm-help track-bpm-min-error'
+						: errors.bpmRange
+							? 'track-bpm-help track-bpm-range-error'
+							: 'track-bpm-help'}
+				/>
+				{#if errors.bpmMin}
+					<p class="field-error" id="track-bpm-min-error">{errors.bpmMin}</p>
+				{/if}
+			</div>
 
-		<div class="form-field">
-			<label for="track-bpm-max">Maximum BPM</label>
-			<input
-				id="track-bpm-max"
-				name="bpmMax"
-				type="number"
-				inputmode="numeric"
-				min="20"
-				max="300"
-				step="1"
-				value={values.bpmMax}
-				aria-invalid={errors.bpmMax || errors.bpmRange ? 'true' : undefined}
-				aria-describedby={errors.bpmMax
-					? 'track-bpm-help track-bpm-max-error'
-					: errors.bpmRange
-						? 'track-bpm-help track-bpm-range-error'
-						: 'track-bpm-help'}
-			/>
-			{#if errors.bpmMax}
-				<p class="field-error" id="track-bpm-max-error">{errors.bpmMax}</p>
-			{/if}
-		</div>
+			<div class="form-field">
+				<label for="track-bpm-max">Maximum BPM</label>
+				<input
+					id="track-bpm-max"
+					name="bpmMax"
+					type="number"
+					inputmode="numeric"
+					min="20"
+					max="300"
+					step="1"
+					value={values.bpmMax}
+					aria-invalid={errors.bpmMax || errors.bpmRange ? 'true' : undefined}
+					aria-describedby={errors.bpmMax
+						? 'track-bpm-help track-bpm-max-error'
+						: errors.bpmRange
+							? 'track-bpm-help track-bpm-range-error'
+							: 'track-bpm-help'}
+				/>
+				{#if errors.bpmMax}
+					<p class="field-error" id="track-bpm-max-error">{errors.bpmMax}</p>
+				{/if}
+			</div>
 
-		<p class="track-filters__bpm-help field-help" id="track-bpm-help">
-			Optional whole numbers from 20 through 300.
-		</p>
-
-		{#if errors.bpmRange}
-			<p class="track-filters__range-error field-error" id="track-bpm-range-error">
-				{errors.bpmRange}
+			<p class="track-filters__bpm-help field-help" id="track-bpm-help">
+				Optional whole numbers from 20 through 300.
 			</p>
-		{/if}
+
+			{#if errors.bpmRange}
+				<p class="track-filters__range-error field-error" id="track-bpm-range-error">
+					{errors.bpmRange}
+				</p>
+			{/if}
+		</div>
 
 		<div class="form-field">
 			<label for="track-musical-key">Musical key</label>
@@ -213,7 +214,6 @@
 		letter-spacing: -0.035em;
 	}
 
-	.track-filters__reset,
 	.track-filters__actions a {
 		color: var(--accent-strong);
 		font-size: 0.88rem;
@@ -244,73 +244,78 @@
 
 	.track-filters__form {
 		display: grid;
-		grid-template-columns: repeat(6, minmax(0, 1fr));
-		gap: 1rem;
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+		gap: 1.25rem 1rem;
 		align-items: start;
 	}
 
 	.track-filters__search {
-		grid-column: span 3;
+		grid-column: span 2;
 	}
 
-	.track-filters__form > .form-field:not(.track-filters__search) {
-		grid-column: span 1;
+	.track-filters__bpm-group {
+		display: grid;
+		grid-column: span 2;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 0.45rem 1rem;
+		min-width: 0;
 	}
 
 	.track-filters__bpm-help,
 	.track-filters__range-error {
-		grid-column: 4 / span 2;
-		margin-top: -0.6rem;
-	}
-
-	.track-filters__range-error {
-		margin-top: -0.35rem;
+		grid-column: 1 / -1;
+		margin: 0;
 	}
 
 	.track-filters__actions {
 		display: flex;
-		grid-column: 1 / -1;
 		align-items: center;
-		gap: 1rem;
-		padding-top: 0.25rem;
+		align-self: start;
+		justify-content: flex-end;
+		gap: 0.85rem;
+		min-width: 0;
+		padding-top: 1.62rem;
 	}
 
 	.track-filters__actions .primary-button {
-		min-width: 9rem;
+		min-width: 8.5rem;
 	}
 
-	@media (max-width: 58rem) {
+	@media (max-width: 68.75rem) {
 		.track-filters__form {
 			grid-template-columns: repeat(2, minmax(0, 1fr));
 		}
 
 		.track-filters__search,
-		.track-filters__form > .form-field:not(.track-filters__search) {
-			grid-column: span 1;
-		}
-
-		.track-filters__search {
+		.track-filters__bpm-group {
 			grid-column: 1 / -1;
 		}
 
-		.track-filters__bpm-help,
-		.track-filters__range-error {
+		.track-filters__actions {
 			grid-column: 1 / -1;
+			justify-content: flex-start;
+			padding-top: 0;
 		}
 	}
 
-	@media (max-width: 36rem) {
-		.track-filters__heading {
-			align-items: flex-start;
-			flex-direction: column;
-		}
-
+	@media (max-width: 43.75rem) {
 		.track-filters__form {
 			grid-template-columns: 1fr;
 		}
 
 		.track-filters__search,
-		.track-filters__form > .form-field:not(.track-filters__search) {
+		.track-filters__bpm-group,
+		.track-filters__form > .form-field,
+		.track-filters__actions {
+			grid-column: 1;
+		}
+
+		.track-filters__bpm-group {
+			grid-template-columns: 1fr;
+		}
+
+		.track-filters__bpm-help,
+		.track-filters__range-error {
 			grid-column: 1;
 		}
 

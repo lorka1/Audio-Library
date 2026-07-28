@@ -6,6 +6,7 @@ import type { PublicTrack } from '$lib/types';
 import GlobalAudioPlayer from './GlobalAudioPlayer.svelte';
 import SiteHeader from './SiteHeader.svelte';
 import TrackCard from './TrackCard.svelte';
+import TrackFilters from './TrackFilters.svelte';
 import TrackPlayButton from './TrackPlayButton.svelte';
 
 const playerTrack: PublicPlayerTrack = {
@@ -41,7 +42,8 @@ describe('global playback components', () => {
 		expect(body).toContain('Fixture Artist');
 		expect(body).toContain('href="/tracks/21"');
 		expect(body).toContain('aria-label="Seek Release Fixture Track"');
-		expect(body).toContain('aria-label="Close audio player"');
+		expect(body).toContain('aria-label="Volume"');
+		expect(body).not.toContain('aria-label="Close audio player"');
 	});
 
 	it('renders a Browse Tracks play button without replacing the details link', () => {
@@ -109,5 +111,31 @@ describe('SiteHeader navigation', () => {
 		expect(registerClass).toBe(loginClass);
 		expect(body).not.toContain('register-link');
 		expect(body).not.toContain('Open profile menu');
+	});
+});
+
+describe('Browse track filters', () => {
+	it('keeps one reset action and the existing GET query parameter names', () => {
+		const { body } = render(TrackFilters, {
+			props: {
+				values: {
+					q: '',
+					bpmMin: '',
+					bpmMax: '',
+					musicalKey: '',
+					genre: '',
+					sort: 'newest'
+				},
+				errors: {}
+			}
+		});
+
+		expect(body).toContain('method="GET"');
+		expect(body).toContain('action="/tracks"');
+		for (const name of ['q', 'bpmMin', 'bpmMax', 'musicalKey', 'genre', 'sort']) {
+			expect(body).toContain(`name="${name}"`);
+		}
+		expect(body.match(/Reset filters/g)).toHaveLength(1);
+		expect(body).toContain('%, _, and \\ are treated literally.');
 	});
 });

@@ -69,7 +69,7 @@
 		align-items: flex-start;
 		justify-content: space-between;
 		gap: 1rem 2rem;
-		margin-bottom: 1rem;
+		margin: 0.25rem 0 1.25rem;
 	}
 
 	.track-results__count {
