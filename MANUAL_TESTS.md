@@ -619,4 +619,4 @@ used for any real service.
 - [ ] Confirm `/my-tracks` includes only the authenticated owner's public and private tracks.
 - [ ] Confirm owner-only metadata editing preserves ownership, visibility, IDs, filenames, and audio bytes.
 - [ ] Confirm deletion requires confirmation and POST, removes only the owned row and correct file, and uses Post/Redirect/Get.
-- [ ] Confirm the remaining future features are absent: audio-file replacement, visibility controls, pagination, automatic analysis, transcoding, waveform generation, comments, ratings, playlists, recommendations, and administrator functionality.
+- [ ] Confirm private user-owned playlists remain available, and that the remaining future features are absent: audio-file replacement, visibility controls, pagination, automatic analysis, transcoding, waveform generation, comments, ratings, recommendations, and administrator functionality.

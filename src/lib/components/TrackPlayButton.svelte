@@ -10,7 +10,7 @@
 	}: {
 		track: PublicPlayerTrack;
 		player?: AudioPlayerController;
-		variant?: 'compact' | 'detail';
+		variant?: 'compact' | 'detail' | 'icon';
 	} = $props();
 
 	let state = $derived($player);
@@ -42,7 +42,10 @@
 
 <button
 	type="button"
-	class:detail={variant === 'detail'}
+	class="track-play-button"
+	class:track-play-button--compact={variant === 'compact'}
+	class:track-play-button--detail={variant === 'detail'}
+	class:track-play-button--icon={variant === 'icon'}
 	class:selected={isSelected}
 	class:playing={isPlaying}
 	class:loading={isLoading}
@@ -68,7 +71,7 @@
 			</svg>
 		{/if}
 	</span>
-	<span>{visibleStatus}</span>
+	<span class:visually-hidden={variant === 'icon'}>{visibleStatus}</span>
 </button>
 
 <style>
@@ -115,10 +118,30 @@
 		background: #fff1f3;
 	}
 
-	button.detail {
+	button.track-play-button--detail {
 		min-height: 3rem;
 		padding-inline: 1rem;
 		font-size: 0.9rem;
+	}
+
+	button.track-play-button--icon {
+		width: 2.75rem;
+		height: 2.75rem;
+		min-height: 2.75rem;
+		padding: 0;
+		border-radius: 999px;
+	}
+
+	.visually-hidden {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+		border: 0;
 	}
 
 	.track-play-button__icon {
