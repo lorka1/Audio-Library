@@ -72,6 +72,7 @@ describe('backup destination safety', () => {
 			await readFile(resolve(destination, 'manifest.json'), 'utf8')
 		);
 		expect(Object.keys(manifest).sort()).toEqual([
+			'collections',
 			'databaseIdentifierHash',
 			'format',
 			'status',

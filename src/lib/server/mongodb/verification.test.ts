@@ -4,6 +4,7 @@ import { MONGODB_INDEX_DEFINITIONS } from './indexes';
 import {
 	isRequiredMongoIndexCompatible,
 	isMongoCounterCompatible,
+	verifyMongoIndexes,
 	verifyMongoOperationalState
 } from './verification';
 
@@ -90,5 +91,22 @@ describe('MongoDB topology failure paths', () => {
 			clientForHello({ isWritablePrimary: true }),
 			{} as Db
 		)).rejects.toThrow('transaction support');
+	});
+});
+
+describe('playlist index verification', () => {
+	it('detects a missing required playlist-item index', async () => {
+		const collection = vi.fn((name: string) => ({
+			indexes: vi.fn().mockImplementation(() => Promise.resolve(
+				(name in MONGODB_INDEX_DEFINITIONS
+					? MONGODB_INDEX_DEFINITIONS[name as keyof typeof MONGODB_INDEX_DEFINITIONS]
+					: [])
+					.filter(({ name: indexName }) => indexName !== 'playlist_items_track_id_idx')
+					.map((index) => ({ v: 2, ...index }))
+			))
+		}));
+		await expect(verifyMongoIndexes({ collection } as unknown as Db)).rejects.toThrow(
+			'playlist_items_track_id_idx'
+		);
 	});
 });

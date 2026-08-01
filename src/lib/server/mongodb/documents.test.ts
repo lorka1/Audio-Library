@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
 	TRACK_PUBLIC_ID_COUNTER,
 	type CounterDocument,
+	type PlaylistDocument,
+	type PlaylistItemDocument,
 	type SessionDocument,
 	type TrackDocument,
 	type UserDocument
@@ -71,5 +73,28 @@ describe('MongoDB document models', () => {
 		} satisfies CounterDocument;
 
 		expect(counter).toEqual({ _id: 'tracks.publicId', value: 42 });
+	});
+
+	it('keeps playlist identities and membership references server-only and normalized', () => {
+		const now = new Date('2026-07-30T12:00:00.000Z');
+		const playlist = {
+			_id: '66666666-6666-4666-8666-666666666666',
+			publicId: 'fixturePlaylistPublicId01',
+			ownerId: '11111111-1111-4111-8111-111111111111',
+			name: 'Synthetic playlist',
+			description: null,
+			createdAt: now,
+			updatedAt: now
+		} satisfies PlaylistDocument;
+		const item = {
+			_id: '77777777-7777-4777-8777-777777777777',
+			playlistId: playlist._id,
+			trackId: '33333333-3333-4333-8333-333333333333',
+			addedAt: now
+		} satisfies PlaylistItemDocument;
+
+		expect(playlist).not.toHaveProperty('tracks');
+		expect(item).not.toHaveProperty('title');
+		expect(item).not.toHaveProperty('storageKey');
 	});
 });

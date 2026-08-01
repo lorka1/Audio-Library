@@ -25,11 +25,15 @@ export async function getApplicationTrackRepository(): Promise<TrackRepository> 
 }
 
 export async function getFocusedMongoTrackRepository(): Promise<TrackRepository> {
-	const { database } = await connectMongoDevelopment();
+	const { client, database } = await connectMongoDevelopment();
 	const collections = getMongoCollections(database);
 	return createMongoTrackRepository(
 		collections.tracks,
 		collections.counters,
-		collections.users
+		collections.users,
+		{
+			client,
+			playlistItems: collections.playlistItems
+		}
 	);
 }

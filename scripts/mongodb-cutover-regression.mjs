@@ -20,6 +20,7 @@ const suites = [
 	['MongoDB auth and failure paths', ['--experimental-strip-types', 'scripts/mongodb-auth-integration.mjs']],
 	['MongoDB tracks and storage failures', ['--experimental-strip-types', 'scripts/mongodb-tracks-integration.mjs']],
 	['MongoDB query behavior', ['--experimental-strip-types', 'scripts/mongodb-queries-integration.mjs']],
+	['MongoDB private playlists', ['--experimental-strip-types', 'scripts/mongodb-playlists-integration.mjs']],
 	['full application cutover', ['--experimental-strip-types', 'scripts/mongodb-cutover-integration.mjs']],
 	[
 		'privacy, configuration, filesystem and quarantine failures',
@@ -44,7 +45,14 @@ const suites = [
 			'src/lib/server/tracks/management.test.ts',
 			'src/lib/server/tracks/files.test.ts',
 			'src/lib/server/tracks/public-model.test.ts',
-			'src/lib/server/tracks/owner-model.test.ts'
+			'src/lib/server/tracks/owner-model.test.ts',
+			'src/lib/server/tracks/mongodb-repository-delete.test.ts',
+			'src/lib/server/playlists/validation.test.ts',
+			'src/lib/server/playlists/picker.test.ts',
+			'src/lib/server/playlists/mongodb-repository.test.ts',
+			'src/lib/server/playlists/actions.test.ts',
+			'src/routes/playlists/server.test.ts',
+			'src/routes/playlists/[publicId]/server.test.ts'
 		]
 	]
 ];

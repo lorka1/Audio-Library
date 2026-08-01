@@ -28,9 +28,10 @@ describe('MongoDB track persistence', () => {
 
 	it('constructs the application repository from centralized MongoDB collections', async () => {
 		const database = {};
-		const collections = { tracks: {}, counters: {}, users: {} };
+		const client = {};
+		const collections = { tracks: {}, counters: {}, users: {}, playlistItems: {} };
 		const repository = {};
-		mocks.connectMongoDevelopment.mockResolvedValue({ client: {}, database });
+		mocks.connectMongoDevelopment.mockResolvedValue({ client, database });
 		mocks.getMongoCollections.mockReturnValue(collections);
 		mocks.createMongoTrackRepository.mockReturnValue(repository);
 
@@ -39,12 +40,13 @@ describe('MongoDB track persistence', () => {
 		expect(mocks.createMongoTrackRepository).toHaveBeenCalledWith(
 			collections.tracks,
 			collections.counters,
-			collections.users
+			collections.users,
+			{ client, playlistItems: collections.playlistItems }
 		);
 	});
 
 	it('uses the same MongoDB construction for focused verification', async () => {
-		const collections = { tracks: {}, counters: {}, users: {} };
+		const collections = { tracks: {}, counters: {}, users: {}, playlistItems: {} };
 		const repository = {};
 		mocks.connectMongoDevelopment.mockResolvedValue({
 			client: {},

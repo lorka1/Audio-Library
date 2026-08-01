@@ -1,10 +1,12 @@
 # Audio Library
 
 Audio Library is a SvelteKit application for uploading, browsing, searching,
-streaming, downloading, and managing privately stored audio. MongoDB is the
+streaming, downloading, managing privately stored audio, and organizing tracks
+in private user-owned playlists. MongoDB is the
 only persistence backend. Audio bytes remain in a private filesystem directory;
 MongoDB stores users, hashed sessions, track metadata, ownership, public route
-IDs, and private storage references.
+IDs, and private storage references. Playlist membership stores only internal
+track references; audio and track metadata are never duplicated into a playlist.
 
 ## Requirements
 
@@ -80,7 +82,10 @@ Index initialization is separate from read-only startup/readiness verification:
 - unique usernames and emails;
 - unique session token hashes, session ownership, and expiration;
 - unique track public IDs and storage keys;
-- owner/public query paths, BPM, musical key, and genre.
+- owner/public query paths, BPM, musical key, and genre;
+- unique opaque playlist public IDs plus owner/update and owner/public-ID lookups;
+- unique playlist/track membership, deterministic insertion order, and
+  track-deletion cleanup lookup.
 
 Check connectivity, database selection, and indexes without modifying
 application documents:
@@ -107,7 +112,18 @@ npm run db:mongodb:audit
 - full streaming, byte Range seeking, invalid Range handling, and downloads;
 - private owner dashboard, metadata editing, and deletion;
 - quarantine-based filesystem deletion with database-failure restoration;
+- private playlists with create, rename, description edit, delete, detail,
+  add-track, and remove-track behavior;
+- accessible-track enforcement: public tracks and the current owner's private
+  tracks may be added, while duplicate membership is idempotently prevented;
+- Add to playlist controls on Browse, public track detail, and My Tracks;
 - safe public, owner, account, navigation, and server-only projections.
+
+Removing a track from a playlist does not delete the track. Deleting a track
+removes every membership referencing it in the same MongoDB transaction as the
+track metadata deletion. Playlist Phase P1 is private and owner-only: public
+playlists, sharing, collaboration, reordering, recommendations, and playlist
+playback queues are intentionally not implemented.
 
 Route modules do not select or construct persistence implementations. Central
 server-only persistence modules provide the MongoDB repositories.
@@ -133,6 +149,8 @@ server-only persistence modules provide the MongoDB repositories.
 | `npm run test:mongodb:auth` | Verify transactions, duplicate conflicts, sessions, expiration, logout, and cleanup. |
 | `npm run test:mongodb:tracks` | Verify public IDs, projections, owner CRUD, filesystem consistency, failure recovery, and cleanup. |
 | `npm run test:mongodb:queries` | Verify search, filters, all six sorts, literal regex handling, projections, and cleanup. |
+| `npm run test:mongodb:playlists` | Verify private playlist ownership, projections, add/remove rules, transactions, track cleanup, and exact isolated-database cleanup. |
+| `npm run test:playlists:viewports` | Use local headless Chrome/Edge plus an isolated database to check playlist pages and dialogs at five target viewport sizes. |
 | `npm run test:mongodb:cutover` | Run the isolated full-application registration, upload, media, owner-management, and cleanup flow. |
 | `npm run test:mongodb:regression` | Run the aggregate MongoDB contract, failure-path, privacy, query, and full-application regression. |
 | `npm run verify:mongodb:clean-clone` | Install and verify an isolated release-candidate copy with an owned test database and production probe. |
@@ -171,7 +189,7 @@ The final operator commissioning checklist is in
 ## Privacy and storage
 
 Browser payloads never receive password hashes, raw or hashed session tokens,
-internal user/track identifiers, owner IDs, storage keys, absolute paths,
+internal user/track/playlist/playlist-item identifiers, owner IDs, storage keys, absolute paths,
 database names, connection strings, or private audit information.
 
 Operational logs are structured and limited to safe categories, codes,

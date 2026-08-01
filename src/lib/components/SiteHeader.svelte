@@ -54,6 +54,7 @@
 			<a class="nav-link" href="/tracks">Browse</a>
 			{#if user}
 				<a class="nav-link" href="/upload">Upload</a>
+				<a class="nav-link" href="/playlists">Playlists</a>
 				<ProfileMenu {user} menuId="desktop-profile-menu" />
 			{:else}
 				<a class="nav-link" href="/login">Login</a>
@@ -95,6 +96,7 @@
 			<a href="/tracks" onclick={() => closeMobileMenu()}>Browse</a>
 			{#if user}
 				<a href="/upload" onclick={() => closeMobileMenu()}>Upload</a>
+				<a href="/playlists" onclick={() => closeMobileMenu()}>Playlists</a>
 			{:else}
 				<a href="/login" onclick={() => closeMobileMenu()}>Login</a>
 				<a href="/register" onclick={() => closeMobileMenu()}>Register</a>

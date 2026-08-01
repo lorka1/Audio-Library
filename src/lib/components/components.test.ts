@@ -4,6 +4,7 @@ import { createAudioPlayerController } from '$lib/player/controller';
 import type { PublicPlayerTrack } from '$lib/player/model';
 import type { PublicTrack } from '$lib/types';
 import GlobalAudioPlayer from './GlobalAudioPlayer.svelte';
+import AddToPlaylist from './AddToPlaylist.svelte';
 import SiteHeader from './SiteHeader.svelte';
 import TrackCard from './TrackCard.svelte';
 import TrackFilters from './TrackFilters.svelte';
@@ -86,6 +87,7 @@ describe('SiteHeader navigation', () => {
 
 		expect(body).toContain('href="/tracks">Browse');
 		expect(body).toContain('href="/upload">Upload');
+		expect(body).toContain('href="/playlists">Playlists');
 		expect(body).toContain('aria-label="Open profile menu"');
 		expect(body).toContain('aria-controls="desktop-profile-menu"');
 		expect(body).toContain('aria-controls="mobile-profile-menu"');
@@ -111,6 +113,50 @@ describe('SiteHeader navigation', () => {
 		expect(registerClass).toBe(loginClass);
 		expect(body).not.toContain('register-link');
 		expect(body).not.toContain('Open profile menu');
+		expect(body).not.toContain('href="/playlists"');
+	});
+});
+
+describe('add-to-playlist controls', () => {
+	it('renders owned playlist membership without internal identity data', () => {
+		const { body } = render(AddToPlaylist, {
+			props: {
+				trackId: 21,
+				trackTitle: 'Release Fixture Track',
+				choices: [
+					{
+						publicId: 'abcdefghijklmnopqrstuvwx',
+						name: 'Synthetic fixture playlist',
+						containsTrack: true
+					}
+				],
+				loginHref: '/login?redirectTo=%2Ftracks%2F21'
+			}
+		});
+
+		expect(body).toContain('aria-haspopup="dialog"');
+		expect(body).toContain('aria-labelledby="playlist-dialog-title-21"');
+		expect(body).toContain('name="trackPublicId" value="21"');
+		expect(body).toContain('name="playlistPublicId" value="abcdefghijklmnopqrstuvwx"');
+		expect(body).toContain('?/removeFromPlaylist');
+		expect(body).toContain('Create or manage playlists');
+		expect(body).not.toContain('ownerId');
+		expect(body).not.toContain('storageKey');
+	});
+
+	it('uses the login flow without loading fake playlist choices for guests', () => {
+		const { body } = render(AddToPlaylist, {
+			props: {
+				trackId: 21,
+				trackTitle: 'Release Fixture Track',
+				choices: null,
+				loginHref: '/login?redirectTo=%2Ftracks%2F21'
+			}
+		});
+
+		expect(body).toContain('href="/login?redirectTo=%2Ftracks%2F21"');
+		expect(body).toContain('Log in to add to a playlist');
+		expect(body).not.toContain('<dialog');
 	});
 });
 

@@ -4,7 +4,15 @@ const OPERATION_TIMEOUT_MS = 5_000;
 
 export async function safeMongoAggregateFingerprint(collections) {
 	const summaries = [];
-	for (const name of ['users', 'sessions', 'tracks', 'counters', 'migrations']) {
+	for (const name of [
+		'users',
+		'sessions',
+		'tracks',
+		'playlists',
+		'playlistItems',
+		'counters',
+		'migrations'
+	]) {
 		const [summary] = await collections[name]
 			.aggregate(
 				[

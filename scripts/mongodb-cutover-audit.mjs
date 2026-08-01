@@ -83,11 +83,13 @@ try {
 	const hello = await client
 		.db('admin')
 		.command({ hello: 1 }, { timeoutMS: 5_000 });
-	const [userCount, sessionCount, trackCount, maximum, counter, marker, tracks] =
+	const [userCount, sessionCount, trackCount, playlistCount, playlistItemCount, maximum, counter, marker, tracks] =
 		await Promise.all([
 			collections.users.countDocuments({}, { timeoutMS: 5_000 }),
 			collections.sessions.countDocuments({}, { timeoutMS: 5_000 }),
 			collections.tracks.countDocuments({}, { timeoutMS: 5_000 }),
+			collections.playlists.countDocuments({}, { timeoutMS: 5_000 }),
+			collections.playlistItems.countDocuments({}, { timeoutMS: 5_000 }),
 			collections.tracks
 				.find({}, { projection: { _id: 0, publicId: 1 }, timeoutMS: 5_000 })
 				.sort({ publicId: -1 })
@@ -119,12 +121,16 @@ try {
 	const expectedIndexes = {
 		users: MONGODB_INDEX_DEFINITIONS.users.map(({ name }) => name),
 		sessions: MONGODB_INDEX_DEFINITIONS.sessions.map(({ name }) => name),
-		tracks: MONGODB_INDEX_DEFINITIONS.tracks.map(({ name }) => name)
+		tracks: MONGODB_INDEX_DEFINITIONS.tracks.map(({ name }) => name),
+		playlists: MONGODB_INDEX_DEFINITIONS.playlists.map(({ name }) => name),
+		playlistItems: MONGODB_INDEX_DEFINITIONS.playlistItems.map(({ name }) => name)
 	};
 	const actualIndexes = {
 		users: (await collections.users.indexes()).map(({ name }) => name),
 		sessions: (await collections.sessions.indexes()).map(({ name }) => name),
-		tracks: (await collections.tracks.indexes()).map(({ name }) => name)
+		tracks: (await collections.tracks.indexes()).map(({ name }) => name),
+		playlists: (await collections.playlists.indexes()).map(({ name }) => name),
+		playlistItems: (await collections.playlistItems.indexes()).map(({ name }) => name)
 	};
 	const indexesVerified = Object.entries(expectedIndexes).every(
 		([collection, names]) =>
@@ -160,6 +166,8 @@ try {
 					userCount,
 					sessionCount,
 					trackCount,
+					playlistCount,
+					playlistItemCount,
 					maxPublicId: maximum?.publicId ?? 0,
 					counterCompatible:
 						(counter?.value ?? -1) >= (maximum?.publicId ?? 0),

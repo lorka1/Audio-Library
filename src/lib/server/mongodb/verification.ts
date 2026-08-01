@@ -46,7 +46,7 @@ export function isRequiredMongoIndexCompatible(
 			JSON.stringify(expected.partialFilterExpression ?? null);
 }
 
-async function verifyIndexes(database: Db): Promise<void> {
+export async function verifyMongoIndexes(database: Db): Promise<void> {
 	const collections = getMongoCollections(database);
 	for (const [name, definitions] of Object.entries(MONGODB_INDEX_DEFINITIONS)) {
 		const actual = await collections[name as keyof typeof MONGODB_INDEX_DEFINITIONS].indexes({
@@ -90,11 +90,13 @@ export async function verifyMongoOperationalState(
 		MONGODB_COLLECTION_NAMES.users,
 		MONGODB_COLLECTION_NAMES.sessions,
 		MONGODB_COLLECTION_NAMES.tracks,
+		MONGODB_COLLECTION_NAMES.playlists,
+		MONGODB_COLLECTION_NAMES.playlistItems,
 		MONGODB_COLLECTION_NAMES.counters
 	]) {
 		if (!existing.has(name)) throw new Error('Required MongoDB collections are incomplete.');
 	}
-	await verifyIndexes(database);
+	await verifyMongoIndexes(database);
 
 	const collections = getMongoCollections(database);
 	const [counter, maximumTrack] = await Promise.all([

@@ -38,6 +38,16 @@
 				Track deleted successfully.
 			</div>
 		{/if}
+		{#if data.playlistNotice}
+			<div
+				class="form-message"
+				class:form-message--success={data.playlistNotice.kind === 'success'}
+				class:form-message--error={data.playlistNotice.kind === 'error'}
+				role="status"
+			>
+				{data.playlistNotice.message}
+			</div>
+		{/if}
 
 		<p class="management-count">
 			{data.tracks.length} {data.tracks.length === 1 ? 'owned track' : 'owned tracks'}
@@ -46,7 +56,10 @@
 		{#if data.tracks.length > 0}
 			<div class="owner-track-grid">
 				{#each data.tracks as track (track.publicId)}
-					<OwnerTrackCard {track} />
+					<OwnerTrackCard
+						{track}
+						playlistChoices={data.playlistChoices[String(track.publicId)] ?? []}
+					/>
 				{/each}
 			</div>
 		{:else}

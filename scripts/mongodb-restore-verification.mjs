@@ -12,7 +12,7 @@ import {
 	MONGODB_TEST_DATABASE_PREFIX,
 	readMongoConfig
 } from '../src/lib/server/mongodb/config.ts';
-import { getMongoCollections } from '../src/lib/server/mongodb/collections.ts';
+import { getMongoCollections, MONGODB_COLLECTION_NAMES } from '../src/lib/server/mongodb/collections.ts';
 import { verifyMongoOperationalState } from '../src/lib/server/mongodb/verification.ts';
 import { createMongoTrackRepository } from '../src/lib/server/tracks/mongodb-repository.ts';
 import { safeMongoAggregateFingerprint } from './lib/mongodb-fingerprint.mjs';
@@ -30,6 +30,11 @@ const audioBackup = requireSafeDestinationRoot(
 const databaseManifest = JSON.parse(await readFile(resolve(databaseBackup, 'manifest.json'), 'utf8'));
 const audioManifest = JSON.parse(await readFile(resolve(audioBackup, 'manifest.json'), 'utf8'));
 assert.equal(databaseManifest.status, 'complete', 'MongoDB backup is incomplete.');
+assert.deepEqual(
+	databaseManifest.collections,
+	Object.values(MONGODB_COLLECTION_NAMES),
+	'MongoDB backup manifest does not cover every application collection.'
+);
 assert.equal(audioManifest.status, 'complete', 'Audio backup is incomplete.');
 
 const suffix = `_restore_${randomBytes(6).toString('hex')}`;
@@ -109,10 +114,29 @@ try {
 	const restoredFileInfo = await lstat(restoredFile);
 	assert.ok(restoredFileInfo.isFile() && !restoredFileInfo.isSymbolicLink());
 	assert.equal(restoredFileInfo.size, stream.fileSizeBytes);
+	const playlistCount = await restoredCollections.playlists.countDocuments({});
+	const playlistItemCount = await restoredCollections.playlistItems.countDocuments({});
+	if (playlistCount > 0) {
+		assert.ok(
+			await restoredCollections.playlists.findOne({}, {
+				projection: { _id: 1, publicId: 1, ownerId: 1 },
+				maxTimeMS: 5_000
+			})
+		);
+	}
+	if (playlistItemCount > 0) {
+		assert.ok(
+			await restoredCollections.playlistItems.findOne({}, {
+				projection: { _id: 1, playlistId: 1, trackId: 1 },
+				maxTimeMS: 5_000
+			})
+		);
+	}
 	console.log(JSON.stringify({
 		status: 'verified',
 		databaseRestore: true,
 		audioRestore: true,
+		playlistRestore: true,
 		applicationReadOnlyProbe: true
 	}));
 } catch (error) {

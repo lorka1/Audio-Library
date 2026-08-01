@@ -47,6 +47,26 @@ export interface TrackDocument {
 	updatedAt: Date;
 }
 
+export interface PlaylistDocument {
+	/** Server-only playlist UUID. */
+	_id: string;
+	/** Opaque identifier used in owner-scoped playlist URLs. */
+	publicId: string;
+	ownerId: string;
+	name: string;
+	description: string | null;
+	createdAt: Date;
+	updatedAt: Date;
+}
+
+export interface PlaylistItemDocument {
+	/** Server-only playlist-item UUID. */
+	_id: string;
+	playlistId: string;
+	trackId: string;
+	addedAt: Date;
+}
+
 export const TRACK_PUBLIC_ID_COUNTER = 'tracks.publicId' as const;
 
 export interface CounterDocument {

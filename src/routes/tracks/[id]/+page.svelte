@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { TrackPlayButton } from '$lib';
+	import { AddToPlaylist, TrackPlayButton } from '$lib';
 	import { formatDate, formatFileSize } from '$lib/formatting';
 	import { toPublicPlayerTrack } from '$lib/player/model';
 	import type { PageProps } from './$types';
@@ -25,6 +25,16 @@
 				Audio track uploaded successfully.
 			</div>
 		{/if}
+		{#if data.playlistNotice}
+			<div
+				class="form-message"
+				class:form-message--success={data.playlistNotice.kind === 'success'}
+				class:form-message--error={data.playlistNotice.kind === 'error'}
+				role="status"
+			>
+				{data.playlistNotice.message}
+			</div>
+		{/if}
 
 		<article class="track-detail">
 			<header class="track-detail__header">
@@ -35,6 +45,12 @@
 
 			<div class="track-detail__actions">
 				<TrackPlayButton track={playerTrack} variant="detail" />
+				<AddToPlaylist
+					trackId={data.track.id}
+					trackTitle={data.track.title}
+					choices={data.playlistChoices}
+					loginHref={data.loginHref}
+				/>
 				<a class="primary-button" href={`/api/tracks/${data.track.id}/download`}>
 					Download audio
 				</a>

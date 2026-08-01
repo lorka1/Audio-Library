@@ -423,6 +423,43 @@ used for any real service.
 - [ ] In a disposable environment, create a private track whose title, artist, description, BPM, musical key, and genre match the active search and filters exactly.
 - [ ] Expected: The private track never appears in results, result counts, page data, or active-filter output, and the response reveals no internal UUID, stored filename, or physical path.
 
+## Private playlists (Phase P1)
+
+### PLY-001 — Owner-only create and list
+
+- [ ] Sign in with a disposable user, open `/playlists`, create a playlist with a trimmed name and optional description, then refresh.
+- [ ] Expected: The playlist remains visible only to that user, with its safe count and updated date; no internal UUID or owner ID appears in page data.
+
+### PLY-002 — Rename, description, and delete confirmation
+
+- [ ] Open a disposable playlist, rename it, add/change/remove its optional description, then attempt deletion without and with the confirmation checkbox.
+- [ ] Expected: Updates use Post/Redirect/Get; deletion is refused without confirmation and removes only the playlist plus its membership rows when confirmed.
+
+### PLY-003 — Accessible add and idempotency
+
+- [ ] From Browse, a public detail page, and My Tracks, open Add to playlist. Add a public track and the signed-in owner's private track; add the same track twice.
+- [ ] Expected: Only owned playlists appear, current membership is stated with Add/Remove text, the duplicate add is reported as already present, and no duplicate row is created.
+
+### PLY-004 — Private-track and ownership boundary
+
+- [ ] With two disposable users, try guessed playlist public IDs and try adding the second user's private track to the first user's playlist.
+- [ ] Expected: Non-owned and missing playlists use the same safe 404/error behavior; the other user's private track is never revealed or added.
+
+### PLY-005 — Detail visibility and track deletion cleanup
+
+- [ ] Make an added public track private under another owner, then revisit the playlist. Separately delete an owned track that belongs to multiple disposable playlists.
+- [ ] Expected: Newly inaccessible metadata is omitted with only a safe unavailable count; deleting a track removes only memberships for that track and keeps unrelated items.
+
+### PLY-006 — Dialog and keyboard accessibility
+
+- [ ] Use only the keyboard to open Add to playlist, add/remove a track, close with Escape, and return focus to the trigger. Trigger success and safe failure states.
+- [ ] Expected: The named native dialog fits the viewport, labels/actions are distinguishable without color, focus is restored, and status copy is announced.
+
+### PLY-007 — Responsive playlist layouts
+
+- [ ] Check `/playlists`, one long-name playlist detail, and Add to playlist at approximately 1920×1080, 1440×900, 1024×768, 768×1024, and 390×844.
+- [ ] Expected: Cards and rows do not overflow, names truncate/wrap safely, action controls remain usable, mobile navigation includes Playlists, and the global player hides no content.
+
 ## My Tracks
 
 ### MYT-001 — Protected route while signed out

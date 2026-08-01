@@ -71,11 +71,43 @@ export const MONGODB_INDEX_DEFINITIONS = {
 			name: 'tracks_public_genre_idx',
 			key: { visibility: 1, genre: 1, createdAt: -1, publicId: -1 }
 		}
+	],
+	playlists: [
+		{
+			name: 'playlists_public_id_unique',
+			key: { publicId: 1 },
+			unique: true
+		},
+		{
+			name: 'playlists_owner_updated_at_idx',
+			key: { ownerId: 1, updatedAt: -1, publicId: 1 }
+		},
+		{
+			name: 'playlists_owner_public_id_idx',
+			key: { ownerId: 1, publicId: 1 }
+		}
+	],
+	playlistItems: [
+		{
+			name: 'playlist_items_playlist_track_unique',
+			key: { playlistId: 1, trackId: 1 },
+			unique: true
+		},
+		{
+			name: 'playlist_items_playlist_added_at_idx',
+			key: { playlistId: 1, addedAt: 1, _id: 1 }
+		},
+		{
+			name: 'playlist_items_track_id_idx',
+			key: { trackId: 1 }
+		}
 	]
 } as const satisfies {
 	users: readonly PlannedMongoIndex[];
 	sessions: readonly PlannedMongoIndex[];
 	tracks: readonly PlannedMongoIndex[];
+	playlists: readonly PlannedMongoIndex[];
+	playlistItems: readonly PlannedMongoIndex[];
 };
 
 export interface EnsureMongoIndexesOptions {
@@ -86,6 +118,8 @@ export interface MongoIndexEnsureResult {
 	users: string[];
 	sessions: string[];
 	tracks: string[];
+	playlists: string[];
+	playlistItems: string[];
 	counters: [];
 }
 
@@ -101,7 +135,7 @@ export async function ensureMongoIndexes(
 	const createOptions: CreateIndexesOptions = {
 		maxTimeMS: options.maxTimeMS
 	};
-	const [users, sessions, tracks] = await Promise.all([
+	const [users, sessions, tracks, playlists, playlistItems] = await Promise.all([
 		collections.users.createIndexes(
 			[...MONGODB_INDEX_DEFINITIONS.users],
 			createOptions
@@ -113,6 +147,14 @@ export async function ensureMongoIndexes(
 		collections.tracks.createIndexes(
 			[...MONGODB_INDEX_DEFINITIONS.tracks],
 			createOptions
+		),
+		collections.playlists.createIndexes(
+			[...MONGODB_INDEX_DEFINITIONS.playlists],
+			createOptions
+		),
+		collections.playlistItems.createIndexes(
+			[...MONGODB_INDEX_DEFINITIONS.playlistItems],
+			createOptions
 		)
 	]);
 
@@ -120,6 +162,8 @@ export async function ensureMongoIndexes(
 		users,
 		sessions,
 		tracks,
+		playlists,
+		playlistItems,
 		counters: []
 	};
 }

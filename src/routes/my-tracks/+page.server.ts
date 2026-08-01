@@ -1,17 +1,29 @@
 import { error } from '@sveltejs/kit';
-import type { PageServerLoad } from './$types';
+import type { Actions, PageServerLoad } from './$types';
 import { requireUser } from '$lib/server/auth/guards';
 import { logTrackStorageError } from '$lib/server/tracks/logging';
 import { getApplicationTrackRepository } from '$lib/server/tracks/persistence';
+import { getPlaylistChoicesForTracks } from '$lib/server/playlists/picker';
+import {
+	addTrackToPlaylistAction,
+	playlistStatusMessage,
+	removeTrackFromPlaylistAction
+} from '$lib/server/playlists/actions';
 
 export const load = (async (event) => {
 	const user = requireUser(event);
 
 	try {
-		return {
-			tracks: await (
+		const tracks = await (
 				await getApplicationTrackRepository()
-			).listTracksForOwner(user.id),
+			).listTracksForOwner(user.id);
+		return {
+			tracks,
+			playlistChoices: await getPlaylistChoicesForTracks(
+				user.id,
+				tracks.map(({ publicId }) => publicId)
+			),
+			playlistNotice: playlistStatusMessage(event.url.searchParams.get('playlistStatus')),
 			updated: event.url.searchParams.get('updated') === '1',
 			deleted: event.url.searchParams.get('deleted') === '1'
 		};
@@ -20,3 +32,8 @@ export const load = (async (event) => {
 		error(500, 'Your tracks are temporarily unavailable.');
 	}
 }) satisfies PageServerLoad;
+
+export const actions = {
+	addToPlaylist: addTrackToPlaylistAction,
+	removeFromPlaylist: removeTrackFromPlaylistAction
+} satisfies Actions;

@@ -277,6 +277,7 @@ try {
 	await runNode(npmArgs('run', 'test:mongodb:auth'), { cwd: cleanRoot, env: environment, label: 'MongoDB auth integration' });
 	await runNode(npmArgs('run', 'test:mongodb:tracks'), { cwd: cleanRoot, env: environment, label: 'MongoDB tracks integration' });
 	await runNode(npmArgs('run', 'test:mongodb:queries'), { cwd: cleanRoot, env: environment, label: 'MongoDB queries integration' });
+	await runNode(npmArgs('run', 'test:mongodb:playlists'), { cwd: cleanRoot, env: environment, label: 'MongoDB playlists integration' });
 	await runNode(npmArgs('run', 'test:mongodb:regression'), { cwd: cleanRoot, env: environment, label: 'MongoDB regression' });
 	await runNode(npmArgs('run', 'test:mongodb:recovery'), { cwd: cleanRoot, env: environment, label: 'Synthetic MongoDB/audio recovery integration' });
 	await runNode(npmArgs('run', 'build'), { cwd: cleanRoot, env: environment, label: 'npm run build' });

@@ -1,10 +1,14 @@
 <script lang="ts">
 	import { formatDate } from '$lib/formatting';
 	import { toPublicPlayerTrack } from '$lib/player/model';
-	import type { OwnerTrack } from '$lib/types';
+	import type { OwnerTrack, PlaylistPickerEntry } from '$lib/types';
+	import AddToPlaylist from './AddToPlaylist.svelte';
 	import TrackPlayButton from './TrackPlayButton.svelte';
 
-	let { track }: { track: OwnerTrack } = $props();
+	let {
+		track,
+		playlistChoices = []
+	}: { track: OwnerTrack; playlistChoices?: PlaylistPickerEntry[] } = $props();
 	let playerTrack = $derived(
 		toPublicPlayerTrack({
 			id: track.publicId,
@@ -45,6 +49,12 @@
 	</p>
 
 	<footer>
+		<AddToPlaylist
+			trackId={track.publicId}
+			trackTitle={track.title}
+			choices={playlistChoices}
+			loginHref="/login?redirectTo=%2Fmy-tracks"
+		/>
 		{#if track.visibility === 'public'}
 			<TrackPlayButton track={playerTrack} />
 		{/if}

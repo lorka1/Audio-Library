@@ -4,6 +4,7 @@ export { default as OwnerTrackCard } from './components/OwnerTrackCard.svelte';
 export { default as GlobalAudioPlayer } from './components/GlobalAudioPlayer.svelte';
 export { default as TrackPlayButton } from './components/TrackPlayButton.svelte';
 export { default as TrackFilters } from './components/TrackFilters.svelte';
+export { default as AddToPlaylist } from './components/AddToPlaylist.svelte';
 export {
 	AudioPlayerController,
 	createAudioPlayerController
@@ -14,7 +15,11 @@ export type { PublicPlayerTrack } from './player/model';
 export type {
 	CurrentUser,
 	NavigationItem,
+	OwnerPlaylist,
 	OwnerTrack,
+	PlaylistPickerEntry,
+	PlaylistSummary,
+	PlaylistTrack,
 	PublicTrack,
 	TrackVisibility
 } from './types';

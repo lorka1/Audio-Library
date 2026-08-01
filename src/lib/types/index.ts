@@ -47,3 +47,35 @@ export interface OwnerTrack {
 	createdAt: string;
 	updatedAt: string;
 }
+
+export interface PlaylistSummary {
+	publicId: string;
+	name: string;
+	description: string | null;
+	trackCount: number;
+	createdAt: string;
+	updatedAt: string;
+}
+
+export interface PlaylistTrack {
+	id: number;
+	title: string;
+	artist: string;
+	bpm: number | null;
+	musicalKey: string | null;
+	genre: string | null;
+	description: string | null;
+	visibility: TrackVisibility;
+	addedAt: string;
+}
+
+export interface OwnerPlaylist extends PlaylistSummary {
+	tracks: PlaylistTrack[];
+	unavailableTrackCount: number;
+}
+
+export interface PlaylistPickerEntry {
+	publicId: string;
+	name: string;
+	containsTrack: boolean;
+}

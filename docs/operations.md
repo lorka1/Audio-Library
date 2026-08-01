@@ -47,7 +47,8 @@ external HTTPS origin.
 7. Probe `/api/health/live` and `/api/health/ready`.
 
 Startup fails before listening when configuration, storage, MongoDB topology,
-indexes, or counter state is unsafe. Startup does not reconnect forever.
+indexes (including `playlists` and `playlistItems`), or counter state is unsafe.
+Startup does not reconnect forever.
 Readiness is bounded and read-only. Liveness does not depend on MongoDB. SIGINT
 and SIGTERM stop accepting requests, wait a bounded interval, and close
 application-owned listeners and the shared MongoDB client exactly once.
@@ -66,7 +67,8 @@ npm run backup:mongodb
 npm run backup:audio
 ```
 
-The first wraps `mongodump`; the second copies private audio and verifies file
+The first wraps `mongodump` and naturally captures users, sessions, tracks,
+playlists, playlist items, counters, and migration markers; the second copies private audio and verifies file
 count, aggregate size, and aggregate content hash. Each creates a new
 timestamped destination, uses an `INCOMPLETE` marker until successful, and
 writes a sanitized manifest. Neither overwrites output or deletes old backups.
@@ -84,8 +86,9 @@ npm run test:mongodb:recovery
 
 It creates an owned test source and restore database plus temporary private
 audio, then checks indexes, safe aggregates, counter compatibility, referenced
-audio, and read-only Browse/detail/stream repository paths. Cleanup removes only
-its exact owned databases and temporary directories.
+audio, read-only Browse/detail/stream repository paths, and synthetic playlist
+and membership restore. Cleanup removes only its exact owned databases and
+temporary directories.
 
 For an operator-supplied synthetic pair, set `MONGODB_RESTORE_SOURCE` and
 `AUDIO_RESTORE_SOURCE` to the two completed directories and run
@@ -93,6 +96,21 @@ For an operator-supplied synthetic pair, set `MONGODB_RESTORE_SOURCE` and
 database, a pre-existing test database, or real audio storage. A real disaster
 restore requires separate approval, a maintenance window, verified targets, and
 a current paired recovery set.
+
+## Playlist storage lifecycle
+
+Playlist Phase P1 stores private owner-scoped metadata in `playlists` and one
+normalized row per unique playlist/track membership in `playlistItems`. Index
+initialization creates stable named indexes for opaque public IDs, owner-scoped
+lookup/listing, unique membership, deterministic insertion order, and cleanup by
+track UUID. Readiness verifies these collections and exact indexes without
+writing or repairing them.
+
+Playlist actions never copy or touch audio files. Deleting a playlist
+transactionally removes only that playlist and its membership rows. Deleting a
+track transactionally removes its membership rows alongside track metadata;
+the existing audio quarantine is restored if that database transaction fails.
+Removing playlist membership alone never deletes the track.
 
 ## Firewall, monitoring, and logs
 

@@ -10,16 +10,18 @@ it through centralized server-only persistence modules.
 | Sessions | Hashed-token MongoDB session repository | Auth integration and session unit tests: creation, lookup, expiration, missing user, logout, uniqueness |
 | Registration | Required MongoDB transaction for user plus initial session | Commit, duplicate-conflict rollback, failed-session rollback, and transaction-support checks |
 | Tracks | MongoDB track repository and atomic public-ID counter | Creation, concurrent allocation, safe public/owner/storage projections, owner CRUD, missing tracks |
+| Private playlists (P1) | Normalized `playlists` and `playlistItems` collections with owner-scoped safe projections and opaque public IDs | Create/list/detail/update/delete; public and owned-private add; idempotent duplicate add; remove; non-owner/missing/inaccessible rejection; track-deletion cleanup |
+| Playlist transactions | Add/remove update `updatedAt`; delete cascades items; track deletion removes all memberships | Commit/rollback boundaries, exact membership uniqueness, session cleanup, unrelated-item preservation |
 | Public browsing | MongoDB aggregation with public visibility enforcement | Literal title/artist/description search, BPM bounds, key, genre, combined filters, no-result behavior |
 | Sorting | MongoDB deterministic aggregation sorts | Newest, oldest, title ascending/descending, BPM ascending/descending, null BPM last, tie ordering |
 | Upload | MongoDB metadata plus private filesystem audio | Validation, successful full-app upload, insertion-failure file cleanup, never-reused public IDs |
 | Media | Public MongoDB lookup plus contained filesystem reads | Full stream, byte Range seeking, invalid/unsatisfiable Range, download, private/missing rejection |
 | Owner management | Owner-scoped MongoDB lookups and mutations | My Tracks, edit, non-owner rejection, immutable fields, delete confirmation and execution |
-| Delete recovery | Quarantine file, delete MongoDB record, remove or restore file | Success, database failure restore, quarantine failures, missing file, concurrent deletion |
+| Delete recovery | Quarantine file, transactionally delete MongoDB track plus playlist memberships, remove or restore file | Success, database failure restore, quarantine failures, missing file, concurrent deletion, playlist cleanup |
 | Privacy | Public, owner, account, navigation, and server-only models | Projection unit tests, full-app payload checks, sanitized error-path tests |
 | Resource safety | Unique owned database, temporary audio/port, bounded clients/processes | Every integration controller plus aggregate supervisor and clean-copy postconditions |
 | Operations | Bounded startup/readiness, liveness, structured safe logs, SIGINT/SIGTERM shutdown | Operational failure-path tests and production startup/shutdown probe |
-| Recovery | Native MongoDB dump, separate aggregate-verified audio copy, owned isolated restore | Missing-tool/path/mismatch tests and complete synthetic recovery integration |
+| Recovery | Native MongoDB dump (including playlists/items), separate aggregate-verified audio copy, owned isolated restore | Missing-tool/path/mismatch tests and complete synthetic track/playlist recovery integration |
 
 ## Full-application traceability
 
@@ -33,7 +35,9 @@ The cutover and aggregate regression commands cover:
   player-safe models, full and Range streaming, invalid Range, and download;
 - My Tracks, owner/non-owner edit and delete, quarantine success/restore,
   missing-file and safe 404 behavior;
-- exact user/session/track/audio/database/process/port/client/session/listener
+- private playlist ownership, membership, inaccessible-track omission, and
+  track-deletion cleanup;
+- exact user/session/track/playlist/item/audio/database/process/port/client/session/listener
   cleanup.
 
 ## Privacy boundary
@@ -41,6 +45,10 @@ The cutover and aggregate regression commands cover:
 Public and owner responses contain only fields required by their UI. Internal
 identifiers, password material, session material, storage references, paths,
 database configuration, and audit fingerprints remain server-only.
+
+Playlist summaries expose only opaque public IDs, names, optional descriptions,
+counts, and timestamps. Detail entries expose a safe track view plus `addedAt`;
+internal playlist/item/track UUIDs and owner/storage fields never enter page data.
 
 ## Historical note
 

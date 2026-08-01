@@ -37,6 +37,8 @@ export type {
 } from './collections';
 export type {
 	CounterDocument,
+	PlaylistDocument,
+	PlaylistItemDocument,
 	SessionDocument,
 	TrackDocument,
 	UserDocument

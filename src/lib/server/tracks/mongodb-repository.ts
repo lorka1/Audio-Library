@@ -1,10 +1,12 @@
 import {
 	MongoServerError,
 	type Collection,
-	type FindOptions
+	type FindOptions,
+	type MongoClient
 } from 'mongodb';
 import type {
 	CounterDocument,
+	PlaylistItemDocument,
 	TrackDocument,
 	UserDocument
 } from '../mongodb/documents.ts';
@@ -29,6 +31,8 @@ import {
 } from './contract.ts';
 import { toOwnerTrack, type OwnerTrackRecord } from './owner-model.ts';
 import { toPublicTrack, type PublicTrackRecord } from './public-model.ts';
+import { cleanupPreservingPrimaryFailure } from '../operational/cleanup.ts';
+import { safeErrorFields, writeSafeLog } from '../operational/logging.ts';
 
 export const MONGODB_TRACK_OPERATION_TIMEOUT_MS = 5_000;
 export const MONGODB_BASIC_PUBLIC_TRACK_LIMIT = 200;
@@ -36,7 +40,11 @@ export const MONGODB_BASIC_PUBLIC_TRACK_LIMIT = 200;
 export interface MongoTrackRepositoryOptions {
 	timeoutMS?: number;
 	signal?: AbortSignal;
+	client?: MongoClient;
+	playlistItems?: Collection<PlaylistItemDocument>;
 }
+
+const TRACK_DELETE_TRANSACTION_TIMEOUT_MS = 8_000;
 
 interface PublicTrackAggregateRecord extends PublicTrackRecord {}
 
@@ -161,6 +169,66 @@ export function createMongoTrackRepository(
 		...operationOptions,
 		projection
 	});
+
+	async function deleteTrackAndPlaylistItems(
+		publicId: number,
+		ownerId: string
+	): Promise<boolean> {
+		if (!options.client || !options.playlistItems) {
+			const result = await tracks.deleteOne({ publicId, ownerId }, operationOptions);
+			return result.deletedCount === 1;
+		}
+		const clientSession = options.client.startSession();
+		let deleted = false;
+		let completed = false;
+		let primaryFailure: unknown;
+		try {
+			await clientSession.withTransaction(async () => {
+				const track = await tracks.findOne(
+					{ publicId, ownerId },
+					{ ...operationOptions, session: clientSession, projection: { _id: 1 } }
+				);
+				if (!track) {
+					deleted = false;
+					completed = true;
+					return;
+				}
+				const result = await tracks.deleteOne(
+					{ _id: track._id, ownerId },
+					{ ...operationOptions, session: clientSession }
+				);
+				if (result.deletedCount !== 1) {
+					throw new Error('Owner-scoped track deletion changed concurrently.');
+				}
+				await options.playlistItems!.deleteMany(
+					{ trackId: track._id },
+					{ ...operationOptions, session: clientSession }
+				);
+				deleted = true;
+				completed = true;
+			}, {
+				maxCommitTimeMS: TRACK_DELETE_TRANSACTION_TIMEOUT_MS,
+				readPreference: 'primary',
+				readConcern: { level: 'snapshot' },
+				writeConcern: { w: 'majority' }
+			});
+		} catch (error) {
+			primaryFailure = error;
+			throw error;
+		} finally {
+			await cleanupPreservingPrimaryFailure(
+				primaryFailure,
+				() => clientSession.endSession(),
+				(error) => writeSafeLog({
+					severity: 'error',
+					category: 'shutdown',
+					...safeErrorFields(error)
+				})
+			);
+		}
+		if (!completed) throw new Error('MongoDB track deletion transaction did not commit.');
+		return deleted;
+	}
 
 	async function allocatePublicTrackId(): Promise<number> {
 		const counter = await counters.findOneAndUpdate(
@@ -357,8 +425,7 @@ export function createMongoTrackRepository(
 		async deleteOwnerTrack(publicId, ownerId) {
 			requireTrackOwnerId(ownerId);
 			assertPositivePublicTrackId(publicId);
-			const result = await tracks.deleteOne({ publicId, ownerId }, operationOptions);
-			return result.deletedCount === 1;
+			return deleteTrackAndPlaylistItems(publicId, ownerId);
 		},
 
 		async getOwnerTrackStorage(publicId, ownerId): Promise<OwnerTrackStorage | null> {

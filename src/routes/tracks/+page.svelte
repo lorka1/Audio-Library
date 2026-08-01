@@ -25,6 +25,17 @@
 			</p>
 		</header>
 
+		{#if data.playlistNotice}
+			<div
+				class="form-message"
+				class:form-message--success={data.playlistNotice.kind === 'success'}
+				class:form-message--error={data.playlistNotice.kind === 'error'}
+				role="status"
+			>
+				{data.playlistNotice.message}
+			</div>
+		{/if}
+
 		<TrackFilters values={data.filterValues} errors={data.filterErrors} />
 
 		<div class="track-results">
@@ -45,7 +56,11 @@
 		{#if data.tracks.length > 0}
 			<div class="track-grid">
 				{#each data.tracks as track (track.id)}
-					<TrackCard {track} />
+					<TrackCard
+						{track}
+						playlistChoices={data.playlistChoices?.[String(track.id)] ?? null}
+						loginHref={data.loginHref}
+					/>
 				{/each}
 			</div>
 		{:else}

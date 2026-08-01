@@ -4,6 +4,7 @@ import { existsSync } from 'node:fs';
 import { mkdir, readdir, rm, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { readMongoConfig } from '../src/lib/server/mongodb/config.ts';
+import { MONGODB_COLLECTION_NAMES } from '../src/lib/server/mongodb/collections.ts';
 import {
 	createExclusiveBackupDirectory,
 	requireSafeDestinationRoot,
@@ -78,6 +79,7 @@ try {
 		toolVersion: version,
 		status: 'complete',
 		format: 'mongodb-directory',
+		collections: Object.values(MONGODB_COLLECTION_NAMES),
 		databaseIdentifierHash: safeDatabaseIdentifier(config.databaseName)
 	};
 	await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, { flag: 'wx' });
@@ -91,6 +93,7 @@ try {
 			toolVersion: 'unavailable',
 			status: 'incomplete',
 			format: 'mongodb-directory',
+			collections: Object.values(MONGODB_COLLECTION_NAMES),
 			databaseIdentifierHash: safeDatabaseIdentifier(config.databaseName)
 		}, null, 2)}\n`,
 		{ flag: existsSync(manifestPath) ? 'w' : 'wx' }

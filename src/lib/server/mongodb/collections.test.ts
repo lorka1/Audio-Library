@@ -6,7 +6,7 @@ import {
 } from './collections';
 
 describe('MongoDB collection mapping', () => {
-	it('uses centralized names and typed accessors for every M1 collection', () => {
+	it('uses centralized names and typed accessors for every application collection', () => {
 		const collection = vi.fn((name: string) => ({ collectionName: name }));
 		const database = { collection } as unknown as Db;
 
@@ -16,13 +16,17 @@ describe('MongoDB collection mapping', () => {
 			users: 'users',
 			sessions: 'sessions',
 			tracks: 'tracks',
+			playlists: 'playlists',
+			playlistItems: 'playlistItems',
 			counters: 'counters',
 			migrations: 'migrations'
 		});
-		expect(collection).toHaveBeenCalledTimes(5);
+		expect(collection).toHaveBeenCalledTimes(7);
 		expect(collections.users.collectionName).toBe('users');
 		expect(collections.sessions.collectionName).toBe('sessions');
 		expect(collections.tracks.collectionName).toBe('tracks');
+		expect(collections.playlists.collectionName).toBe('playlists');
+		expect(collections.playlistItems.collectionName).toBe('playlistItems');
 		expect(collections.counters.collectionName).toBe('counters');
 		expect(collections.migrations.collectionName).toBe('migrations');
 	});

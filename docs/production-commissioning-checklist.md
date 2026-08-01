@@ -32,6 +32,12 @@ paths, filenames, or database contents in the completed checklist.
   reverse-proxy document root.
 - [ ] `MAX_AUDIO_FILE_SIZE_MB` is positive and `BODY_SIZE_LIMIT` safely exceeds
   it.
+- [ ] Authenticated navigation exposes Playlists on desktop and mobile; signed-out
+  navigation does not expose the private destination.
+- [ ] Private playlist create, rename, description edit, delete, add, and remove
+  work only for the owner; guessed non-owned IDs return the same safe 404.
+- [ ] Public and owned-private tracks can be added; another user's private track
+  and later-inaccessible track data are never exposed.
 - [ ] `npm ci`, `npm run check`, `npm test`, and `npm run build` pass.
 - [ ] Production starts with `npm start`.
 - [ ] `/api/health/live` is reachable by the local service monitor.
@@ -50,7 +56,8 @@ paths, filenames, or database contents in the completed checklist.
 - [ ] MongoDB and audio backups are scheduled as one logical recovery set.
 - [ ] No automatic destructive retention is assumed; an approved retention
   policy exists separately.
-- [ ] Periodic isolated restore verification is scheduled.
+- [ ] Periodic isolated restore verification covers MongoDB track/playlist metadata
+  plus referenced audio files.
 - [ ] A completed synthetic `npm run test:mongodb:recovery` run is recorded.
 - [ ] The historical SQLite backup remains separately retained as migration
   history only.

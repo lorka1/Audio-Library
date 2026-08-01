@@ -71,8 +71,9 @@ try {
 		createdAt: now,
 		updatedAt: now
 	});
+	const trackId = randomUUID();
 	await collections.tracks.insertOne({
-		_id: randomUUID(),
+		_id: trackId,
 		publicId: 1,
 		ownerId: userId,
 		title: 'Synthetic restore track',
@@ -89,6 +90,22 @@ try {
 		visibility: 'public',
 		createdAt: now,
 		updatedAt: now
+	});
+	const playlistId = randomUUID();
+	await collections.playlists.insertOne({
+		_id: playlistId,
+		publicId: randomBytes(18).toString('base64url'),
+		ownerId: userId,
+		name: 'Synthetic restore playlist',
+		description: 'Synthetic recovery-only fixture.',
+		createdAt: now,
+		updatedAt: now
+	});
+	await collections.playlistItems.insertOne({
+		_id: randomUUID(),
+		playlistId,
+		trackId,
+		addedAt: now
 	});
 	await manager.close(true);
 

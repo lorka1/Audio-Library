@@ -76,6 +76,7 @@
 	>
 		<p>Signed in as <strong>{user.username}</strong></p>
 		<a bind:this={firstLink} href="/my-tracks" onclick={() => closeMenu()}>My Tracks</a>
+		<a href="/playlists" onclick={() => closeMenu()}>Playlists</a>
 		<a href="/account" onclick={() => closeMenu()}>Account</a>
 		<form method="POST" action="/logout">
 			<button type="submit">Logout</button>

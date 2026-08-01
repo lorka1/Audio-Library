@@ -2,13 +2,21 @@
 	import { formatDate } from '$lib/formatting';
 	import type { AudioPlayerController } from '$lib/player/controller';
 	import { toPublicPlayerTrack } from '$lib/player/model';
-	import type { PublicTrack } from '$lib/types';
+	import type { PlaylistPickerEntry, PublicTrack } from '$lib/types';
+	import AddToPlaylist from './AddToPlaylist.svelte';
 	import TrackPlayButton from './TrackPlayButton.svelte';
 
 	let {
 		track,
-		player
-	}: { track: PublicTrack; player?: AudioPlayerController } = $props();
+		player,
+		playlistChoices = null,
+		loginHref = `/login?redirectTo=${encodeURIComponent(`/tracks/${track.id}`)}`
+	}: {
+		track: PublicTrack;
+		player?: AudioPlayerController;
+		playlistChoices?: PlaylistPickerEntry[] | null;
+		loginHref?: string;
+	} = $props();
 	let playerTrack = $derived(toPublicPlayerTrack(track));
 </script>
 
@@ -37,6 +45,12 @@
 	</dl>
 
 	<footer>
+		<AddToPlaylist
+			trackId={track.id}
+			trackTitle={track.title}
+			choices={playlistChoices}
+			{loginHref}
+		/>
 		<p>
 			Uploaded by <strong>{track.ownerUsername}</strong>
 		</p>

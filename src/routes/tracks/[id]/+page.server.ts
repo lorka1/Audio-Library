@@ -1,8 +1,14 @@
 import { error } from '@sveltejs/kit';
-import type { PageServerLoad } from './$types';
+import type { Actions, PageServerLoad } from './$types';
 import { parseTrackId } from '$lib/server/tracks/id';
 import { logTrackStorageError } from '$lib/server/tracks/logging';
 import { getApplicationTrackRepository } from '$lib/server/tracks/persistence';
+import { getPlaylistChoicesForTracks } from '$lib/server/playlists/picker';
+import {
+	addTrackToPlaylistAction,
+	playlistStatusMessage,
+	removeTrackFromPlaylistAction
+} from '$lib/server/playlists/actions';
 
 export const load = (async ({ locals, params, url }) => {
 	const id = parseTrackId(params.id);
@@ -21,6 +27,11 @@ export const load = (async ({ locals, params, url }) => {
 
 		return {
 			track,
+			playlistChoices: locals.user
+				? (await getPlaylistChoicesForTracks(locals.user.id, [id]))[String(id)]
+				: null,
+			playlistNotice: playlistStatusMessage(url.searchParams.get('playlistStatus')),
+			loginHref: `/login?redirectTo=${encodeURIComponent(`${url.pathname}${url.search}`)}`,
 			canManage: locals.user
 				? (await repository.findOwnerTrack(id, locals.user.id)) !== null
 				: false,
@@ -40,3 +51,8 @@ export const load = (async ({ locals, params, url }) => {
 		error(500, 'The track is temporarily unavailable.');
 	}
 }) satisfies PageServerLoad;
+
+export const actions = {
+	addToPlaylist: addTrackToPlaylistAction,
+	removeFromPlaylist: removeTrackFromPlaylistAction
+} satisfies Actions;

@@ -21,6 +21,8 @@
     "test:mongodb:auth": "node --experimental-strip-types scripts/mongodb-auth-integration.mjs",
     "test:mongodb:tracks": "node --experimental-strip-types scripts/mongodb-tracks-integration.mjs",
     "test:mongodb:queries": "node --experimental-strip-types scripts/mongodb-queries-integration.mjs",
+    "test:mongodb:playlists": "node --experimental-strip-types scripts/mongodb-playlists-integration.mjs",
+    "test:playlists:viewports": "node --experimental-strip-types scripts/playlist-viewport-verification.mjs",
     "test:mongodb:cutover": "node --experimental-strip-types scripts/mongodb-cutover-integration.mjs",
     "test:mongodb:regression": "node --experimental-strip-types scripts/mongodb-cutover-regression.mjs",
     "verify:mongodb:clean-clone": "node --experimental-strip-types scripts/mongodb-clean-clone-check.mjs",

@@ -18,7 +18,7 @@ import { TRACK_PUBLIC_ID_COUNTER } from '../src/lib/server/mongodb/documents.ts'
 import { ensureMongoIndexes } from '../src/lib/server/mongodb/indexes.ts';
 import { safeMongoAggregateFingerprint } from './lib/mongodb-fingerprint.mjs';
 
-const EXPECTED_CHECKS = 23;
+const EXPECTED_CHECKS = 31;
 const STARTUP_TIMEOUT_MS = 45_000;
 const REQUEST_TIMEOUT_MS = 12_000;
 const SHUTDOWN_TIMEOUT_MS = 8_000;
@@ -443,6 +443,114 @@ async function main() {
 		});
 		await upload.body?.cancel();
 
+		const createPlaylist = await request(baseUrl, '/playlists?/create', {
+			method: 'POST',
+			headers: formHeaders(baseUrl, ownerCookie),
+			body: form({
+				name: 'M7 synthetic private playlist',
+				description: ''
+			})
+		});
+		const ownerDocument = await collections.users.findOne(
+			{ email: ownerEmail },
+			{ projection: { _id: 1 } }
+		);
+		const playlistDocument = await collections.playlists.findOne({
+			ownerId: ownerDocument?._id,
+			name: 'M7 synthetic private playlist'
+		});
+		assert.ok(playlistDocument);
+		const playlistPublicId = playlistDocument.publicId;
+		await check('owner creates a private playlist through POST and PRG', async () => {
+			assert.equal(createPlaylist.status, 303);
+			assert.equal(createPlaylist.headers.get('location'), '/playlists?created=1');
+			assert.equal(typeof playlistPublicId, 'string');
+			assert.equal(await collections.playlists.countDocuments({}), 1);
+		});
+		await createPlaylist.body?.cancel();
+
+		const updatePlaylist = await request(
+			baseUrl,
+			`/playlists/${playlistPublicId}?/update`,
+			{
+				method: 'POST',
+				headers: formHeaders(baseUrl, ownerCookie),
+				body: form({
+					name: 'M7 synthetic playlist renamed',
+					description: 'Synthetic owner-only description.'
+				})
+			}
+		);
+		const playlistList = await request(baseUrl, '/playlists', {
+			headers: { cookie: ownerCookie }
+		});
+		const playlistListHtml = await playlistList.text();
+		const playlistDetail = await request(baseUrl, `/playlists/${playlistPublicId}`, {
+			headers: { cookie: ownerCookie }
+		});
+		const playlistDetailHtml = await playlistDetail.text();
+		await check('owner lists, views, renames, and edits a safe playlist projection', async () => {
+			assert.equal(updatePlaylist.status, 303);
+			assert.equal(playlistList.status, 200);
+			assert.equal(playlistDetail.status, 200);
+			assert.ok(playlistListHtml.includes('M7 synthetic playlist renamed'));
+			assert.ok(playlistDetailHtml.includes('Synthetic owner-only description.'));
+			for (const html of [playlistListHtml, playlistDetailHtml]) {
+				assert.equal(html.includes(playlistDocument._id), false);
+				assert.equal(html.includes(playlistDocument.ownerId), false);
+			}
+		});
+		await updatePlaylist.body?.cancel();
+
+		const addFirst = await request(baseUrl, `/tracks/${publicId}?/addToPlaylist`, {
+			method: 'POST',
+			headers: formHeaders(baseUrl, ownerCookie),
+			body: form({ playlistPublicId, trackPublicId: String(publicId) })
+		});
+		const addDuplicate = await request(baseUrl, `/tracks/${publicId}?/addToPlaylist`, {
+			method: 'POST',
+			headers: formHeaders(baseUrl, ownerCookie),
+			body: form({ playlistPublicId, trackPublicId: String(publicId) })
+		});
+		await check('add-to-playlist is transactional and duplicate membership is idempotent', async () => {
+			assert.equal(addFirst.status, 303);
+			assert.match(addFirst.headers.get('location') ?? '', /playlistStatus=added/);
+			assert.equal(addDuplicate.status, 303);
+			assert.match(addDuplicate.headers.get('location') ?? '', /playlistStatus=already-added/);
+			assert.equal(
+				await collections.playlistItems.countDocuments({ playlistId: playlistDocument._id }),
+				1
+			);
+		});
+		await addFirst.body?.cancel();
+		await addDuplicate.body?.cancel();
+
+		const removeFirst = await request(
+			baseUrl,
+			`/playlists/${playlistPublicId}?/removeFromPlaylist`,
+			{
+				method: 'POST',
+				headers: formHeaders(baseUrl, ownerCookie),
+				body: form({ playlistPublicId, trackPublicId: String(publicId) })
+			}
+		);
+		const readdFirst = await request(baseUrl, `/tracks/${publicId}?/addToPlaylist`, {
+			method: 'POST',
+			headers: formHeaders(baseUrl, ownerCookie),
+			body: form({ playlistPublicId, trackPublicId: String(publicId) })
+		});
+		await check('playlist detail removes one exact membership without deleting the track', async () => {
+			assert.equal(removeFirst.status, 303);
+			assert.equal(readdFirst.status, 303);
+			assert.equal(await collections.tracks.countDocuments({}), 1);
+			assert.equal(
+				await collections.playlistItems.countDocuments({ playlistId: playlistDocument._id }),
+				1
+			);
+		});
+		await removeFirst.body?.cancel();
+		await readdFirst.body?.cancel();
+
 		const browse = await request(baseUrl, '/tracks');
 		const browseHtml = await browse.text();
 		await check('Browse lists the isolated public upload', () => {
@@ -452,6 +560,10 @@ async function main() {
 					.length,
 				1
 			);
+		});
+		await check('logged-out Browse uses the real login flow for playlist actions', () => {
+			assert.ok(browseHtml.includes('Log in to add to a playlist'));
+			assert.equal(browseHtml.includes('M7 synthetic playlist renamed'), false);
 		});
 
 		const detail = await request(baseUrl, `/tracks/${publicId}`);
@@ -502,6 +614,12 @@ async function main() {
 					[]).length,
 				1
 			);
+		});
+		await check('authenticated add-to-playlist UI lists owned membership safely', () => {
+			assert.ok(myTracksHtml.includes('M7 synthetic playlist renamed'));
+			assert.ok(myTracksHtml.includes('?/removeFromPlaylist'));
+			assert.equal(myTracksHtml.includes(playlistDocument._id), false);
+			assert.equal(myTracksHtml.includes(playlistDocument.ownerId), false);
 		});
 
 		const edit = await request(
@@ -562,6 +680,32 @@ async function main() {
 		});
 		await otherRegistration.body?.cancel();
 
+		const forbiddenPlaylist = await request(
+			baseUrl,
+			`/playlists/${playlistPublicId}`,
+			{ headers: { cookie: otherCookie } }
+		);
+		const forbiddenPlaylistAdd = await request(
+			baseUrl,
+			`/tracks/${publicId}?/addToPlaylist`,
+			{
+				method: 'POST',
+				headers: formHeaders(baseUrl, otherCookie),
+				body: form({ playlistPublicId, trackPublicId: String(publicId) })
+			}
+		);
+		await check('non-owner playlist view and membership mutation reveal no existence details', async () => {
+			assert.equal(forbiddenPlaylist.status, 404);
+			assert.equal(forbiddenPlaylistAdd.status, 303);
+			assert.match(forbiddenPlaylistAdd.headers.get('location') ?? '', /playlistStatus=error/);
+			assert.equal(
+				await collections.playlistItems.countDocuments({ playlistId: playlistDocument._id }),
+				1
+			);
+		});
+		await forbiddenPlaylist.body?.cancel();
+		await forbiddenPlaylistAdd.body?.cancel();
+
 		const forbiddenEdit = await request(
 			baseUrl,
 			`/my-tracks/${publicId}/edit`,
@@ -599,11 +743,42 @@ async function main() {
 		await check('owner delete removes MongoDB metadata', async () => {
 			assert.equal(ownerDelete.status, 303);
 			assert.equal(await collections.tracks.countDocuments({ publicId }), 0);
+			assert.equal(
+				await collections.playlistItems.countDocuments({ playlistId: playlistDocument._id }),
+				0
+			);
 		});
 		await ownerDelete.body?.cancel();
 		await check('owner delete removes audio and quarantine artifacts', async () => {
 			assert.deepEqual(await directoryFileNames(temporaryAudioRoot), []);
 		});
+
+		const unconfirmedPlaylistDelete = await request(
+			baseUrl,
+			`/playlists/${playlistPublicId}?/delete`,
+			{
+				method: 'POST',
+				headers: formHeaders(baseUrl, ownerCookie),
+				body: form({})
+			}
+		);
+		const confirmedPlaylistDelete = await request(
+			baseUrl,
+			`/playlists/${playlistPublicId}?/delete`,
+			{
+				method: 'POST',
+				headers: formHeaders(baseUrl, ownerCookie),
+				body: form({ confirmDelete: 'delete' })
+			}
+		);
+		await check('playlist deletion requires confirmation and removes only its MongoDB documents', async () => {
+			assert.equal(unconfirmedPlaylistDelete.status, 400);
+			assert.equal(confirmedPlaylistDelete.status, 303);
+			assert.equal(await collections.playlists.countDocuments({}), 0);
+			assert.equal(await collections.playlistItems.countDocuments({}), 0);
+		});
+		await unconfirmedPlaylistDelete.body?.cancel();
+		await confirmedPlaylistDelete.body?.cancel();
 
 		const ownerLogout = await request(baseUrl, '/logout', {
 			method: 'POST',
