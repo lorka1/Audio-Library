@@ -44,7 +44,7 @@
 		position: relative;
 		min-width: 0;
 		pointer-events: none;
-		filter: drop-shadow(0 0 2rem rgb(102 51 238 / 28%));
+		filter: drop-shadow(0 0 2rem var(--waveform-shadow));
 	}
 
 	svg {
@@ -56,7 +56,7 @@
 
 	.audio-waveform__bars {
 		fill: none;
-		stroke: #6544ec;
+		stroke: var(--waveform-primary);
 		stroke-width: 1.1;
 		stroke-linecap: round;
 		opacity: 0.42;
@@ -66,31 +66,31 @@
 
 	.audio-waveform__lines {
 		fill: none;
-		stroke: #824dff;
+		stroke: var(--waveform-secondary);
 		stroke-width: 1.35;
 		stroke-linecap: round;
 		opacity: 0.65;
 	}
 
 	.audio-waveform__lines path:first-child {
-		stroke: #9b5cff;
+		stroke: var(--waveform-highlight);
 		stroke-width: 2.4;
 		opacity: 0.95;
 	}
 
 	.audio-waveform__lines path:nth-child(2) {
-		stroke: #6847f5;
+		stroke: var(--accent);
 		opacity: 0.8;
 	}
 
 	.audio-waveform__lines path:nth-child(4),
 	.audio-waveform__lines path:nth-child(5) {
-		stroke: #3346d9;
+		stroke: var(--waveform-deep);
 		opacity: 0.38;
 	}
 
 	.audio-waveform__particles {
-		fill: #754cff;
+		fill: var(--waveform-fill);
 		opacity: 0.75;
 		animation: particles-float 9s ease-in-out infinite alternate;
 	}

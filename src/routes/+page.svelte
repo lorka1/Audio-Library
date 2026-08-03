@@ -112,11 +112,8 @@
 		min-height: clamp(38rem, 76vh, 46rem);
 		padding-block: clamp(5rem, 9vw, 8rem);
 		overflow: hidden;
-		color: white;
-		background:
-			radial-gradient(circle at 77% 45%, rgb(98 37 207 / 19%), transparent 28rem),
-			radial-gradient(circle at 18% 28%, rgb(36 60 139 / 19%), transparent 28rem),
-			linear-gradient(115deg, #080d1f 0%, #0b1026 52%, #100824 100%);
+		color: var(--hero-text);
+		background: var(--hero-background);
 	}
 
 	.hero__inner {
@@ -135,7 +132,7 @@
 
 	.eyebrow {
 		margin: 0 0 1rem;
-		color: #8f86ff;
+		color: var(--accent-strong);
 		font-size: 0.78rem;
 		font-weight: 800;
 		letter-spacing: 0.12em;
@@ -150,17 +147,17 @@
 		letter-spacing: -0.055em;
 		overflow-wrap: anywhere;
 		text-wrap: balance;
-		text-shadow: 0 0.8rem 2.5rem rgb(0 0 0 / 22%);
+		text-shadow: var(--shadow-hero-text);
 	}
 
 	.hero__punctuation {
-		color: #795cff;
+		color: var(--accent-strong);
 	}
 
 	.lead {
 		max-width: 39rem;
 		margin: clamp(1.5rem, 3vw, 2rem) 0;
-		color: #b7bfd2;
+		color: var(--hero-muted);
 		font-size: clamp(1rem, 1.55vw, 1.18rem);
 		line-height: 1.72;
 	}
@@ -171,10 +168,10 @@
 		gap: 0.6rem;
 		min-height: 3.4rem;
 		padding: 0.8rem 1.15rem;
-		color: white;
-		border: 1px solid rgb(155 166 203 / 29%);
+		color: var(--hero-text);
+		border: 1px solid var(--hero-control-border);
 		border-radius: 0.7rem;
-		background: rgb(12 18 42 / 64%);
+		background: var(--hero-control-bg);
 		font-size: 0.9rem;
 		font-weight: 700;
 		text-decoration: none;
@@ -191,8 +188,9 @@
 
 	.hero__link--primary {
 		border-color: transparent;
-		background: linear-gradient(135deg, #6040ed, #7547f5);
-		box-shadow: 0 0.8rem 2rem rgb(79 44 218 / 30%);
+		color: var(--on-accent);
+		background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+		box-shadow: var(--shadow-accent);
 	}
 
 	.hero__link svg {
@@ -203,11 +201,11 @@
 
 	.hero__link:hover {
 		transform: translateY(-2px);
-		background: rgb(255 255 255 / 12%);
+		background: var(--hero-control-hover);
 	}
 
 	.hero__link--primary:hover {
-		background: linear-gradient(135deg, #7352f7, #875cff);
+		background: linear-gradient(135deg, var(--accent-strong), var(--accent-hover));
 	}
 
 	:global(.hero__waveform) {
@@ -251,7 +249,7 @@
 		border: 1px solid var(--border);
 		border-radius: 1rem;
 		background: var(--surface);
-		box-shadow: 0 1rem 3rem rgb(0 2 12 / 25%);
+		box-shadow: var(--shadow-card);
 	}
 
 	.card-number {
@@ -261,7 +259,7 @@
 		height: 2.2rem;
 		color: var(--accent);
 		border-radius: 0.6rem;
-		background: rgb(91 78 232 / 10%);
+		background: var(--accent-soft);
 		font-size: 0.75rem;
 		font-weight: 800;
 	}
@@ -297,7 +295,7 @@
 		place-items: center;
 		width: 1.5rem;
 		height: 1.5rem;
-		color: white;
+		color: var(--on-accent);
 		border-radius: 999px;
 		background: var(--accent);
 		font-family: Georgia, serif;

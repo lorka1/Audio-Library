@@ -47,10 +47,10 @@
 
 	.delete-confirmation {
 		padding: clamp(1.5rem, 5vw, 2.75rem);
-		border: 1px solid #efbdc6;
+		border: 1px solid var(--error-border);
 		border-radius: 1.25rem;
 		background: var(--surface);
-		box-shadow: 0 1.5rem 4rem rgb(24 32 51 / 9%);
+		box-shadow: var(--shadow-card);
 	}
 
 	h1 {
@@ -72,10 +72,10 @@
 		gap: 0.5rem;
 		margin: 1.5rem 0;
 		padding: 1rem;
-		color: #8e2438;
-		border: 1px solid #efbdc6;
+		color: var(--error-strong);
+		border: 1px solid var(--error-border);
 		border-radius: 0.75rem;
-		background: #fff1f3;
+		background: var(--error-bg);
 	}
 
 	.delete-warning p {
@@ -94,16 +94,16 @@
 		justify-content: center;
 		min-height: 3rem;
 		padding: 0.75rem 1rem;
-		color: white;
+		color: var(--on-accent);
 		border: 0;
 		border-radius: 0.65rem;
-		background: #b83249;
+		background: var(--danger-button);
 		font-weight: 800;
 		cursor: pointer;
 	}
 
 	.danger-button:hover {
-		background: #92263a;
+		background: var(--danger-button-hover);
 	}
 
 	form a {

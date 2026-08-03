@@ -82,10 +82,10 @@
 		justify-content: center;
 		min-height: 2.75rem;
 		padding: 0.6rem 0.8rem;
-		color: #d8d2ff;
-		border: 1px solid rgb(154 132 255 / 34%);
+		color: var(--link);
+		border: 1px solid var(--accent-border);
 		border-radius: 0.6rem;
-		background: rgb(104 71 245 / 11%);
+		background: var(--accent-soft);
 		font-size: 0.82rem;
 		font-weight: 750;
 		text-decoration: none;
@@ -94,7 +94,7 @@
 
 	.playlist-trigger:hover,
 	.playlist-login-link:hover {
-		background: rgb(104 71 245 / 20%);
+		background: color-mix(in srgb, var(--accent) 20%, transparent);
 	}
 
 	.playlist-dialog {
@@ -103,14 +103,14 @@
 		padding: 1.25rem;
 		overflow: auto;
 		color: var(--text);
-		border: 1px solid rgb(151 129 255 / 32%);
+		border: 1px solid var(--accent-border);
 		border-radius: 1rem;
-		background: #10172b;
-		box-shadow: 0 1.5rem 4rem rgb(0 2 14 / 58%);
+		background: var(--dialog-bg);
+		box-shadow: var(--shadow-floating);
 	}
 
 	.playlist-dialog::backdrop {
-		background: rgb(1 4 14 / 76%);
+		background: var(--overlay);
 		backdrop-filter: blur(0.2rem);
 	}
 
@@ -162,7 +162,7 @@
 		padding: 0.65rem;
 		border: 1px solid var(--border);
 		border-radius: 0.7rem;
-		background: rgb(7 12 29 / 58%);
+		background: var(--surface-translucent);
 	}
 
 	.playlist-dialog__name {
@@ -182,8 +182,8 @@
 	.playlist-dialog__list button {
 		min-width: 5rem;
 		padding: 0.55rem 0.7rem;
-		color: white;
-		border: 1px solid rgb(154 132 255 / 34%);
+		color: var(--on-accent);
+		border: 1px solid var(--accent-border);
 		border-radius: 0.55rem;
 		background: var(--accent);
 		font-weight: 750;
@@ -191,9 +191,9 @@
 	}
 
 	.playlist-dialog__list button.remove {
-		color: #ffc4ce;
-		border-color: rgb(222 89 112 / 36%);
-		background: rgb(116 30 49 / 20%);
+		color: var(--error);
+		border-color: var(--error-border);
+		background: var(--error-bg);
 	}
 
 	.playlist-dialog__empty {
@@ -203,7 +203,7 @@
 
 	.playlist-dialog__manage {
 		display: inline-flex;
-		color: #b6a8ff;
+		color: var(--link);
 		font-weight: 750;
 		text-underline-offset: 0.2em;
 	}

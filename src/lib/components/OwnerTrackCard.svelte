@@ -80,18 +80,17 @@
 		gap: 1.25rem;
 		min-width: 0;
 		padding: 1.5rem;
-		border: 1px solid rgb(139 153 198 / 18%);
+		border: 1px solid var(--border);
 		border-radius: 1rem;
-		background:
-			linear-gradient(135deg, rgb(18 27 52 / 96%), rgb(11 18 37 / 98%));
-		box-shadow: 0 1rem 3rem rgb(0 2 14 / 21%);
+		background: var(--card-background);
+		box-shadow: var(--shadow-card);
 		transition:
 			border-color 150ms ease,
 			transform 150ms ease;
 	}
 
 	.owner-track-card:hover {
-		border-color: rgb(141 117 255 / 36%);
+		border-color: var(--accent-border);
 		transform: translateY(-1px);
 	}
 
@@ -116,7 +115,7 @@
 
 	.owner-track-card__heading p {
 		margin: 0;
-		color: #a795ff;
+		color: var(--accent-strong);
 		font-size: 0.78rem;
 		font-weight: 800;
 		letter-spacing: 0.08em;
@@ -127,18 +126,18 @@
 	.owner-track-card__heading span {
 		flex: 0 0 auto;
 		padding: 0.28rem 0.55rem;
-		color: #9ee9c1;
-		border: 1px solid rgb(73 184 125 / 30%);
+		color: var(--success);
+		border: 1px solid var(--success-border);
 		border-radius: 999px;
-		background: rgb(26 104 65 / 20%);
+		background: var(--success-bg);
 		font-size: 0.72rem;
 		font-weight: 800;
 	}
 
 	.owner-track-card__heading span.private {
-		color: #efd596;
-		border-color: rgb(221 177 74 / 32%);
-		background: rgb(119 82 18 / 20%);
+		color: var(--warning);
+		border-color: var(--warning-border);
+		background: var(--warning-bg);
 	}
 
 	h2 {
@@ -162,8 +161,8 @@
 		min-width: 0;
 		padding: 0.75rem;
 		border-radius: 0.65rem;
-		border: 1px solid rgb(139 153 198 / 10%);
-		background: rgb(20 30 56 / 72%);
+		border: 1px solid var(--border);
+		background: var(--surface-secondary);
 	}
 
 	dt {
@@ -199,8 +198,8 @@
 	footer a {
 		display: inline-flex;
 		padding: 0.55rem 0.7rem;
-		color: #c8bfff;
-		border: 1px solid rgb(154 132 255 / 30%);
+		color: var(--link);
+		border: 1px solid var(--accent-border);
 		border-radius: 0.55rem;
 		font-size: 0.82rem;
 		font-weight: 750;
@@ -208,16 +207,16 @@
 	}
 
 	footer a:hover {
-		background: rgb(104 71 245 / 16%);
+		background: var(--accent-soft);
 	}
 
 	footer .delete-link {
-		color: #ffb6c2;
-		border-color: rgb(222 89 112 / 34%);
+		color: var(--error);
+		border-color: var(--error-border);
 	}
 
 	footer .delete-link:hover {
-		background: rgb(116 30 49 / 20%);
+		background: var(--error-bg);
 	}
 
 	@media (max-width: 28rem) {

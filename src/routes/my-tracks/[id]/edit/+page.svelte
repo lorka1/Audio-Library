@@ -198,7 +198,7 @@
 		border: 1px solid var(--border);
 		border-radius: 1.25rem;
 		background: var(--surface);
-		box-shadow: 0 1.5rem 4rem rgb(24 32 51 / 9%);
+		box-shadow: var(--shadow-card);
 	}
 
 	header {
@@ -237,12 +237,12 @@
 	}
 
 	.readonly-track-summary span {
-		color: #17633d;
+		color: var(--success);
 		font-weight: 800;
 	}
 
 	.readonly-track-summary span.private {
-		color: #6d5211;
+		color: var(--warning);
 	}
 
 	.management-actions {

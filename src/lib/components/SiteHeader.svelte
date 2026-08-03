@@ -2,6 +2,7 @@
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
 	import ProfileMenu from './ProfileMenu.svelte';
+	import ThemeToggle from './ThemeToggle.svelte';
 	import type { NavigationUser } from '$lib/types';
 
 	let { user }: { user: NavigationUser | null } = $props();
@@ -62,59 +63,63 @@
 			<span>Audio Library</span>
 		</a>
 
-		<nav class="desktop-navigation" aria-label="Main navigation">
-			<a
-				class="nav-link"
-				href="/tracks"
-				aria-current={isRouteActive('/tracks') ? 'page' : undefined}>Browse</a
-			>
-			{#if user}
+		<div class="header-actions">
+			<nav class="desktop-navigation" aria-label="Main navigation">
 				<a
 					class="nav-link"
-					href="/upload"
-					aria-current={isRouteActive('/upload') ? 'page' : undefined}>Upload</a
+					href="/tracks"
+					aria-current={isRouteActive('/tracks') ? 'page' : undefined}>Browse</a
 				>
-				<a
-					class="nav-link"
-					href="/playlists"
-					aria-current={isRouteActive('/playlists') ? 'page' : undefined}>Playlists</a
-				>
-				<ProfileMenu {user} menuId="desktop-profile-menu" />
-			{:else}
-				<a
-					class="nav-link"
-					href="/login"
-					aria-current={isRouteActive('/login') ? 'page' : undefined}>Login</a
-				>
-				<a
-					class="nav-link nav-link--primary"
-					href="/register"
-					aria-current={isRouteActive('/register') ? 'page' : undefined}>Register</a
-				>
-			{/if}
-		</nav>
+				{#if user}
+					<a
+						class="nav-link"
+						href="/upload"
+						aria-current={isRouteActive('/upload') ? 'page' : undefined}>Upload</a
+					>
+					<a
+						class="nav-link"
+						href="/playlists"
+						aria-current={isRouteActive('/playlists') ? 'page' : undefined}>Playlists</a
+					>
+					<ProfileMenu {user} menuId="desktop-profile-menu" />
+				{:else}
+					<a
+						class="nav-link"
+						href="/login"
+						aria-current={isRouteActive('/login') ? 'page' : undefined}>Login</a
+					>
+					<a
+						class="nav-link nav-link--primary"
+						href="/register"
+						aria-current={isRouteActive('/register') ? 'page' : undefined}>Register</a
+					>
+				{/if}
+			</nav>
 
-		<div class="mobile-actions">
-			<button
-				bind:this={mobileTrigger}
-				class="mobile-menu-trigger"
-				type="button"
-				aria-label={mobileOpen ? 'Close navigation menu' : 'Open navigation menu'}
-				aria-expanded={mobileOpen}
-				aria-controls="mobile-navigation"
-				onclick={() => (mobileOpen = !mobileOpen)}
-			>
-				<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-					{#if mobileOpen}
-						<path d="M6.4 5 5 6.4l5.6 5.6L5 17.6 6.4 19l5.6-5.6 5.6 5.6 1.4-1.4-5.6-5.6L19 6.4 17.6 5 12 10.6z"></path>
-					{:else}
-						<path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"></path>
-					{/if}
-				</svg>
-			</button>
-			{#if user}
-				<ProfileMenu {user} menuId="mobile-profile-menu" />
-			{/if}
+			<ThemeToggle />
+
+			<div class="mobile-actions">
+				<button
+					bind:this={mobileTrigger}
+					class="mobile-menu-trigger"
+					type="button"
+					aria-label={mobileOpen ? 'Close navigation menu' : 'Open navigation menu'}
+					aria-expanded={mobileOpen}
+					aria-controls="mobile-navigation"
+					onclick={() => (mobileOpen = !mobileOpen)}
+				>
+					<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+						{#if mobileOpen}
+							<path d="M6.4 5 5 6.4l5.6 5.6L5 17.6 6.4 19l5.6-5.6 5.6 5.6 1.4-1.4-5.6-5.6L19 6.4 17.6 5 12 10.6z"></path>
+						{:else}
+							<path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"></path>
+						{/if}
+					</svg>
+				</button>
+				{#if user}
+					<ProfileMenu {user} menuId="mobile-profile-menu" />
+				{/if}
+			</div>
 		</div>
 	</div>
 
@@ -165,10 +170,10 @@
 		top: 0;
 		width: 100%;
 		isolation: isolate;
-		color: #f9fafb;
-		background: rgb(5 9 23 / 92%);
-		border-bottom: 1px solid rgb(139 153 198 / 13%);
-		box-shadow: 0 0.5rem 2rem rgb(0 2 14 / 18%);
+		color: var(--header-text);
+		background: var(--header-bg);
+		border-bottom: 1px solid var(--border);
+		box-shadow: var(--shadow-header);
 		backdrop-filter: blur(1rem);
 	}
 
@@ -198,8 +203,8 @@
 		width: 2rem;
 		height: 2rem;
 		border-radius: 0.55rem;
-		background: linear-gradient(145deg, #835cff, #5031de);
-		box-shadow: 0 0.5rem 1.5rem rgb(86 48 224 / 34%);
+		background: linear-gradient(145deg, var(--accent-strong), var(--accent-active));
+		box-shadow: var(--shadow-accent);
 	}
 
 	.brand__mark span {
@@ -231,13 +236,21 @@
 		margin-left: auto;
 	}
 
+	.header-actions {
+		display: flex;
+		align-items: center;
+		justify-content: flex-end;
+		gap: 0.5rem;
+		margin-left: auto;
+	}
+
 	.nav-link,
 	.mobile-navigation a {
 		display: inline-flex;
 		align-items: center;
 		min-height: 2.75rem;
 		padding: 0.55rem 0.75rem;
-		color: #c5ccdc;
+		color: var(--header-text-muted);
 		border-radius: 0.5rem;
 		font-size: 0.875rem;
 		font-weight: 680;
@@ -246,38 +259,38 @@
 
 	.nav-link:hover,
 	.mobile-navigation a:hover {
-		color: white;
-		background: rgb(255 255 255 / 8%);
+		color: var(--header-text);
+		background: var(--header-hover-bg);
 	}
 
 	.nav-link[aria-current='page'],
 	.mobile-navigation a[aria-current='page'] {
-		color: #967cff;
-		background: rgb(104 71 245 / 10%);
+		color: var(--accent-strong);
+		background: var(--accent-soft);
 	}
 
 	.nav-link--primary,
 	.mobile-navigation .mobile-navigation__primary {
 		min-width: 6rem;
 		justify-content: center;
-		color: white;
-		background: linear-gradient(135deg, #6040ed, #7547f5);
-		box-shadow: 0 0.55rem 1.25rem rgb(80 45 213 / 24%);
+		color: var(--on-accent);
+		background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+		box-shadow: var(--shadow-accent-soft);
 	}
 
 	.nav-link--primary:hover,
 	.mobile-navigation .mobile-navigation__primary:hover,
 	.nav-link--primary[aria-current='page'],
 	.mobile-navigation .mobile-navigation__primary[aria-current='page'] {
-		color: white;
-		background: linear-gradient(135deg, #7352f7, #875cff);
+		color: var(--on-accent);
+		background: linear-gradient(135deg, var(--accent-strong), var(--accent-hover));
 	}
 
 	.nav-link:focus-visible,
 	.mobile-navigation a:focus-visible,
 	.brand:focus-visible,
 	.mobile-menu-trigger:focus-visible {
-		outline-color: #a59dff;
+		outline-color: var(--focus-ring);
 	}
 
 	.mobile-actions,
@@ -291,10 +304,10 @@
 		width: 2.75rem;
 		height: 2.75rem;
 		padding: 0;
-		color: #dbe3ef;
-		border: 1px solid rgb(255 255 255 / 14%);
+		color: var(--header-control-text);
+		border: 1px solid var(--header-control-border);
 		border-radius: 0.65rem;
-		background: rgb(255 255 255 / 5%);
+		background: var(--header-control-bg);
 		cursor: pointer;
 	}
 
@@ -326,8 +339,8 @@
 
 		.mobile-navigation {
 			display: block;
-			border-top: 1px solid rgb(255 255 255 / 9%);
-			background: rgb(6 10 24 / 98%);
+			border-top: 1px solid var(--border);
+			background: var(--header-mobile-bg);
 		}
 
 		.mobile-navigation__inner {

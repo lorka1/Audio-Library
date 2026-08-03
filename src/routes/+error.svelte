@@ -51,7 +51,7 @@
 		border: 1px solid var(--border);
 		border-radius: 1.25rem;
 		background: var(--surface);
-		box-shadow: 0 1.5rem 4rem rgb(24 32 51 / 9%);
+		box-shadow: var(--shadow-card);
 	}
 
 	h1 {

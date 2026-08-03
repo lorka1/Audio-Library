@@ -123,9 +123,7 @@
 	.track-detail {
 		position: relative;
 		overflow: hidden;
-		background:
-			radial-gradient(circle at 18% 10%, rgb(104 71 245 / 10%), transparent 23rem),
-			linear-gradient(135deg, rgb(18 27 52 / 98%), rgb(10 16 34 / 99%));
+		background: var(--detail-background);
 	}
 
 	.track-detail__hero {
@@ -149,7 +147,7 @@
 	}
 
 	.track-detail__artist {
-		color: #b6bfd2;
+		color: var(--text-muted);
 	}
 
 	.track-detail__actions {
@@ -157,19 +155,19 @@
 	}
 
 	.track-detail__metadata {
-		border-color: rgb(139 153 198 / 16%);
-		background: rgb(7 12 28 / 34%);
+		border-color: var(--border);
+		background: var(--surface-translucent);
 	}
 
 	.track-detail__metadata div {
-		border-color: rgb(139 153 198 / 14%);
+		border-color: var(--border);
 	}
 
 	.track-description {
 		padding: 1.25rem;
-		border: 1px solid rgb(139 153 198 / 13%);
+		border: 1px solid var(--border);
 		border-radius: 0.85rem;
-		background: rgb(8 14 31 / 36%);
+		background: var(--detail-section-bg);
 	}
 
 	@media (max-width: 48rem) {

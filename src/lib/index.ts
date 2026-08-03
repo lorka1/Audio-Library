@@ -6,6 +6,7 @@ export { default as TrackCard } from './components/TrackCard.svelte';
 export { default as OwnerTrackCard } from './components/OwnerTrackCard.svelte';
 export { default as GlobalAudioPlayer } from './components/GlobalAudioPlayer.svelte';
 export { default as TrackPlayButton } from './components/TrackPlayButton.svelte';
+export { default as ThemeToggle } from './components/ThemeToggle.svelte';
 export { default as TrackFilters } from './components/TrackFilters.svelte';
 export { default as AddToPlaylist } from './components/AddToPlaylist.svelte';
 export { default as PlaylistArtwork } from './components/PlaylistArtwork.svelte';

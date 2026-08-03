@@ -38,6 +38,8 @@ const STARTUP_TIMEOUT_MS = 60_000;
 const PAGE_TIMEOUT_MS = 30_000;
 const BROWSER_COMMAND_TIMEOUT_MS = 20_000;
 const OVERALL_TIMEOUT_MS = 12 * 60_000;
+const THEME_STORAGE_KEY = 'audio-library-theme';
+const THEMES = ['dark', 'light'];
 const SYNTHETIC_AUDIO = new Uint8Array([
 	0x49, 0x44, 0x33, 0x04, 0x00, 0x00, 0x00, 0x00,
 	0x00, 0x0f, 0x54, 0x49, 0x54, 0x32, 0x00, 0x00,
@@ -234,6 +236,80 @@ async function navigate(cdp, url, selector) {
 	throw new Error(`Page did not reach the expected state: ${selector}.`);
 }
 
+async function reload(cdp, selector) {
+	await cdp.command('Page.reload', { ignoreCache: true });
+	const deadline = Date.now() + PAGE_TIMEOUT_MS;
+	while (Date.now() < deadline) {
+		const ready = await evaluate(
+			cdp,
+			`document.readyState === 'complete' && Boolean(document.querySelector(${JSON.stringify(selector)}))`
+		);
+		if (ready) return;
+		await new Promise((resolveDelay) => setTimeout(resolveDelay, 100));
+	}
+	throw new Error(`Reload did not reach the expected state: ${selector}.`);
+}
+
+async function saveThemeAndReload(cdp, theme, selector) {
+	await evaluate(
+		cdp,
+		`localStorage.setItem(${JSON.stringify(THEME_STORAGE_KEY)}, ${JSON.stringify(theme)})`
+	);
+	await reload(cdp, selector);
+}
+
+async function waitForFirstPaintTheme(cdp) {
+	const deadline = Date.now() + PAGE_TIMEOUT_MS;
+	while (Date.now() < deadline) {
+		const theme = await evaluate(cdp, 'window.__audioLibraryThemeAtFirstPaint ?? null');
+		if (theme !== null) return theme;
+		await new Promise((resolveDelay) => setTimeout(resolveDelay, 50));
+	}
+	throw new Error('Timed out waiting for the first-paint theme observation.');
+}
+
+async function waitForThemeUi(cdp) {
+	const deadline = Date.now() + PAGE_TIMEOUT_MS;
+	while (Date.now() < deadline) {
+		const ready = await evaluate(cdp, `(() => {
+			const theme = document.documentElement.dataset.theme;
+			const expected = theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode';
+			return document.querySelector('.theme-toggle')?.getAttribute('aria-label') === expected;
+		})()`);
+		if (ready) return;
+		await new Promise((resolveDelay) => setTimeout(resolveDelay, 50));
+	}
+	throw new Error('Timed out waiting for the hydrated theme control.');
+}
+
+async function currentThemeState(cdp) {
+	await waitForFirstPaintTheme(cdp);
+	await waitForThemeUi(cdp);
+	return evaluate(cdp, `(() => ({
+		theme: document.documentElement.dataset.theme,
+		stored: localStorage.getItem(${JSON.stringify(THEME_STORAGE_KEY)}),
+		firstFrame: window.__audioLibraryThemeAtFirstPaint ?? null,
+		label: document.querySelector('.theme-toggle')?.getAttribute('aria-label') ?? null,
+		colorScheme: getComputedStyle(document.documentElement).colorScheme
+	}))()`);
+}
+
+function assertThemeState(
+	state,
+	expectedTheme,
+	expectedStored = expectedTheme,
+	expectedFirstPaint = expectedTheme
+) {
+	assert.equal(state.theme, expectedTheme);
+	assert.equal(state.stored, expectedStored);
+	assert.equal(state.firstFrame, expectedFirstPaint);
+	assert.equal(
+		state.label,
+		expectedTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'
+	);
+	assert.ok(state.colorScheme.includes(expectedTheme));
+}
+
 async function activateAndWaitForPlayer(cdp) {
 	const deadline = Date.now() + PAGE_TIMEOUT_MS;
 	while (Date.now() < deadline) {
@@ -249,16 +325,53 @@ async function activateAndWaitForPlayer(cdp) {
 }
 
 async function commonPageState(cdp) {
+	await waitForFirstPaintTheme(cdp);
+	await waitForThemeUi(cdp);
 	return evaluate(cdp, `(() => {
+		const channel = (value) => {
+			const match = value.match(/[\\d.]+/g)?.map(Number) ?? [];
+			return match.slice(0, 3).map((component) => {
+				const normalized = component / 255;
+				return normalized <= 0.03928
+					? normalized / 12.92
+					: ((normalized + 0.055) / 1.055) ** 2.4;
+			});
+		};
+		const luminance = (value) => {
+			const [red = 0, green = 0, blue = 0] = channel(value);
+			return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+		};
+		const contrast = (foreground, background) => {
+			const first = luminance(foreground);
+			const second = luminance(background);
+			return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
+		};
 		const header = document.querySelector('.site-header');
 		const headerRect = header?.getBoundingClientRect();
 		const bodyStyle = getComputedStyle(document.body);
+		const rootStyle = getComputedStyle(document.documentElement);
+		const toggle = document.querySelector('.theme-toggle');
+		const toggleRect = toggle?.getBoundingClientRect();
 		const text = document.body.textContent || '';
 		return {
 			innerWidth: window.innerWidth,
 			clientWidth: document.documentElement.clientWidth,
 			scrollWidth: document.documentElement.scrollWidth,
 			bodyMargin: bodyStyle.margin,
+			theme: document.documentElement.dataset.theme,
+			storedTheme: localStorage.getItem(${JSON.stringify(THEME_STORAGE_KEY)}),
+			firstFrameTheme: window.__audioLibraryThemeAtFirstPaint ?? null,
+			colorScheme: rootStyle.colorScheme,
+			toggleLabel: toggle?.getAttribute('aria-label') ?? null,
+			toggleVisible: Boolean(
+				toggleRect &&
+					toggleRect.width > 0 &&
+					toggleRect.height > 0 &&
+					getComputedStyle(toggle).visibility !== 'hidden'
+			),
+			bodyContrast: contrast(bodyStyle.color, bodyStyle.backgroundColor),
+			bodyColor: bodyStyle.color,
+			bodyBackground: bodyStyle.backgroundColor,
 			headerLeft: headerRect?.left ?? null,
 			headerRight: headerRect?.right ?? null,
 			fakeStatistics: ['250K+ Tracks', '120K+ Creators', '2M+ Downloads', '190+ Countries']
@@ -270,13 +383,25 @@ async function commonPageState(cdp) {
 	})()`);
 }
 
-function assertCommonPageState(state, width) {
+function assertCommonPageState(state, width, theme) {
 	assert.equal(state.innerWidth, width);
 	assert.ok(
 		state.scrollWidth <= state.clientWidth,
 		`Horizontal overflow: ${state.scrollWidth} > ${state.clientWidth}.`
 	);
 	assert.equal(state.bodyMargin, '0px');
+	assert.equal(state.theme, theme);
+	assert.equal(state.storedTheme, theme);
+	assert.equal(state.firstFrameTheme, theme);
+	assert.ok(state.colorScheme.includes(theme));
+	assert.equal(
+		state.toggleLabel,
+		theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'
+	);
+	assert.equal(state.toggleVisible, true);
+	assert.ok(state.bodyContrast >= 4.5, `Insufficient body contrast: ${state.bodyContrast}.`);
+	assert.notEqual(state.bodyColor, 'rgba(0, 0, 0, 0)');
+	assert.notEqual(state.bodyBackground, 'rgba(0, 0, 0, 0)');
 	assert.ok(Math.abs(state.headerLeft) <= 0.5);
 	assert.ok(Math.abs(state.headerRight - state.clientWidth) <= 0.5);
 	assert.equal(state.fakeStatistics, false);
@@ -414,13 +539,17 @@ try {
 	assert.ok(isOwnedTemporaryRoot(temporaryRoot));
 	const audioRoot = join(temporaryRoot, 'audio');
 	const coverRoot = join(audioRoot, 'covers');
+	const playlistImageRoot = join(temporaryRoot, 'playlist-images');
 	const browserProfile = join(temporaryRoot, 'browser-profile');
 	await mkdir(coverRoot, { recursive: true });
+	await mkdir(playlistImageRoot);
 	const audioStorageKeys = [`${randomUUID()}.mp3`, `${randomUUID()}.mp3`, `${randomUUID()}.mp3`];
 	const coverStorageKey = `${randomUUID()}.png`;
+	const playlistImageStorageKey = `${randomUUID()}.png`;
 	await Promise.all([
 		...audioStorageKeys.map((storageKey) => writeFile(join(audioRoot, storageKey), SYNTHETIC_AUDIO)),
-		writeFile(join(coverRoot, coverStorageKey), SYNTHETIC_PNG)
+		writeFile(join(coverRoot, coverStorageKey), SYNTHETIC_PNG),
+		writeFile(join(playlistImageRoot, playlistImageStorageKey), SYNTHETIC_PNG)
 	]);
 
 	const collections = getMongoCollections(client.db(databaseName));
@@ -479,15 +608,32 @@ try {
 	})));
 	const playlistId = randomUUID();
 	const playlistPublicId = randomBytes(18).toString('base64url');
-	await collections.playlists.insertOne({
-		_id: playlistId,
-		publicId: playlistPublicId,
-		ownerId,
-		name: 'Synthetic visual playlist with a deliberately long responsive name',
-		description: 'Owned visual verification fixture.',
-		createdAt: now,
-		updatedAt: now
-	});
+	await collections.playlists.insertMany([
+		{
+			_id: playlistId,
+			publicId: playlistPublicId,
+			ownerId,
+			name: 'Synthetic visual playlist with a deliberately long responsive name',
+			description: 'Owned visual verification fixture.',
+			image: {
+				storageKey: playlistImageStorageKey,
+				mimeType: 'image/png',
+				byteSize: SYNTHETIC_PNG.byteLength
+			},
+			createdAt: now,
+			updatedAt: now
+		},
+		{
+			_id: randomUUID(),
+			publicId: randomBytes(18).toString('base64url'),
+			ownerId,
+			name: 'Synthetic fallback playlist',
+			description: null,
+			image: null,
+			createdAt: now,
+			updatedAt: now
+		}
+	]);
 	await collections.playlistItems.insertMany(trackIds.slice(0, 2).map((trackId, index) => ({
 		_id: randomUUID(),
 		playlistId,
@@ -514,6 +660,7 @@ try {
 			cwd: resolve('.'),
 			env: createSyntheticApplicationEnvironment({
 				AUDIO_STORAGE_PATH: audioRoot,
+				PLAYLIST_IMAGE_STORAGE_PATH: playlistImageRoot,
 				SESSION_COOKIE_NAME: cookieName,
 				MONGODB_URI: config.uri,
 				MONGODB_DB_NAME: databaseName,
@@ -552,6 +699,9 @@ try {
 	await cdp.command('Page.enable');
 	await cdp.command('Runtime.enable');
 	await cdp.command('Network.enable');
+	await cdp.command('Page.addScriptToEvaluateOnNewDocument', {
+		source: `window.__audioLibraryThemeAtFirstPaint = null; new PerformanceObserver((list, observer) => { if (list.getEntries().some((entry) => entry.name === 'first-paint')) { window.__audioLibraryThemeAtFirstPaint = document.documentElement.dataset.theme ?? null; observer.disconnect(); } }).observe({ type: 'paint', buffered: true });`
+	});
 
 	for (const [width, height] of VIEWPORTS) {
 		assert.equal(overallTimedOut, false, 'Visual viewport verification exceeded its overall timeout.');
@@ -564,7 +714,31 @@ try {
 		await cdp.command('Network.clearBrowserCookies');
 
 		await navigate(cdp, `${baseUrl}/`, '.hero');
-		assertCommonPageState(await commonPageState(cdp), width);
+		await evaluate(cdp, `localStorage.removeItem(${JSON.stringify(THEME_STORAGE_KEY)})`);
+		await reload(cdp, '.hero');
+		assertThemeState(await currentThemeState(cdp), 'dark', null);
+		await saveThemeAndReload(cdp, 'light', '.hero');
+		assertCommonPageState(await commonPageState(cdp), width, 'light');
+		await navigate(cdp, `${baseUrl}/tracks`, '.track-filters');
+		assertCommonPageState(await commonPageState(cdp), width, 'light');
+		await reload(cdp, '.track-filters');
+		assertCommonPageState(await commonPageState(cdp), width, 'light');
+		await evaluate(cdp, `document.querySelector('.theme-toggle').click()`);
+		assertThemeState(await currentThemeState(cdp), 'dark', 'dark', 'light');
+		await reload(cdp, '.track-filters');
+		assertCommonPageState(await commonPageState(cdp), width, 'dark');
+		await evaluate(
+			cdp,
+			`localStorage.setItem(${JSON.stringify(THEME_STORAGE_KEY)}, 'invalid-theme')`
+		);
+		await reload(cdp, '.track-filters');
+		assertThemeState(await currentThemeState(cdp), 'dark', 'invalid-theme');
+
+		for (const theme of THEMES) {
+			await cdp.command('Network.clearBrowserCookies');
+			await navigate(cdp, `${baseUrl}/`, '.hero');
+			await saveThemeAndReload(cdp, theme, '.hero');
+			assertCommonPageState(await commonPageState(cdp), width, theme);
 		const homeState = await evaluate(cdp, `(() => ({
 			heading: document.querySelector('.hero h1')?.textContent.trim(),
 			waveformHidden: document.querySelector('.audio-waveform')?.getAttribute('aria-hidden'),
@@ -587,8 +761,18 @@ try {
 			features: [{ name: 'prefers-reduced-motion', value: 'no-preference' }]
 		});
 
+		await navigate(cdp, `${baseUrl}/login`, '.auth-card');
+		assertCommonPageState(await commonPageState(cdp), width, theme);
+		const loginControls = await evaluate(cdp, `(() => [...document.querySelectorAll('.auth-card input:not([type="hidden"])')].every((input) => {
+			const style = getComputedStyle(input);
+			return input.getBoundingClientRect().width > 0 && style.color !== 'rgba(0, 0, 0, 0)' && style.backgroundColor !== 'rgba(0, 0, 0, 0)';
+		}))()`);
+		assert.equal(loginControls, true);
+		await navigate(cdp, `${baseUrl}/register`, '.auth-card');
+		assertCommonPageState(await commonPageState(cdp), width, theme);
+
 		await navigate(cdp, `${baseUrl}/tracks`, '.track-filters');
-		assertCommonPageState(await commonPageState(cdp), width);
+		assertCommonPageState(await commonPageState(cdp), width, theme);
 		await verifyFilterLayout(cdp, width);
 		const browseState = await evaluate(cdp, `(() => {
 			const cards = [...document.querySelectorAll('.track-card')];
@@ -613,7 +797,7 @@ try {
 		assert.equal(browseState.longIdentitySafe, true);
 
 		await navigate(cdp, `${baseUrl}/tracks/1`, '.track-detail');
-		assertCommonPageState(await commonPageState(cdp), width);
+		assertCommonPageState(await commonPageState(cdp), width, theme);
 		const detailState = await evaluate(cdp, `(() => ({
 			cover: Boolean(document.querySelector('.track-detail .track-cover img')),
 			play: Boolean(document.querySelector('.track-detail [aria-label^="Play "]')),
@@ -624,7 +808,7 @@ try {
 
 		await setAuthenticatedCookie(cdp, cookieName, token, baseUrl);
 		await navigate(cdp, `${baseUrl}/`, '.hero');
-		assertCommonPageState(await commonPageState(cdp), width);
+		assertCommonPageState(await commonPageState(cdp), width, theme);
 		const authNavigation = await evaluate(
 			cdp,
 			`[...document.querySelectorAll('a[href="/playlists"]')].length`
@@ -632,6 +816,22 @@ try {
 		assert.ok(authNavigation >= 2);
 
 		await navigate(cdp, `${baseUrl}/tracks`, '.track-card');
+		const dialogState = await evaluate(cdp, `(() => {
+			const trigger = document.querySelector('.track-card .playlist-trigger');
+			trigger?.click();
+			const dialog = document.querySelector('.playlist-dialog');
+			const style = dialog ? getComputedStyle(dialog) : null;
+			const state = {
+				open: Boolean(dialog?.open),
+				background: style?.backgroundColor ?? 'rgba(0, 0, 0, 0)',
+				color: style?.color ?? 'rgba(0, 0, 0, 0)'
+			};
+			dialog?.close();
+			return state;
+		})()`);
+		assert.equal(dialogState.open, true);
+		assert.notEqual(dialogState.background, 'rgba(0, 0, 0, 0)');
+		assert.notEqual(dialogState.color, 'rgba(0, 0, 0, 0)');
 		await activateAndWaitForPlayer(cdp);
 		const playerState = await evaluate(cdp, `(() => {
 			const player = document.querySelector('.global-player');
@@ -648,7 +848,9 @@ try {
 				toggle: Boolean(player.querySelector('.global-player__toggle')),
 				seek: Boolean(player.querySelector('input[aria-label^="Seek "]')),
 				volume: Boolean(player.querySelector('input[aria-label="Volume"]')),
-				shellPaddingBottom: parseFloat(getComputedStyle(shell).paddingBottom)
+				shellPaddingBottom: parseFloat(getComputedStyle(shell).paddingBottom),
+				color: getComputedStyle(player).color,
+				backgroundImage: getComputedStyle(player).backgroundImage
 			};
 		})()`);
 		assert.ok(Math.abs(playerState.left) <= 0.5);
@@ -659,10 +861,12 @@ try {
 		assert.equal(playerState.toggle, true);
 		assert.equal(playerState.seek, true);
 		assert.equal(playerState.volume, true);
+		assert.notEqual(playerState.color, 'rgba(0, 0, 0, 0)');
+		assert.notEqual(playerState.backgroundImage, 'none');
 		assert.ok(playerState.shellPaddingBottom >= playerState.height - 2);
 
 		await navigate(cdp, `${baseUrl}/my-tracks`, '.owner-track-grid');
-		assertCommonPageState(await commonPageState(cdp), width);
+		assertCommonPageState(await commonPageState(cdp), width, theme);
 		const ownerState = await evaluate(cdp, `(() => {
 			const cards = [...document.querySelectorAll('.owner-track-card')];
 			return {
@@ -678,29 +882,55 @@ try {
 		assert.equal(ownerState.overflow, false);
 
 		await navigate(cdp, `${baseUrl}/playlists`, '.playlist-card');
-		assertCommonPageState(await commonPageState(cdp), width);
+		assertCommonPageState(await commonPageState(cdp), width, theme);
+		const playlistImageDecoded = await evaluate(cdp, `(async () => {
+			const image = document.querySelector('.playlist-card .playlist-artwork img');
+			if (!image) return false;
+			try {
+				await Promise.race([
+					image.decode(),
+					new Promise((_, reject) => setTimeout(() => reject(new Error('decode timeout')), 5_000))
+				]);
+			} catch {}
+			return image.complete && image.naturalWidth > 0;
+		})()`);
+		assert.equal(playlistImageDecoded, true);
+		const playlistLibraryState = await evaluate(cdp, `(() => {
+			const images = [...document.querySelectorAll('.playlist-card .playlist-artwork img')];
+			return {
+				cards: document.querySelectorAll('.playlist-card').length,
+				images: images.length,
+				decodedImages: images.filter((image) => image.complete && image.naturalWidth > 0).length,
+				fallbacks: document.querySelectorAll('.playlist-card .playlist-artwork__fallback').length
+			};
+		})()`);
+		assert.deepEqual(playlistLibraryState, { cards: 2, images: 1, decodedImages: 1, fallbacks: 1 });
 		await navigate(cdp, `${baseUrl}/playlists/${playlistPublicId}`, '.playlist-detail-page');
-		assertCommonPageState(await commonPageState(cdp), width);
+		assertCommonPageState(await commonPageState(cdp), width, theme);
 		const playlistState = await evaluate(cdp, `(() => {
 			const rows = [...document.querySelectorAll('.playlist-tracks li')];
 			return {
 				count: rows.length,
-				overflow: rows.some((row) => row.scrollWidth > row.clientWidth + 1)
+				overflow: rows.some((row) => row.scrollWidth > row.clientWidth + 1),
+				image: Boolean(document.querySelector('.playlist-detail-heading .playlist-artwork img'))
 			};
 		})()`);
 		assert.equal(playlistState.count, 2);
 		assert.equal(playlistState.overflow, false);
+		assert.equal(playlistState.image, true);
 
 		const screenshot = await cdp.command('Page.captureScreenshot', {
 			format: 'png',
 			captureBeyondViewport: false
 		});
 		assert.ok(screenshot.data.length > 1_000);
-		console.log(`VISUAL_VIEWPORT_PASS=${width}x${height}`);
+			console.log(`THEME_VIEWPORT_PASS=${theme}:${width}x${height}`);
+		}
+		console.log(`THEME_VIEWPORT_BOTH_PASS=${width}x${height}`);
 	}
 
 	console.log(
-		`VISUAL_VIEWPORTS_VERIFIED=${VIEWPORTS.map(([width, height]) => `${width}x${height}`).join(',')}`
+		`THEME_VIEWPORTS_VERIFIED=${VIEWPORTS.map(([width, height]) => `${width}x${height}`).join(',')};THEMES=${THEMES.join(',')}`
 	);
 } catch (error) {
 	if (overallTimedOut) {

@@ -687,6 +687,29 @@ used for any real service.
 - [ ] Sign out and inspect desktop and mobile navigation.
 - [ ] Expected: The linked brand replaces Home; Browse, Login, and Register remain available; Login and Register have equal neutral styling.
 
+## Persistent light and dark themes
+
+### THEME-001 — Default and saved preferences
+
+- [ ] Clear `audio-library-theme`, reload, and confirm the page first appears in dark mode without a light flash.
+- [ ] Select light mode, navigate within the app, and reload.
+- [ ] Expected: Light mode remains selected across navigation and reload; an invalid stored value safely returns to dark mode.
+
+### THEME-002 — Header toggle accessibility
+
+- [ ] Use the theme control by keyboard while signed out and signed in at desktop and 390 px widths, including while the profile menu is open.
+- [ ] Expected: The control remains visible, has a visible focus indicator, and its accessible name alternates between “Switch to light mode” and “Switch to dark mode”.
+
+### THEME-003 — Major surfaces in both themes
+
+- [ ] In both themes inspect Home, Browse and filters, upload/edit forms, track detail, My Tracks, playlists and playlist detail, login/register/account, the Add to playlist dialog, and the fixed player.
+- [ ] Expected: Text, inputs, notices, focus indicators, range controls, images, fallbacks, and dialogs remain readable; no content overflows or sits beneath the player.
+
+### THEME-004 — Media and reduced motion
+
+- [ ] Verify track covers, playlist images, their fallback artwork, and the decorative waveform in both themes with reduced motion enabled and disabled.
+- [ ] Expected: Media behavior is unchanged, the waveform remains hidden from assistive technology, and motion is removed when reduced motion is requested.
+
 ## Scope confirmation
 
 - [ ] Confirm upload is available only to signed-in users.

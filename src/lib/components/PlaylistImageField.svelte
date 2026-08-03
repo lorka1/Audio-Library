@@ -18,7 +18,7 @@
 </div>
 
 <style>
-	.playlist-image-field { display: grid; grid-template-columns: 4.5rem minmax(0, 1fr); gap: 1rem; align-items: start; padding: 0.9rem; border: 1px solid var(--border); border-radius: 0.9rem; background: rgb(7 12 29 / 38%); }
+	.playlist-image-field { display: grid; grid-template-columns: 4.5rem minmax(0, 1fr); gap: 1rem; align-items: start; padding: 0.9rem; border: 1px solid var(--border); border-radius: 0.9rem; background: var(--surface-translucent); }
 	.playlist-image-field :global(.playlist-artwork) { width: 4.5rem; }
 	.playlist-image-field label:first-child { display: inline-block; margin-bottom: 0.45rem; }
 	.remove-image { display: flex; align-items: center; gap: 0.55rem; margin-top: 0.75rem; color: var(--text-muted); font-size: 0.85rem; }

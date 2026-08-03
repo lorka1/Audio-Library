@@ -192,6 +192,8 @@ describe('SiteHeader navigation', () => {
 		expect(body).toMatch(/method="POST" action="\/logout"/);
 		expect(body).not.toContain('href="/">Home</a>');
 		expect(body).not.toContain('ownerEmail');
+		expect(body).toContain('aria-label="Switch to light mode"');
+		expect(body.match(/<button class="theme-toggle\b/g)).toHaveLength(1);
 	});
 
 	it('uses the stronger Register action without adding invalid routes', () => {
@@ -209,6 +211,9 @@ describe('SiteHeader navigation', () => {
 		expect(body).not.toContain('For Creators');
 		expect(body).not.toContain('Open profile menu');
 		expect(body).not.toContain('href="/playlists"');
+		expect(body).toContain('aria-label="Switch to light mode"');
+		expect(body).toContain('theme-toggle__moon');
+		expect(body).toContain('theme-toggle__sun');
 	});
 });
 

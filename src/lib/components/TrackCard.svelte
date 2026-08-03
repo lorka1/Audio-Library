@@ -92,11 +92,10 @@
 		gap: 0.85rem 1rem;
 		min-width: 0;
 		padding: 0.65rem 0.85rem;
-		border: 1px solid rgb(139 153 198 / 17%);
+		border: 1px solid var(--border);
 		border-radius: 0.85rem;
-		background:
-			linear-gradient(110deg, rgb(19 28 54 / 94%), rgb(12 19 39 / 96%));
-		box-shadow: 0 0.75rem 2rem rgb(0 2 14 / 17%);
+		background: var(--card-background);
+		box-shadow: var(--shadow-card);
 		transition:
 			border-color 160ms ease,
 			background-color 160ms ease,
@@ -104,9 +103,8 @@
 	}
 
 	.track-card:hover {
-		border-color: rgb(142 117 255 / 38%);
-		background:
-			linear-gradient(110deg, rgb(23 33 63 / 97%), rgb(14 22 45 / 98%));
+		border-color: var(--accent-border);
+		background: var(--card-background-hover);
 		transform: translateY(-1px);
 	}
 
@@ -120,7 +118,7 @@
 
 	.track-card__artist {
 		margin: 0.22rem 0 0;
-		color: #b2bbce;
+		color: var(--text-muted);
 		font-size: 0.82rem;
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -129,7 +127,7 @@
 
 	.track-card__owner {
 		margin: 0.22rem 0 0;
-		color: #79849e;
+		color: var(--text-subtle);
 		font-size: 0.68rem;
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -151,7 +149,7 @@
 	}
 
 	h2 a:hover {
-		color: #b9acff;
+		color: var(--link);
 	}
 
 	.track-card__genre {
@@ -160,10 +158,10 @@
 		margin: 0;
 		padding: 0.3rem 0.55rem;
 		overflow: hidden;
-		color: #aa99ff;
-		border: 1px solid rgb(125 96 246 / 15%);
+		color: var(--link);
+		border: 1px solid var(--border);
 		border-radius: 0.4rem;
-		background: rgb(104 71 245 / 13%);
+		background: var(--accent-soft);
 		font-size: 0.72rem;
 		text-overflow: ellipsis;
 		white-space: nowrap;
@@ -182,7 +180,7 @@
 	}
 
 	dt {
-		color: #707b96;
+		color: var(--text-subtle);
 		font-size: 0.58rem;
 		font-weight: 800;
 		letter-spacing: 0.06em;
@@ -191,7 +189,7 @@
 
 	dd {
 		margin: 0.2rem 0 0;
-		color: #d8deeb;
+		color: var(--text);
 		font-size: 0.8rem;
 		font-weight: 700;
 		overflow: hidden;
@@ -217,7 +215,7 @@
 		place-items: center;
 		width: 2.45rem;
 		height: 2.45rem;
-		color: #aeb7cb;
+		color: var(--text-muted);
 		border: 1px solid transparent;
 		border-radius: 999px;
 		transition:
@@ -227,9 +225,9 @@
 	}
 
 	.track-card__actions a:hover {
-		color: white;
-		border-color: rgb(151 129 255 / 28%);
-		background: rgb(104 71 245 / 15%);
+		color: var(--link);
+		border-color: var(--accent-border);
+		background: var(--accent-soft);
 	}
 
 	.track-card__actions svg {

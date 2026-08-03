@@ -211,13 +211,11 @@
 	.track-filters {
 		margin-bottom: 2rem;
 		padding: clamp(1.25rem, 3vw, 1.8rem);
-		color: #131a2c;
-		border: 1px solid rgb(226 230 240 / 82%);
+		color: var(--filter-text);
+		border: 1px solid var(--border-strong);
 		border-radius: 0.95rem;
-		background:
-			radial-gradient(circle at 84% 10%, rgb(116 79 247 / 5%), transparent 24rem),
-			#f7f8fc;
-		box-shadow: 0 1.5rem 4rem rgb(0 2 15 / 32%);
+		background: var(--filter-bg);
+		box-shadow: var(--shadow-card);
 		color-scheme: light;
 	}
 
@@ -231,7 +229,7 @@
 
 	h2 {
 		margin: 0;
-		color: #151d32;
+		color: var(--filter-text);
 		font-size: clamp(1.25rem, 3vw, 1.55rem);
 		letter-spacing: -0.035em;
 	}
@@ -241,7 +239,7 @@
 		align-items: center;
 		gap: 0.55rem;
 		margin-bottom: 0.55rem;
-		color: #5139d8;
+		color: var(--accent);
 	}
 
 	.track-filters .auth-eyebrow svg {
@@ -260,8 +258,8 @@
 		min-height: var(--control-height);
 		min-width: 8.5rem;
 		padding: 0.7rem 1rem;
-		color: #5139d8;
-		border: 1px solid #8f7af0;
+		color: var(--accent);
+		border: 1px solid var(--accent-border);
 		border-radius: var(--radius-control);
 		background: transparent;
 		font-size: 0.86rem;
@@ -273,17 +271,17 @@
 	}
 
 	.track-filters__actions a:hover {
-		border-color: #6547ef;
-		background: #eeebff;
+		border-color: var(--accent);
+		background: var(--accent-soft);
 	}
 
 	.filter-errors {
 		margin-bottom: 1.25rem;
 		padding: 0.9rem 1rem;
-		color: #8e2438;
-		border: 1px solid #efbdc6;
+		color: var(--error-strong);
+		border: 1px solid var(--error-border);
 		border-radius: 0.65rem;
-		background: #fff1f3;
+		background: var(--error-bg);
 		font-size: 0.88rem;
 		line-height: 1.5;
 	}
@@ -322,35 +320,35 @@
 	}
 
 	.track-filters .form-field label {
-		color: #161e32;
+		color: var(--filter-text);
 		font-size: 0.82rem;
 	}
 
 	.track-filters .form-field input,
 	.track-filters .form-field select {
-		color: #182036;
-		border-color: #ccd3e1;
-		background-color: white;
+		color: var(--filter-input-text);
+		border-color: var(--filter-input-border);
+		background-color: var(--filter-input-bg);
 	}
 
 	.track-filters .form-field input::placeholder {
-		color: #7d869b;
+		color: var(--filter-placeholder);
 	}
 
 	.track-filters .form-field input:hover,
 	.track-filters .form-field select:hover {
-		border-color: #a9b2c5;
-		background-color: white;
+		border-color: var(--border-strong);
+		background-color: var(--filter-input-bg);
 	}
 
 	.track-filters .form-field input:focus,
 	.track-filters .form-field select:focus {
-		border-color: #6847f5;
-		box-shadow: 0 0 0 3px rgb(104 71 245 / 18%);
+		border-color: var(--accent);
+		box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus-ring) 18%, transparent);
 	}
 
 	.track-filters .field-help {
-		color: #687187;
+		color: var(--filter-muted);
 	}
 
 	.track-filters__input-wrap {
@@ -364,7 +362,7 @@
 		left: 1rem;
 		width: 1.1rem;
 		height: 1.1rem;
-		fill: #727d94;
+		fill: var(--filter-muted);
 		transform: translateY(-50%);
 		pointer-events: none;
 	}
@@ -393,7 +391,7 @@
 	.track-filters__actions .primary-button {
 		gap: 0.45rem;
 		min-width: 9.25rem;
-		box-shadow: 0 0.6rem 1.4rem rgb(82 54 209 / 18%);
+		box-shadow: var(--shadow-accent-soft);
 	}
 
 	.track-filters__actions .primary-button svg {

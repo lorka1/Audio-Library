@@ -188,11 +188,10 @@
 		padding: 0.65rem max(var(--page-gutter), env(safe-area-inset-right))
 			calc(0.65rem + env(safe-area-inset-bottom))
 			max(var(--page-gutter), env(safe-area-inset-left));
-		color: #f9fafb;
-		border-top: 1px solid rgb(153 165 205 / 21%);
-		background:
-			linear-gradient(90deg, rgb(12 19 39 / 97%), rgb(8 14 31 / 97%));
-		box-shadow: 0 -0.75rem 2.75rem rgb(0 2 14 / 42%);
+		color: var(--player-text);
+		border-top: 1px solid var(--border-strong);
+		background: var(--player-bg);
+		box-shadow: var(--shadow-player);
 		backdrop-filter: blur(1rem);
 	}
 
@@ -236,20 +235,20 @@
 	}
 
 	.global-player__track-copy a:hover {
-		color: #c3b9ff;
+		color: var(--link);
 		text-decoration: underline;
 		text-underline-offset: 0.2em;
 	}
 
 	.global-player__track-copy p:last-child {
 		margin-top: 0.15rem;
-		color: #a9b3c8;
+		color: var(--player-muted);
 		font-size: 0.75rem;
 	}
 
 	.global-player__identity .global-player__status {
 		margin-bottom: 0.15rem;
-		color: #a691ff;
+		color: var(--accent-strong);
 		font-size: 0.65rem;
 		font-weight: 800;
 		letter-spacing: 0.08em;
@@ -263,7 +262,7 @@
 		gap: 1.1rem;
 		min-width: 0;
 		padding-inline: clamp(1rem, 2.5vw, 2.25rem);
-		border-inline: 1px solid rgb(145 158 200 / 14%);
+		border-inline: 1px solid var(--border);
 	}
 
 	button {
@@ -272,27 +271,28 @@
 		width: 3.25rem;
 		height: 3.25rem;
 		padding: 0;
-		color: white;
-		border: 1px solid rgb(255 255 255 / 18%);
+		color: var(--player-text);
+		border: 1px solid var(--player-control-border);
 		border-radius: 999px;
-		background: rgb(255 255 255 / 8%);
+		background: var(--player-control-bg);
 		cursor: pointer;
 	}
 
 	button:hover {
-		background: rgb(255 255 255 / 14%);
+		background: var(--player-control-hover);
 	}
 
 	.global-player__toggle {
-		border: 2px solid #8f72ff;
-		background: linear-gradient(145deg, #7653ff, #5938e5);
+		color: var(--on-accent);
+		border: 2px solid var(--accent-strong);
+		background: linear-gradient(145deg, var(--accent-strong), var(--accent-active));
 		box-shadow:
-			0 0 0 0.25rem rgb(104 71 245 / 18%),
-			0 0.65rem 1.6rem rgb(66 36 190 / 38%);
+			0 0 0 0.25rem color-mix(in srgb, var(--accent) 18%, transparent),
+			var(--shadow-accent);
 	}
 
 	.global-player__toggle:hover {
-		background: linear-gradient(145deg, #8b6aff, #6a48f2);
+		background: linear-gradient(145deg, var(--accent-hover), var(--accent));
 	}
 
 	button svg {
@@ -306,7 +306,7 @@
 		grid-template-columns: 2.9rem minmax(5rem, 1fr) 2.9rem;
 		align-items: center;
 		gap: 0.5rem;
-		color: #c5ccda;
+		color: var(--player-muted);
 		font-size: 0.75rem;
 		font-variant-numeric: tabular-nums;
 	}
@@ -322,7 +322,7 @@
 		min-width: 0;
 		margin: 0;
 		background: transparent;
-		accent-color: #8f76ff;
+		accent-color: var(--accent-strong);
 		cursor: pointer;
 	}
 
@@ -331,8 +331,8 @@
 		border-radius: 999px;
 		background: linear-gradient(
 			90deg,
-			#7652f6 0 var(--range-progress),
-			#333b58 var(--range-progress) 100%
+			var(--range-filled) 0 var(--range-progress),
+			var(--range-empty) var(--range-progress) 100%
 		);
 	}
 
@@ -343,20 +343,20 @@
 		margin-top: -0.305rem;
 		border: 0;
 		border-radius: 999px;
-		background: #8062fa;
-		box-shadow: 0 0 0 0.2rem rgb(104 71 245 / 14%);
+		background: var(--range-thumb);
+		box-shadow: 0 0 0 0.2rem color-mix(in srgb, var(--accent) 14%, transparent);
 	}
 
 	input[type='range']::-moz-range-track {
 		height: 0.24rem;
 		border-radius: 999px;
-		background: #333b58;
+		background: var(--range-empty);
 	}
 
 	input[type='range']::-moz-range-progress {
 		height: 0.24rem;
 		border-radius: 999px;
-		background: #7652f6;
+		background: var(--range-filled);
 	}
 
 	input[type='range']::-moz-range-thumb {
@@ -364,8 +364,8 @@
 		height: 0.85rem;
 		border: 0;
 		border-radius: 999px;
-		background: #8062fa;
-		box-shadow: 0 0 0 0.2rem rgb(104 71 245 / 14%);
+		background: var(--range-thumb);
+		box-shadow: 0 0 0 0.2rem color-mix(in srgb, var(--accent) 14%, transparent);
 	}
 
 	input[type='range']:disabled {
@@ -380,7 +380,7 @@
 		gap: 0.75rem;
 		min-width: 0;
 		padding-left: clamp(1rem, 2.5vw, 2.25rem);
-		color: #cbd5e1;
+		color: var(--player-muted);
 		font-size: 0.65rem;
 		font-weight: 700;
 	}
@@ -400,7 +400,7 @@
 	.global-player__message {
 		width: min(100%, var(--content-width));
 		margin: 0.4rem auto 0;
-		color: #fecdd3;
+		color: var(--error);
 		font-size: 0.75rem;
 		text-align: center;
 	}

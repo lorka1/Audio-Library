@@ -96,10 +96,7 @@
 		min-height: 20rem;
 		padding-block: clamp(3.5rem, 7vw, 5.75rem) 7rem;
 		overflow: hidden;
-		background:
-			radial-gradient(circle at 76% 42%, rgb(98 37 207 / 18%), transparent 25rem),
-			radial-gradient(circle at 17% 26%, rgb(36 60 139 / 18%), transparent 24rem),
-			linear-gradient(112deg, #080d1f 0%, #0b1026 55%, #100824 100%);
+		background: var(--hero-background);
 	}
 
 	.tracks-hero__inner {
@@ -118,7 +115,7 @@
 
 	.tracks-heading h1 {
 		margin: 0;
-		color: white;
+		color: var(--hero-text);
 		font-size: clamp(2.75rem, 5vw, 4.75rem);
 		line-height: 1;
 		letter-spacing: -0.052em;
@@ -126,13 +123,13 @@
 	}
 
 	.tracks-heading h1 span {
-		color: #795cff;
+		color: var(--accent-strong);
 	}
 
 	.tracks-heading > p:last-child {
 		max-width: 39rem;
 		margin: 1rem 0 0;
-		color: #b7bfd2;
+		color: var(--hero-muted);
 		font-size: clamp(0.98rem, 1.5vw, 1.12rem);
 		line-height: 1.65;
 	}

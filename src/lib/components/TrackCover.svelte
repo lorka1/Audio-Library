@@ -44,12 +44,10 @@
 		position: relative;
 		flex: 0 0 auto;
 		overflow: hidden;
-		border: 1px solid rgb(139 116 255 / 22%);
+		border: 1px solid var(--accent-border);
 		border-radius: 0.7rem;
-		background: #101735;
-		box-shadow:
-			inset 0 0 1.5rem rgb(113 63 245 / 12%),
-			0 0.5rem 1.5rem rgb(2 5 18 / 24%);
+		background: var(--artwork-bg);
+		box-shadow: var(--shadow-artwork);
 	}
 
 	.track-cover--row {
@@ -87,21 +85,19 @@
 	}
 
 	.track-cover__fallback {
-		background:
-			radial-gradient(circle at 72% 24%, rgb(137 67 255 / 28%), transparent 34%),
-			linear-gradient(145deg, #11174a 0%, #17104a 44%, #070c25 100%);
+		background: var(--artwork-fallback);
 	}
 
 	svg {
 		fill: none;
-		stroke: #8255ff;
+		stroke: var(--artwork-stroke);
 		stroke-width: 1.3;
-		filter: drop-shadow(0 0 0.45rem rgb(128 70 255 / 62%));
+		filter: var(--shadow-artwork-icon);
 		transform: scale(1.12);
 	}
 
 	.track-cover__glow {
-		stroke: #a45cff;
+		stroke: var(--waveform-highlight);
 		stroke-width: 2.2;
 		opacity: 0.9;
 	}

@@ -83,10 +83,10 @@
 		gap: 0.4rem;
 		min-height: 2.75rem;
 		padding: 0.55rem 0.7rem;
-		color: #cfc6ff;
-		border: 1px solid rgb(154 132 255 / 35%);
+		color: var(--link);
+		border: 1px solid var(--accent-border);
 		border-radius: 0.65rem;
-		background: rgb(104 71 245 / 12%);
+		background: var(--accent-soft);
 		font-size: 0.78rem;
 		font-weight: 800;
 		cursor: pointer;
@@ -97,27 +97,27 @@
 	}
 
 	button:hover {
-		border-color: rgb(164 142 255 / 58%);
-		background: rgb(104 71 245 / 22%);
+		border-color: var(--accent-border);
+		background: color-mix(in srgb, var(--accent) 22%, transparent);
 	}
 
 	button.selected {
-		color: white;
-		border-color: #8e75ff;
-		background: rgb(104 71 245 / 30%);
+		color: var(--on-accent);
+		border-color: var(--accent-strong);
+		background: color-mix(in srgb, var(--accent) 30%, transparent);
 	}
 
 	button.playing {
-		color: white;
-		border-color: #8a6fff;
-		background: #6847f5;
-		box-shadow: 0 0 1.2rem rgb(104 71 245 / 28%);
+		color: var(--on-accent);
+		border-color: var(--accent-strong);
+		background: var(--accent);
+		box-shadow: var(--shadow-accent-soft);
 	}
 
 	button.error {
-		color: #ffc4ce;
-		border-color: rgb(222 89 112 / 44%);
-		background: rgb(116 30 49 / 24%);
+		color: var(--error);
+		border-color: var(--error-border);
+		background: var(--error-bg);
 	}
 
 	button.track-play-button--detail {
@@ -131,20 +131,20 @@
 		height: 2.75rem;
 		min-height: 2.75rem;
 		padding: 0;
-		color: #f6f4ff;
-		border-color: rgb(209 213 231 / 54%);
+		color: var(--player-text);
+		border-color: var(--player-control-border);
 		border-radius: 999px;
-		background: rgb(8 14 33 / 68%);
+		background: var(--player-control-bg);
 	}
 
 	button.track-play-button--icon:hover,
 	button.track-play-button--icon.selected {
-		border-color: #8f76ff;
-		background: rgb(104 71 245 / 25%);
+		border-color: var(--accent-strong);
+		background: color-mix(in srgb, var(--accent) 25%, transparent);
 	}
 
 	button.track-play-button--icon.playing {
-		background: #6847f5;
+		background: var(--accent);
 	}
 
 	.visually-hidden {

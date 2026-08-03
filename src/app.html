@@ -1,9 +1,20 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<meta name="theme-color" content="#111827" />
+		<script>
+			(() => {
+				let theme = 'dark';
+				try {
+					const saved = localStorage.getItem('audio-library-theme');
+					if (saved === 'dark' || saved === 'light') theme = saved;
+				} catch {}
+				document.documentElement.dataset.theme = theme;
+				document.documentElement.style.colorScheme = theme;
+			})();
+		</script>
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">
