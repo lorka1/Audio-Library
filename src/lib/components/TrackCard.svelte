@@ -22,88 +22,128 @@
 </script>
 
 <article class="track-card">
-	<header>
-		<TrackCover
-			coverImageUrl={track.coverImageUrl}
-			title={track.title}
-			variant="row"
-		/>
-		<div>
-			<p class="track-card__artist">{track.artist}</p>
+	<TrackCover
+		coverImageUrl={track.coverImageUrl}
+		title={track.title}
+		variant="row"
+	/>
+
+	<TrackPlayButton track={playerTrack} {player} variant="icon" />
+
+	<header class="track-card__identity">
+		<div class="track-card__title">
 			<h2><a href={`/tracks/${track.id}`}>{track.title}</a></h2>
+			<p class="track-card__artist">{track.artist}</p>
 		</div>
-		<TrackPlayButton track={playerTrack} {player} />
+		<p class="track-card__owner">
+			Uploaded by {track.ownerUsername} ·
+			<time datetime={track.createdAt}>{formatDate(track.createdAt)}</time>
+		</p>
 	</header>
+
+	<p class="track-card__genre">{track.genre ?? 'No genre'}</p>
 
 	<dl class="track-card__metadata">
 		<div>
 			<dt>BPM</dt>
-			<dd>{track.bpm ?? 'Not specified'}</dd>
+			<dd>{track.bpm ?? '—'}</dd>
 		</div>
 		<div>
-			<dt>Musical key</dt>
-			<dd>{track.musicalKey ?? 'Not specified'}</dd>
-		</div>
-		<div>
-			<dt>Genre</dt>
-			<dd>{track.genre ?? 'Not specified'}</dd>
+			<dt>Key</dt>
+			<dd>{track.musicalKey ?? '—'}</dd>
 		</div>
 	</dl>
 
-	<footer>
+	<div class="track-card__actions">
 		<AddToPlaylist
 			trackId={track.id}
 			trackTitle={track.title}
 			choices={playlistChoices}
 			{loginHref}
 		/>
-		<p>
-			Uploaded by <strong>{track.ownerUsername}</strong>
-		</p>
-		<time datetime={track.createdAt}>{formatDate(track.createdAt)}</time>
-	</footer>
+		<a
+			href={`/api/tracks/${track.id}/download`}
+			aria-label={`Download ${track.title}`}
+			title="Download audio"
+		>
+			<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+				<path d="M11 4h2v9.2l3-3 1.4 1.4-5.4 5.4-5.4-5.4L8 10.2l3 3zM5 18h14v2H5z"></path>
+			</svg>
+		</a>
+		<a
+			href={`/tracks/${track.id}`}
+			aria-label={`View details for ${track.title}`}
+			title="View track details"
+		>
+			<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+				<path d="M12 4a8 8 0 1 0 0 16 8 8 0 0 0 0-16m0 1.8a6.2 6.2 0 1 1 0 12.4 6.2 6.2 0 0 1 0-12.4m-.9 2.7h1.8v1.8h-1.8zm0 3.2h1.8v4.1h-1.8z"></path>
+			</svg>
+		</a>
+	</div>
 </article>
 
 <style>
 	.track-card {
 		display: grid;
-		gap: 1.5rem;
+		grid-template-columns:
+			3.5rem 2.75rem minmax(12rem, 2fr) minmax(6.5rem, 0.75fr)
+			minmax(8.5rem, 0.85fr) auto;
+		align-items: center;
+		gap: 0.85rem 1rem;
 		min-width: 0;
-		padding: 1.5rem;
-		border: 1px solid var(--border);
-		border-radius: 1rem;
-		background: var(--surface);
-		box-shadow: 0 1rem 3rem rgb(24 32 51 / 6%);
+		padding: 0.65rem 0.85rem;
+		border: 1px solid rgb(139 153 198 / 17%);
+		border-radius: 0.85rem;
+		background:
+			linear-gradient(110deg, rgb(19 28 54 / 94%), rgb(12 19 39 / 96%));
+		box-shadow: 0 0.75rem 2rem rgb(0 2 14 / 17%);
+		transition:
+			border-color 160ms ease,
+			background-color 160ms ease,
+			transform 160ms ease;
 	}
 
-	header {
-		display: flex;
-		align-items: flex-start;
-		justify-content: space-between;
-		gap: 1rem;
+	.track-card:hover {
+		border-color: rgb(142 117 255 / 38%);
+		background:
+			linear-gradient(110deg, rgb(23 33 63 / 97%), rgb(14 22 45 / 98%));
+		transform: translateY(-1px);
+	}
+
+	.track-card__identity {
 		min-width: 0;
 	}
 
-	header > div {
+	.track-card__title {
 		min-width: 0;
 	}
 
 	.track-card__artist {
-		margin: 0 0 0.45rem;
-		color: var(--accent);
-		font-size: 0.78rem;
-		font-weight: 800;
-		letter-spacing: 0.08em;
-		text-transform: uppercase;
-		overflow-wrap: anywhere;
+		margin: 0.22rem 0 0;
+		color: #b2bbce;
+		font-size: 0.82rem;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.track-card__owner {
+		margin: 0.22rem 0 0;
+		color: #79849e;
+		font-size: 0.68rem;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 
 	h2 {
 		margin: 0;
-		font-size: 1.35rem;
+		font-size: 0.98rem;
 		line-height: 1.2;
-		letter-spacing: -0.025em;
-		overflow-wrap: anywhere;
+		letter-spacing: -0.015em;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 
 	h2 a {
@@ -111,68 +151,169 @@
 	}
 
 	h2 a:hover {
-		color: var(--accent-strong);
-		text-decoration: underline;
-		text-underline-offset: 0.2em;
+		color: #b9acff;
+	}
+
+	.track-card__genre {
+		width: fit-content;
+		max-width: 100%;
+		margin: 0;
+		padding: 0.3rem 0.55rem;
+		overflow: hidden;
+		color: #aa99ff;
+		border: 1px solid rgb(125 96 246 / 15%);
+		border-radius: 0.4rem;
+		background: rgb(104 71 245 / 13%);
+		font-size: 0.72rem;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 
 	.track-card__metadata {
 		display: grid;
-		grid-template-columns: repeat(3, minmax(0, 1fr));
+		grid-template-columns: repeat(2, minmax(0, 1fr));
 		gap: 0.75rem;
 		margin: 0;
 	}
 
 	.track-card__metadata div {
 		min-width: 0;
-		padding: 0.75rem;
-		border-radius: 0.65rem;
-		background: var(--surface-muted);
+		padding: 0;
 	}
 
 	dt {
-		color: var(--text-muted);
-		font-size: 0.7rem;
+		color: #707b96;
+		font-size: 0.58rem;
 		font-weight: 800;
 		letter-spacing: 0.06em;
 		text-transform: uppercase;
 	}
 
 	dd {
-		margin: 0.3rem 0 0;
-		font-size: 0.9rem;
+		margin: 0.2rem 0 0;
+		color: #d8deeb;
+		font-size: 0.8rem;
 		font-weight: 700;
-		overflow-wrap: anywhere;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 
-	footer {
+	.track-card__actions {
 		display: flex;
-		flex-wrap: wrap;
-		justify-content: space-between;
-		gap: 0.5rem 1rem;
-		padding-top: 1rem;
-		color: var(--text-muted);
-		border-top: 1px solid var(--border);
-		font-size: 0.82rem;
+		align-items: center;
+		justify-content: flex-end;
+		gap: 0.25rem;
 	}
 
-	footer p {
-		margin: 0;
-		overflow-wrap: anywhere;
+	.track-card__actions :global(.playlist-trigger),
+	.track-card__actions :global(.playlist-login-link) {
+		min-height: 2.45rem;
+		white-space: nowrap;
 	}
 
-	@media (max-width: 28rem) {
-		header {
-			align-items: stretch;
-			flex-direction: column;
+	.track-card__actions a {
+		display: inline-grid;
+		place-items: center;
+		width: 2.45rem;
+		height: 2.45rem;
+		color: #aeb7cb;
+		border: 1px solid transparent;
+		border-radius: 999px;
+		transition:
+			color 150ms ease,
+			border-color 150ms ease,
+			background-color 150ms ease;
+	}
+
+	.track-card__actions a:hover {
+		color: white;
+		border-color: rgb(151 129 255 / 28%);
+		background: rgb(104 71 245 / 15%);
+	}
+
+	.track-card__actions svg {
+		width: 1.15rem;
+		height: 1.15rem;
+		fill: currentColor;
+	}
+
+	@media (max-width: 58rem) {
+		.track-card {
+			grid-template-columns: 3.5rem 2.75rem minmax(0, 1fr) auto;
 		}
 
-		header :global(button) {
-			align-self: flex-start;
+		.track-card__identity {
+			grid-column: 3;
+		}
+
+		.track-card__genre {
+			grid-column: 3;
+			grid-row: 2;
 		}
 
 		.track-card__metadata {
-			grid-template-columns: 1fr;
+			grid-column: 3;
+			grid-row: 3;
+			justify-self: start;
+			width: min(100%, 16rem);
+		}
+
+		.track-card__actions {
+			grid-column: 4;
+			grid-row: 1 / span 3;
+		}
+
+		.track-card > :global(.track-cover) {
+			grid-row: 1 / span 2;
+			align-self: start;
+		}
+
+		.track-card > :global(button) {
+			grid-row: 1 / span 2;
+			align-self: start;
+			margin-top: 0.35rem;
+		}
+	}
+
+	@media (max-width: 37rem) {
+		.track-card {
+			grid-template-columns: 3.5rem minmax(0, 1fr) auto;
+			gap: 0.65rem 0.8rem;
+		}
+
+		.track-card > :global(button) {
+			grid-column: 3;
+			grid-row: 1;
+			margin-top: 0.35rem;
+		}
+
+		.track-card__identity,
+		.track-card__genre,
+		.track-card__metadata {
+			grid-column: 2;
+		}
+
+		.track-card__identity {
+			grid-row: 1;
+		}
+
+		.track-card__genre {
+			grid-row: 2;
+		}
+
+		.track-card__metadata {
+			grid-row: 3;
+		}
+
+		.track-card__actions {
+			grid-column: 3;
+			grid-row: 2 / span 2;
+			flex-direction: column;
+		}
+
+		.track-card__owner {
+			display: none;
 		}
 	}
 </style>

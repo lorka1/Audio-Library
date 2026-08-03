@@ -1,16 +1,23 @@
 import { render } from 'svelte/server';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createAudioPlayerController } from '$lib/player/controller';
 import type { PublicPlayerTrack } from '$lib/player/model';
-import type { PublicTrack } from '$lib/types';
+import type { OwnerTrack, PublicTrack } from '$lib/types';
 import GlobalAudioPlayer from './GlobalAudioPlayer.svelte';
 import AddToPlaylist from './AddToPlaylist.svelte';
+import AudioWaveform from './AudioWaveform.svelte';
 import CoverImageField from './CoverImageField.svelte';
+import OwnerTrackCard from './OwnerTrackCard.svelte';
 import SiteHeader from './SiteHeader.svelte';
 import TrackCard from './TrackCard.svelte';
 import TrackCover from './TrackCover.svelte';
 import TrackFilters from './TrackFilters.svelte';
 import TrackPlayButton from './TrackPlayButton.svelte';
+import HomePage from '../../routes/+page.svelte';
+
+vi.mock('$app/state', () => ({
+	page: { url: new URL('https://fixture.example.invalid/tracks') }
+}));
 
 const playerTrack: PublicPlayerTrack = {
 	id: 21,
@@ -32,6 +39,23 @@ const publicTrack: PublicTrack = {
 	coverImageUrl: '/api/tracks/21/cover',
 	fileSizeBytes: 1024,
 	ownerUsername: 'fixture_owner',
+	createdAt: '2026-07-26T12:00:00.000Z',
+	updatedAt: '2026-07-26T12:00:00.000Z'
+};
+
+const ownerTrack: OwnerTrack = {
+	publicId: 22,
+	title: 'Owner fallback fixture',
+	artist: 'Fixture Artist',
+	coverImageUrl: null,
+	bpm: null,
+	musicalKey: null,
+	genre: null,
+	description: null,
+	visibility: 'public',
+	fileSizeBytes: 1024,
+	mimeType: 'audio/mpeg',
+	originalFilename: 'fixture.mp3',
 	createdAt: '2026-07-26T12:00:00.000Z',
 	updatedAt: '2026-07-26T12:00:00.000Z'
 };
@@ -60,6 +84,7 @@ describe('global playback components', () => {
 
 		expect(body).toContain('aria-label="Play Release Fixture Track"');
 		expect(body).toContain('href="/tracks/21"');
+		expect(body).toContain('aria-label="Download Release Fixture Track"');
 		expect(body).toContain('src="/api/tracks/21/cover"');
 		expect(body).not.toContain('<audio');
 	});
@@ -75,6 +100,21 @@ describe('global playback components', () => {
 
 		expect(body).toContain('track-cover__fallback');
 		expect(body).not.toContain('<img');
+	});
+
+	it('keeps covered Browse rows and fallback owner cards structurally safe', () => {
+		const browse = render(TrackCard, {
+			props: { track: publicTrack, player: createAudioPlayerController() }
+		}).body;
+		const owner = render(OwnerTrackCard, {
+			props: { track: { ...ownerTrack, visibility: 'private' }, playlistChoices: [] }
+		}).body;
+
+		expect(browse).toContain('src="/api/tracks/21/cover"');
+		expect(browse).toContain('track-card__identity');
+		expect(owner).toContain('track-cover__fallback');
+		expect(owner).toContain('owner-track-card__identity');
+		expect(owner).not.toContain('<img');
 	});
 
 	it('uses active and paused accessibility labels for the selected track', () => {
@@ -137,7 +177,8 @@ describe('SiteHeader navigation', () => {
 			props: { user: { username: 'fixture_owner' } }
 		});
 
-		expect(body).toContain('href="/tracks">Browse');
+		expect(body).toContain('href="/tracks"');
+		expect(body).toContain('href="/tracks" aria-current="page">Browse');
 		expect(body).toContain('href="/upload">Upload');
 		expect(body).toContain('href="/playlists">Playlists');
 		expect(body).toContain('aria-label="Open profile menu"');
@@ -153,17 +194,19 @@ describe('SiteHeader navigation', () => {
 		expect(body).not.toContain('ownerEmail');
 	});
 
-	it('shows equal neutral signed-out navigation styling', () => {
+	it('uses the stronger Register action without adding invalid routes', () => {
 		const { body } = render(SiteHeader, { props: { user: null } });
 
-		expect(body).toMatch(/class="nav-link [^"]*" href="\/tracks">Browse/);
+		expect(body).toMatch(/class="nav-link [^"]*" href="\/tracks"[^>]*>Browse/);
 		const loginClass = body.match(/<a class="([^"]*)" href="\/login">Login/)?.[1];
 		const registerClass = body.match(
 			/<a class="([^"]*)" href="\/register">Register/
 		)?.[1];
 		expect(loginClass).toBeTruthy();
-		expect(registerClass).toBe(loginClass);
-		expect(body).not.toContain('register-link');
+		expect(registerClass).toContain('nav-link--primary');
+		expect(registerClass).not.toBe(loginClass);
+		expect(body).not.toContain('Pricing');
+		expect(body).not.toContain('For Creators');
 		expect(body).not.toContain('Open profile menu');
 		expect(body).not.toContain('href="/playlists"');
 	});
@@ -235,5 +278,32 @@ describe('Browse track filters', () => {
 		}
 		expect(body.match(/Reset filters/g)).toHaveLength(1);
 		expect(body).toContain('%, _, and \\ are treated literally.');
+		expect(body).toContain('track-filters__search');
+		expect(body).toContain('track-filters__bpm-group');
+		expect(body).toContain('track-filters__actions');
+	});
+});
+
+describe('homepage visual structure', () => {
+	it('renders the real hero and waveform without fake statistics', () => {
+		const { body } = render(HomePage, {
+			props: { data: { user: null }, params: {} }
+		});
+
+		expect(body).toContain('Discover community audio');
+		expect(body).toContain('audio-waveform');
+		expect(body).not.toContain('250K+');
+		expect(body).not.toContain('120K+');
+		expect(body).not.toContain('2M+');
+		expect(body).not.toContain('190+');
+	});
+
+	it('keeps the local waveform decorative and out of the accessibility tree', () => {
+		const { body } = render(AudioWaveform);
+
+		expect(body).toContain('aria-hidden="true"');
+		expect(body).toContain('role="presentation"');
+		expect(body).toContain('focusable="false"');
+		expect(body).not.toContain('aria-label=');
 	});
 });

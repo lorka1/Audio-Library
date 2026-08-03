@@ -29,7 +29,12 @@
 <section class="track-filters" aria-labelledby="track-filters-title">
 	<div class="track-filters__heading">
 		<div>
-			<p class="auth-eyebrow">Refine the library</p>
+			<p class="auth-eyebrow">
+				<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+					<path d="M4 5h16l-6.3 7.1V18l-3.4 1v-6.9z"></path>
+				</svg>
+				Refine your search
+			</p>
 			<h2 id="track-filters-title">Search and filters</h2>
 		</div>
 	</div>
@@ -48,16 +53,23 @@
 	<form method="GET" action="/tracks" class="track-filters__form">
 		<div class="form-field track-filters__search">
 			<label for="track-search">Search</label>
-			<input
-				id="track-search"
-				name="q"
-				type="search"
-				maxlength="100"
-				placeholder="Title, artist, or description"
-				value={values.q}
-				aria-invalid={errors.q ? 'true' : undefined}
-				aria-describedby={errors.q ? 'track-search-help track-search-error' : 'track-search-help'}
-			/>
+			<div class="track-filters__input-wrap">
+				<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+					<path d="M10.7 4a6.7 6.7 0 1 0 4.2 11.9l4 4 1.1-1.1-4-4A6.7 6.7 0 0 0 10.7 4m0 1.7a5 5 0 1 1 0 10 5 5 0 0 1 0-10"></path>
+				</svg>
+				<input
+					id="track-search"
+					name="q"
+					type="search"
+					maxlength="100"
+					placeholder="Search by title, artist, or description"
+					value={values.q}
+					aria-invalid={errors.q ? 'true' : undefined}
+					aria-describedby={errors.q
+						? 'track-search-help track-search-error'
+						: 'track-search-help'}
+				/>
+			</div>
 			<p class="field-help" id="track-search-help">
 				Partial matches are case-insensitive. %, _, and \ are treated literally.
 			</p>
@@ -124,7 +136,7 @@
 			{/if}
 		</div>
 
-		<div class="form-field">
+		<div class="form-field track-filters__select">
 			<label for="track-musical-key">Musical key</label>
 			<select
 				id="track-musical-key"
@@ -149,7 +161,7 @@
 			{/if}
 		</div>
 
-		<div class="form-field">
+		<div class="form-field track-filters__select">
 			<label for="track-genre">Genre</label>
 			<select
 				id="track-genre"
@@ -172,7 +184,7 @@
 			{/if}
 		</div>
 
-		<div class="form-field">
+		<div class="form-field track-filters__select">
 			<label for="track-sort">Sort</label>
 			<select id="track-sort" name="sort">
 				{#each TRACK_SORT_OPTIONS as option}
@@ -184,7 +196,12 @@
 		</div>
 
 		<div class="track-filters__actions">
-			<button class="primary-button" type="submit">Apply filters</button>
+			<button class="primary-button" type="submit">
+				<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+					<path d="M4 5h16l-6.3 7.1V18l-3.4 1v-6.9z"></path>
+				</svg>
+				Apply filters
+			</button>
 			<a href="/tracks">Reset filters</a>
 		</div>
 	</form>
@@ -193,11 +210,15 @@
 <style>
 	.track-filters {
 		margin-bottom: 2rem;
-		padding: clamp(1.25rem, 4vw, 2rem);
-		border: 1px solid var(--border);
-		border-radius: 1rem;
-		background: var(--surface);
-		box-shadow: 0 1rem 3rem rgb(24 32 51 / 5%);
+		padding: clamp(1.25rem, 3vw, 1.8rem);
+		color: #131a2c;
+		border: 1px solid rgb(226 230 240 / 82%);
+		border-radius: 0.95rem;
+		background:
+			radial-gradient(circle at 84% 10%, rgb(116 79 247 / 5%), transparent 24rem),
+			#f7f8fc;
+		box-shadow: 0 1.5rem 4rem rgb(0 2 15 / 32%);
+		color-scheme: light;
 	}
 
 	.track-filters__heading {
@@ -205,20 +226,55 @@
 		align-items: start;
 		justify-content: space-between;
 		gap: 1rem;
-		margin-bottom: 1.5rem;
+		margin-bottom: 1.3rem;
 	}
 
 	h2 {
 		margin: 0;
-		font-size: clamp(1.35rem, 4vw, 1.8rem);
+		color: #151d32;
+		font-size: clamp(1.25rem, 3vw, 1.55rem);
 		letter-spacing: -0.035em;
 	}
 
+	.track-filters .auth-eyebrow {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.55rem;
+		margin-bottom: 0.55rem;
+		color: #5139d8;
+	}
+
+	.track-filters .auth-eyebrow svg {
+		width: 1rem;
+		height: 1rem;
+		fill: none;
+		stroke: currentColor;
+		stroke-width: 1.8;
+		stroke-linejoin: round;
+	}
+
 	.track-filters__actions a {
-		color: var(--accent-strong);
-		font-size: 0.88rem;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		min-height: var(--control-height);
+		min-width: 8.5rem;
+		padding: 0.7rem 1rem;
+		color: #5139d8;
+		border: 1px solid #8f7af0;
+		border-radius: var(--radius-control);
+		background: transparent;
+		font-size: 0.86rem;
 		font-weight: 750;
-		text-underline-offset: 0.2em;
+		text-decoration: none;
+		transition:
+			background-color 150ms ease,
+			border-color 150ms ease;
+	}
+
+	.track-filters__actions a:hover {
+		border-color: #6547ef;
+		background: #eeebff;
 	}
 
 	.filter-errors {
@@ -244,21 +300,77 @@
 
 	.track-filters__form {
 		display: grid;
-		grid-template-columns: repeat(4, minmax(0, 1fr));
+		grid-template-columns: repeat(10, minmax(0, 1fr));
 		gap: 1.25rem 1rem;
 		align-items: start;
 	}
 
 	.track-filters__search {
-		grid-column: span 2;
+		grid-column: span 5;
 	}
 
 	.track-filters__bpm-group {
 		display: grid;
-		grid-column: span 2;
+		grid-column: span 5;
 		grid-template-columns: repeat(2, minmax(0, 1fr));
 		gap: 0.45rem 1rem;
 		min-width: 0;
+	}
+
+	.track-filters__select {
+		grid-column: span 2;
+	}
+
+	.track-filters .form-field label {
+		color: #161e32;
+		font-size: 0.82rem;
+	}
+
+	.track-filters .form-field input,
+	.track-filters .form-field select {
+		color: #182036;
+		border-color: #ccd3e1;
+		background-color: white;
+	}
+
+	.track-filters .form-field input::placeholder {
+		color: #7d869b;
+	}
+
+	.track-filters .form-field input:hover,
+	.track-filters .form-field select:hover {
+		border-color: #a9b2c5;
+		background-color: white;
+	}
+
+	.track-filters .form-field input:focus,
+	.track-filters .form-field select:focus {
+		border-color: #6847f5;
+		box-shadow: 0 0 0 3px rgb(104 71 245 / 18%);
+	}
+
+	.track-filters .field-help {
+		color: #687187;
+	}
+
+	.track-filters__input-wrap {
+		position: relative;
+	}
+
+	.track-filters__input-wrap svg {
+		position: absolute;
+		z-index: 1;
+		top: 50%;
+		left: 1rem;
+		width: 1.1rem;
+		height: 1.1rem;
+		fill: #727d94;
+		transform: translateY(-50%);
+		pointer-events: none;
+	}
+
+	.track-filters__input-wrap input {
+		padding-left: 2.8rem;
 	}
 
 	.track-filters__bpm-help,
@@ -272,13 +384,25 @@
 		align-items: center;
 		align-self: start;
 		justify-content: flex-end;
-		gap: 0.85rem;
+		grid-column: span 4;
+		gap: 0.75rem;
 		min-width: 0;
 		padding-top: 1.62rem;
 	}
 
 	.track-filters__actions .primary-button {
-		min-width: 8.5rem;
+		gap: 0.45rem;
+		min-width: 9.25rem;
+		box-shadow: 0 0.6rem 1.4rem rgb(82 54 209 / 18%);
+	}
+
+	.track-filters__actions .primary-button svg {
+		width: 1rem;
+		height: 1rem;
+		fill: none;
+		stroke: currentColor;
+		stroke-width: 1.8;
+		stroke-linejoin: round;
 	}
 
 	@media (max-width: 68.75rem) {
@@ -292,9 +416,13 @@
 		}
 
 		.track-filters__actions {
-			grid-column: 1 / -1;
+			grid-column: span 1;
 			justify-content: flex-start;
-			padding-top: 0;
+			padding-top: 1.55rem;
+		}
+
+		.track-filters__select {
+			grid-column: span 1;
 		}
 	}
 
@@ -322,11 +450,16 @@
 		.track-filters__actions {
 			align-items: stretch;
 			flex-direction: column;
+			padding-top: 0;
 		}
 
 		.track-filters__actions a {
-			padding: 0.5rem;
 			text-align: center;
+		}
+
+		.track-filters__actions .primary-button,
+		.track-filters__actions a {
+			width: 100%;
 		}
 	}
 </style>

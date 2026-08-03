@@ -35,6 +35,9 @@
 				</span>
 			</div>
 			<h2>{track.title}</h2>
+			<p class="owner-track-card__date">
+				Uploaded <time datetime={track.createdAt}>{formatDate(track.createdAt)}</time>
+			</p>
 		</div>
 	</header>
 
@@ -52,10 +55,6 @@
 			<dd>{track.genre ?? 'Not specified'}</dd>
 		</div>
 	</dl>
-
-	<p class="owner-track-card__date">
-		Uploaded <time datetime={track.createdAt}>{formatDate(track.createdAt)}</time>
-	</p>
 
 	<footer>
 		<AddToPlaylist
@@ -81,10 +80,19 @@
 		gap: 1.25rem;
 		min-width: 0;
 		padding: 1.5rem;
-		border: 1px solid var(--border);
+		border: 1px solid rgb(139 153 198 / 18%);
 		border-radius: 1rem;
-		background: var(--surface);
-		box-shadow: 0 1rem 3rem rgb(24 32 51 / 6%);
+		background:
+			linear-gradient(135deg, rgb(18 27 52 / 96%), rgb(11 18 37 / 98%));
+		box-shadow: 0 1rem 3rem rgb(0 2 14 / 21%);
+		transition:
+			border-color 150ms ease,
+			transform 150ms ease;
+	}
+
+	.owner-track-card:hover {
+		border-color: rgb(141 117 255 / 36%);
+		transform: translateY(-1px);
 	}
 
 	header {
@@ -108,7 +116,7 @@
 
 	.owner-track-card__heading p {
 		margin: 0;
-		color: var(--accent);
+		color: #a795ff;
 		font-size: 0.78rem;
 		font-weight: 800;
 		letter-spacing: 0.08em;
@@ -119,18 +127,18 @@
 	.owner-track-card__heading span {
 		flex: 0 0 auto;
 		padding: 0.28rem 0.55rem;
-		color: #17633d;
-		border: 1px solid #a9dec2;
+		color: #9ee9c1;
+		border: 1px solid rgb(73 184 125 / 30%);
 		border-radius: 999px;
-		background: #edf9f2;
+		background: rgb(26 104 65 / 20%);
 		font-size: 0.72rem;
 		font-weight: 800;
 	}
 
 	.owner-track-card__heading span.private {
-		color: #6d5211;
-		border-color: #ead49e;
-		background: #fff9e8;
+		color: #efd596;
+		border-color: rgb(221 177 74 / 32%);
+		background: rgb(119 82 18 / 20%);
 	}
 
 	h2 {
@@ -138,7 +146,9 @@
 		font-size: 1.35rem;
 		line-height: 1.2;
 		letter-spacing: -0.025em;
-		overflow-wrap: anywhere;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 
 	dl {
@@ -152,7 +162,8 @@
 		min-width: 0;
 		padding: 0.75rem;
 		border-radius: 0.65rem;
-		background: var(--surface-muted);
+		border: 1px solid rgb(139 153 198 / 10%);
+		background: rgb(20 30 56 / 72%);
 	}
 
 	dt {
@@ -188,8 +199,8 @@
 	footer a {
 		display: inline-flex;
 		padding: 0.55rem 0.7rem;
-		color: var(--accent-strong);
-		border: 1px solid #c9c4fa;
+		color: #c8bfff;
+		border: 1px solid rgb(154 132 255 / 30%);
 		border-radius: 0.55rem;
 		font-size: 0.82rem;
 		font-weight: 750;
@@ -197,16 +208,16 @@
 	}
 
 	footer a:hover {
-		background: #f3f1ff;
+		background: rgb(104 71 245 / 16%);
 	}
 
 	footer .delete-link {
-		color: #a72d43;
-		border-color: #efbdc6;
+		color: #ffb6c2;
+		border-color: rgb(222 89 112 / 34%);
 	}
 
 	footer .delete-link:hover {
-		background: #fff1f3;
+		background: rgb(116 30 49 / 20%);
 	}
 
 	@media (max-width: 28rem) {

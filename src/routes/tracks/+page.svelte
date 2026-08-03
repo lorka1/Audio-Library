@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { TrackCard, TrackFilters } from '$lib';
+	import { AudioWaveform, TrackCard, TrackFilters } from '$lib';
 	import { formatTrackResultCount } from '$lib/tracks-query';
 	import type { PageProps } from './$types';
 
@@ -15,16 +15,21 @@
 </svelte:head>
 
 <section class="tracks-page">
-	<div class="page-container">
-		<header class="tracks-heading">
-			<p class="auth-eyebrow">Public audio library</p>
-			<h1>Browse tracks</h1>
-			<p>
-				Search by title, artist, or description, then refine public tracks by BPM,
-				musical key, genre, and sort order.
-			</p>
-		</header>
+	<header class="tracks-hero">
+		<div class="page-container tracks-hero__inner">
+			<div class="tracks-heading">
+				<p class="auth-eyebrow">Your audio, ready to share</p>
+				<h1>Find the perfect track<span>.</span></h1>
+				<p>
+					Search the community-powered library by title, artist, or description, then
+					refine public tracks by BPM, musical key, genre, and sort order.
+				</p>
+			</div>
+			<AudioWaveform variant="compact" class="tracks-hero__waveform" />
+		</div>
+	</header>
 
+	<div class="page-container tracks-content">
 		{#if data.playlistNotice}
 			<div
 				class="form-message"
@@ -35,7 +40,6 @@
 				{data.playlistNotice.message}
 			</div>
 		{/if}
-
 		<TrackFilters values={data.filterValues} errors={data.filterErrors} />
 
 		<div class="track-results">
@@ -84,7 +88,64 @@
 		align-items: flex-start;
 		justify-content: space-between;
 		gap: 1rem 2rem;
-		margin: 0.25rem 0 1.25rem;
+		margin: 0.5rem 0 1.1rem;
+	}
+
+	.tracks-hero {
+		position: relative;
+		min-height: 20rem;
+		padding-block: clamp(3.5rem, 7vw, 5.75rem) 7rem;
+		overflow: hidden;
+		background:
+			radial-gradient(circle at 76% 42%, rgb(98 37 207 / 18%), transparent 25rem),
+			radial-gradient(circle at 17% 26%, rgb(36 60 139 / 18%), transparent 24rem),
+			linear-gradient(112deg, #080d1f 0%, #0b1026 55%, #100824 100%);
+	}
+
+	.tracks-hero__inner {
+		display: grid;
+		grid-template-columns: minmax(0, 0.95fr) minmax(24rem, 1.05fr);
+		align-items: center;
+		gap: 2rem;
+	}
+
+	.tracks-heading {
+		position: relative;
+		z-index: 1;
+		max-width: 43rem;
+		margin: 0;
+	}
+
+	.tracks-heading h1 {
+		margin: 0;
+		color: white;
+		font-size: clamp(2.75rem, 5vw, 4.75rem);
+		line-height: 1;
+		letter-spacing: -0.052em;
+		text-wrap: balance;
+	}
+
+	.tracks-heading h1 span {
+		color: #795cff;
+	}
+
+	.tracks-heading > p:last-child {
+		max-width: 39rem;
+		margin: 1rem 0 0;
+		color: #b7bfd2;
+		font-size: clamp(0.98rem, 1.5vw, 1.12rem);
+		line-height: 1.65;
+	}
+
+	:global(.tracks-hero__waveform) {
+		width: min(43rem, 47vw);
+		margin-right: -7rem;
+	}
+
+	.tracks-content {
+		position: relative;
+		z-index: 2;
+		margin-top: -4.75rem;
 	}
 
 	.track-results__count {
@@ -92,6 +153,7 @@
 		margin: 0;
 		color: var(--text);
 		font-weight: 800;
+		letter-spacing: -0.015em;
 	}
 
 	.active-filters {
@@ -142,6 +204,36 @@
 		.active-filters ul {
 			justify-content: flex-start;
 			text-align: left;
+		}
+	}
+
+	@media (max-width: 62rem) {
+		.tracks-hero__inner {
+			grid-template-columns: minmax(0, 1fr);
+		}
+
+		:global(.tracks-hero__waveform) {
+			position: absolute;
+			right: -13rem;
+			bottom: -7rem;
+			width: 42rem;
+			margin: 0;
+			opacity: 0.34;
+		}
+	}
+
+	@media (max-width: 43.75rem) {
+		.tracks-hero {
+			min-height: 17rem;
+			padding-block: 3.5rem 6rem;
+		}
+
+		.tracks-heading h1 {
+			font-size: clamp(2.65rem, 13vw, 4rem);
+		}
+
+		.tracks-content {
+			margin-top: -3.75rem;
 		}
 	}
 </style>

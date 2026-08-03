@@ -17,6 +17,11 @@
 						: `Play ${state.track.title}`
 			: 'Play'
 	);
+	let progressPercentage = $derived(
+		state.duration > 0
+			? Math.min(100, Math.max(0, (state.currentTime / state.duration) * 100))
+			: 0
+	);
 	let audio: HTMLAudioElement;
 	let handledRequestVersion = -1;
 
@@ -128,6 +133,7 @@
 						max={state.duration || 0}
 						step="0.1"
 						value={Math.min(state.currentTime, state.duration || 0)}
+						style={`--range-progress: ${progressPercentage}%`}
 						disabled={state.duration === 0}
 						aria-label={`Seek ${state.track.title}`}
 						oninput={seek}
@@ -141,7 +147,7 @@
 					<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
 						<path d="M4 9v6h4l5 4V5L8 9zm11.5-.5v7a4 4 0 0 0 0-7z"></path>
 					</svg>
-					Volume
+					<span class="sr-only">Volume</span>
 				</span>
 				<input
 					type="range"
@@ -149,6 +155,7 @@
 					max="1"
 					step="0.05"
 					value={state.volume}
+					style={`--range-progress: ${state.volume * 100}%`}
 					aria-label="Volume"
 					oninput={changeVolume}
 				/>
@@ -178,21 +185,24 @@
 		left: 0;
 		width: 100%;
 		min-height: var(--player-height);
-		padding: 0.7rem max(var(--page-gutter), env(safe-area-inset-right))
-			calc(0.7rem + env(safe-area-inset-bottom))
+		padding: 0.65rem max(var(--page-gutter), env(safe-area-inset-right))
+			calc(0.65rem + env(safe-area-inset-bottom))
 			max(var(--page-gutter), env(safe-area-inset-left));
 		color: #f9fafb;
-		border-top: 1px solid rgb(255 255 255 / 12%);
-		background: rgb(17 24 39 / 98%);
-		box-shadow: 0 -0.75rem 2.5rem rgb(17 24 39 / 20%);
-		backdrop-filter: blur(0.8rem);
+		border-top: 1px solid rgb(153 165 205 / 21%);
+		background:
+			linear-gradient(90deg, rgb(12 19 39 / 97%), rgb(8 14 31 / 97%));
+		box-shadow: 0 -0.75rem 2.75rem rgb(0 2 14 / 42%);
+		backdrop-filter: blur(1rem);
 	}
 
 	.global-player__inner {
 		display: grid;
-		grid-template-columns: minmax(11.25rem, 1fr) minmax(22.5rem, 2fr) minmax(9.375rem, 0.7fr);
+		grid-template-columns:
+			minmax(15rem, 0.9fr) minmax(23rem, 1.7fr)
+			minmax(10rem, 0.55fr);
 		align-items: center;
-		gap: 1rem 1.5rem;
+		gap: 0;
 		width: min(100%, var(--content-width));
 		margin-inline: auto;
 	}
@@ -201,16 +211,17 @@
 		display: grid;
 		grid-template-columns: auto minmax(0, 1fr);
 		align-items: center;
-		gap: 0.75rem;
+		gap: 0.85rem;
 		min-width: 0;
+		padding-right: 1.35rem;
 	}
 
 	.global-player__track-copy {
 		min-width: 0;
 	}
 
-	.global-player__identity a,
-	.global-player__identity p {
+	.global-player__track-copy a,
+	.global-player__track-copy p {
 		display: block;
 		margin: 0;
 		overflow: hidden;
@@ -218,26 +229,27 @@
 		white-space: nowrap;
 	}
 
-	.global-player__identity a {
+	.global-player__track-copy a {
 		font-size: 0.9rem;
 		font-weight: 800;
 		text-decoration: none;
 	}
 
-	.global-player__identity a:hover {
+	.global-player__track-copy a:hover {
+		color: #c3b9ff;
 		text-decoration: underline;
 		text-underline-offset: 0.2em;
 	}
 
-	.global-player__identity p:last-child {
+	.global-player__track-copy p:last-child {
 		margin-top: 0.15rem;
-		color: #aeb8c8;
+		color: #a9b3c8;
 		font-size: 0.75rem;
 	}
 
 	.global-player__identity .global-player__status {
 		margin-bottom: 0.15rem;
-		color: #a59dff;
+		color: #a691ff;
 		font-size: 0.65rem;
 		font-weight: 800;
 		letter-spacing: 0.08em;
@@ -248,18 +260,20 @@
 		display: grid;
 		grid-template-columns: auto minmax(0, 1fr);
 		align-items: center;
-		gap: 0.9rem;
+		gap: 1.1rem;
 		min-width: 0;
+		padding-inline: clamp(1rem, 2.5vw, 2.25rem);
+		border-inline: 1px solid rgb(145 158 200 / 14%);
 	}
 
 	button {
 		display: inline-grid;
 		place-items: center;
-		width: 2.625rem;
-		height: 2.625rem;
+		width: 3.25rem;
+		height: 3.25rem;
 		padding: 0;
 		color: white;
-		border: 1px solid rgb(255 255 255 / 16%);
+		border: 1px solid rgb(255 255 255 / 18%);
 		border-radius: 999px;
 		background: rgb(255 255 255 / 8%);
 		cursor: pointer;
@@ -270,12 +284,15 @@
 	}
 
 	.global-player__toggle {
-		border-color: transparent;
-		background: var(--accent);
+		border: 2px solid #8f72ff;
+		background: linear-gradient(145deg, #7653ff, #5938e5);
+		box-shadow:
+			0 0 0 0.25rem rgb(104 71 245 / 18%),
+			0 0.65rem 1.6rem rgb(66 36 190 / 38%);
 	}
 
 	.global-player__toggle:hover {
-		background: #756af1;
+		background: linear-gradient(145deg, #8b6aff, #6a48f2);
 	}
 
 	button svg {
@@ -286,11 +303,11 @@
 
 	.global-player__timeline {
 		display: grid;
-		grid-template-columns: 2.65rem minmax(5rem, 1fr) 2.65rem;
+		grid-template-columns: 2.9rem minmax(5rem, 1fr) 2.9rem;
 		align-items: center;
 		gap: 0.5rem;
-		color: #cbd5e1;
-		font-size: 0.72rem;
+		color: #c5ccda;
+		font-size: 0.75rem;
 		font-variant-numeric: tabular-nums;
 	}
 
@@ -299,11 +316,56 @@
 	}
 
 	input[type='range'] {
+		appearance: none;
 		width: 100%;
 		height: 1.25rem;
 		min-width: 0;
-		accent-color: #8f86ff;
+		margin: 0;
+		background: transparent;
+		accent-color: #8f76ff;
 		cursor: pointer;
+	}
+
+	input[type='range']::-webkit-slider-runnable-track {
+		height: 0.24rem;
+		border-radius: 999px;
+		background: linear-gradient(
+			90deg,
+			#7652f6 0 var(--range-progress),
+			#333b58 var(--range-progress) 100%
+		);
+	}
+
+	input[type='range']::-webkit-slider-thumb {
+		appearance: none;
+		width: 0.85rem;
+		height: 0.85rem;
+		margin-top: -0.305rem;
+		border: 0;
+		border-radius: 999px;
+		background: #8062fa;
+		box-shadow: 0 0 0 0.2rem rgb(104 71 245 / 14%);
+	}
+
+	input[type='range']::-moz-range-track {
+		height: 0.24rem;
+		border-radius: 999px;
+		background: #333b58;
+	}
+
+	input[type='range']::-moz-range-progress {
+		height: 0.24rem;
+		border-radius: 999px;
+		background: #7652f6;
+	}
+
+	input[type='range']::-moz-range-thumb {
+		width: 0.85rem;
+		height: 0.85rem;
+		border: 0;
+		border-radius: 999px;
+		background: #8062fa;
+		box-shadow: 0 0 0 0.2rem rgb(104 71 245 / 14%);
 	}
 
 	input[type='range']:disabled {
@@ -313,8 +375,11 @@
 
 	.global-player__volume {
 		display: grid;
-		gap: 0.35rem;
+		grid-template-columns: auto minmax(4rem, 1fr);
+		align-items: center;
+		gap: 0.75rem;
 		min-width: 0;
+		padding-left: clamp(1rem, 2.5vw, 2.25rem);
 		color: #cbd5e1;
 		font-size: 0.65rem;
 		font-weight: 700;
@@ -327,8 +392,8 @@
 	}
 
 	.global-player__volume-label svg {
-		width: 0.9rem;
-		height: 0.9rem;
+		width: 1.15rem;
+		height: 1.15rem;
 		fill: currentColor;
 	}
 
@@ -340,13 +405,17 @@
 		text-align: center;
 	}
 
-	@media (max-width: 48rem) {
+	@media (max-width: 56.25rem) {
 		.global-player__inner {
-			grid-template-columns: minmax(10rem, 0.8fr) minmax(20rem, 2fr);
+			grid-template-columns: minmax(12rem, 0.8fr) minmax(20rem, 2fr);
 		}
 
 		.global-player__volume {
 			display: none;
+		}
+
+		.global-player__playback {
+			border-right: 0;
 		}
 	}
 
@@ -363,10 +432,12 @@
 
 		.global-player__identity {
 			grid-column: 1;
+			padding-right: 0;
 		}
 
 		.global-player__playback {
 			display: contents;
+			border: 0;
 		}
 
 		.global-player__toggle {
@@ -377,6 +448,17 @@
 		.global-player__timeline {
 			grid-column: 1 / -1;
 			grid-row: 2;
+		}
+	}
+
+	@media (max-width: 30rem) {
+		.global-player__status {
+			display: none;
+		}
+
+		.global-player__timeline {
+			grid-template-columns: 2.5rem minmax(3rem, 1fr) 2.5rem;
+			gap: 0.35rem;
 		}
 	}
 </style>

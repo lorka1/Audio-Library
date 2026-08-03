@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { page } from '$app/state';
 	import { onMount, tick } from 'svelte';
 	import type { NavigationUser } from '$lib/types';
 
@@ -11,6 +12,17 @@
 	let container: HTMLDivElement;
 	let trigger: HTMLButtonElement;
 	let firstLink: HTMLAnchorElement;
+
+	function isRouteActive(href: string, includeChildren = false): boolean {
+		try {
+			return includeChildren
+				? page.url.pathname === href || page.url.pathname.startsWith(`${href}/`)
+				: page.url.pathname === href;
+		} catch {
+			// Component-only SSR tests do not provide SvelteKit's request context.
+			return false;
+		}
+	}
 
 	async function toggleMenu(): Promise<void> {
 		open = !open;
@@ -75,9 +87,22 @@
 		aria-label="Profile navigation"
 	>
 		<p>Signed in as <strong>{user.username}</strong></p>
-		<a bind:this={firstLink} href="/my-tracks" onclick={() => closeMenu()}>My Tracks</a>
-		<a href="/playlists" onclick={() => closeMenu()}>Playlists</a>
-		<a href="/account" onclick={() => closeMenu()}>Account</a>
+		<a
+			bind:this={firstLink}
+			href="/my-tracks"
+			aria-current={isRouteActive('/my-tracks', true) ? 'page' : undefined}
+			onclick={() => closeMenu()}>My Tracks</a
+		>
+		<a
+			href="/playlists"
+			aria-current={isRouteActive('/playlists', true) ? 'page' : undefined}
+			onclick={() => closeMenu()}>Playlists</a
+		>
+		<a
+			href="/account"
+			aria-current={isRouteActive('/account') ? 'page' : undefined}
+			onclick={() => closeMenu()}>Account</a
+		>
 		<form method="POST" action="/logout">
 			<button type="submit">Logout</button>
 		</form>
@@ -95,8 +120,8 @@
 		width: 2.75rem;
 		height: 2.75rem;
 		padding: 0;
-		color: #dbe3ef;
-		border: 1px solid rgb(255 255 255 / 14%);
+		color: #d8deec;
+		border: 1px solid rgb(159 171 209 / 20%);
 		border-radius: 999px;
 		background: rgb(255 255 255 / 6%);
 		cursor: pointer;
@@ -105,7 +130,8 @@
 	.profile-menu__trigger:hover,
 	.profile-menu__trigger[aria-expanded='true'] {
 		color: white;
-		background: rgb(255 255 255 / 12%);
+		border-color: rgb(151 126 255 / 42%);
+		background: rgb(104 71 245 / 18%);
 	}
 
 	.profile-menu__trigger svg {
@@ -122,10 +148,10 @@
 		width: min(17rem, calc(100vw - 2rem));
 		padding: 0.5rem;
 		color: var(--text);
-		border: 1px solid var(--border);
+		border: 1px solid rgb(145 158 200 / 23%);
 		border-radius: 0.8rem;
-		background: white;
-		box-shadow: 0 1.25rem 3rem rgb(12 18 31 / 24%);
+		background: #10172b;
+		box-shadow: 0 1.25rem 3rem rgb(0 2 14 / 48%);
 	}
 
 	.profile-menu__panel[hidden] {
@@ -169,6 +195,11 @@
 	.profile-menu__panel a:hover,
 	.profile-menu__panel form button:hover {
 		background: var(--surface-muted);
+	}
+
+	.profile-menu__panel a[aria-current='page'] {
+		color: #b4a5ff;
+		background: var(--accent-soft);
 	}
 
 	.profile-menu__panel form {

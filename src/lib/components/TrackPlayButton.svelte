@@ -83,10 +83,10 @@
 		gap: 0.4rem;
 		min-height: 2.75rem;
 		padding: 0.55rem 0.7rem;
-		color: var(--accent-strong);
-		border: 1px solid #c9c4fa;
+		color: #cfc6ff;
+		border: 1px solid rgb(154 132 255 / 35%);
 		border-radius: 0.65rem;
-		background: #f7f6ff;
+		background: rgb(104 71 245 / 12%);
 		font-size: 0.78rem;
 		font-weight: 800;
 		cursor: pointer;
@@ -97,25 +97,27 @@
 	}
 
 	button:hover {
-		background: #efedff;
+		border-color: rgb(164 142 255 / 58%);
+		background: rgb(104 71 245 / 22%);
 	}
 
 	button.selected {
-		color: #3227a8;
-		border-color: #958cf0;
-		background: #e9e7ff;
+		color: white;
+		border-color: #8e75ff;
+		background: rgb(104 71 245 / 30%);
 	}
 
 	button.playing {
-		color: #17633d;
-		border-color: #a9dec2;
-		background: #edf9f2;
+		color: white;
+		border-color: #8a6fff;
+		background: #6847f5;
+		box-shadow: 0 0 1.2rem rgb(104 71 245 / 28%);
 	}
 
 	button.error {
-		color: #8e2438;
-		border-color: #efbdc6;
-		background: #fff1f3;
+		color: #ffc4ce;
+		border-color: rgb(222 89 112 / 44%);
+		background: rgb(116 30 49 / 24%);
 	}
 
 	button.track-play-button--detail {
@@ -129,7 +131,20 @@
 		height: 2.75rem;
 		min-height: 2.75rem;
 		padding: 0;
+		color: #f6f4ff;
+		border-color: rgb(209 213 231 / 54%);
 		border-radius: 999px;
+		background: rgb(8 14 33 / 68%);
+	}
+
+	button.track-play-button--icon:hover,
+	button.track-play-button--icon.selected {
+		border-color: #8f76ff;
+		background: rgb(104 71 245 / 25%);
+	}
+
+	button.track-play-button--icon.playing {
+		background: #6847f5;
 	}
 
 	.visually-hidden {

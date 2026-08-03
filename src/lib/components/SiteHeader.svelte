@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { page } from '$app/state';
 	import { onMount } from 'svelte';
 	import ProfileMenu from './ProfileMenu.svelte';
 	import type { NavigationUser } from '$lib/types';
@@ -8,6 +9,15 @@
 	let mobileOpen = $state(false);
 	let header: HTMLElement;
 	let mobileTrigger: HTMLButtonElement;
+
+	function isRouteActive(href: string): boolean {
+		try {
+			return page.url.pathname === href || page.url.pathname.startsWith(`${href}/`);
+		} catch {
+			// Component-only SSR tests do not provide SvelteKit's request context.
+			return false;
+		}
+	}
 
 	function closeMobileMenu(restoreFocus = false): void {
 		if (!mobileOpen) return;
@@ -46,19 +56,41 @@
 				<span></span>
 				<span></span>
 				<span></span>
+				<span></span>
+				<span></span>
 			</span>
 			<span>Audio Library</span>
 		</a>
 
 		<nav class="desktop-navigation" aria-label="Main navigation">
-			<a class="nav-link" href="/tracks">Browse</a>
+			<a
+				class="nav-link"
+				href="/tracks"
+				aria-current={isRouteActive('/tracks') ? 'page' : undefined}>Browse</a
+			>
 			{#if user}
-				<a class="nav-link" href="/upload">Upload</a>
-				<a class="nav-link" href="/playlists">Playlists</a>
+				<a
+					class="nav-link"
+					href="/upload"
+					aria-current={isRouteActive('/upload') ? 'page' : undefined}>Upload</a
+				>
+				<a
+					class="nav-link"
+					href="/playlists"
+					aria-current={isRouteActive('/playlists') ? 'page' : undefined}>Playlists</a
+				>
 				<ProfileMenu {user} menuId="desktop-profile-menu" />
 			{:else}
-				<a class="nav-link" href="/login">Login</a>
-				<a class="nav-link" href="/register">Register</a>
+				<a
+					class="nav-link"
+					href="/login"
+					aria-current={isRouteActive('/login') ? 'page' : undefined}>Login</a
+				>
+				<a
+					class="nav-link nav-link--primary"
+					href="/register"
+					aria-current={isRouteActive('/register') ? 'page' : undefined}>Register</a
+				>
 			{/if}
 		</nav>
 
@@ -93,13 +125,34 @@
 		aria-label="Mobile navigation"
 	>
 		<div class="page-container mobile-navigation__inner">
-			<a href="/tracks" onclick={() => closeMobileMenu()}>Browse</a>
+			<a
+				href="/tracks"
+				aria-current={isRouteActive('/tracks') ? 'page' : undefined}
+				onclick={() => closeMobileMenu()}>Browse</a
+			>
 			{#if user}
-				<a href="/upload" onclick={() => closeMobileMenu()}>Upload</a>
-				<a href="/playlists" onclick={() => closeMobileMenu()}>Playlists</a>
+				<a
+					href="/upload"
+					aria-current={isRouteActive('/upload') ? 'page' : undefined}
+					onclick={() => closeMobileMenu()}>Upload</a
+				>
+				<a
+					href="/playlists"
+					aria-current={isRouteActive('/playlists') ? 'page' : undefined}
+					onclick={() => closeMobileMenu()}>Playlists</a
+				>
 			{:else}
-				<a href="/login" onclick={() => closeMobileMenu()}>Login</a>
-				<a href="/register" onclick={() => closeMobileMenu()}>Register</a>
+				<a
+					href="/login"
+					aria-current={isRouteActive('/login') ? 'page' : undefined}
+					onclick={() => closeMobileMenu()}>Login</a
+				>
+				<a
+					class="mobile-navigation__primary"
+					href="/register"
+					aria-current={isRouteActive('/register') ? 'page' : undefined}
+					onclick={() => closeMobileMenu()}>Register</a
+				>
 			{/if}
 		</div>
 	</nav>
@@ -113,9 +166,10 @@
 		width: 100%;
 		isolation: isolate;
 		color: #f9fafb;
-		background: rgb(17 24 39 / 96%);
-		border-bottom: 1px solid rgb(255 255 255 / 10%);
-		backdrop-filter: blur(0.75rem);
+		background: rgb(5 9 23 / 92%);
+		border-bottom: 1px solid rgb(139 153 198 / 13%);
+		box-shadow: 0 0.5rem 2rem rgb(0 2 14 / 18%);
+		backdrop-filter: blur(1rem);
 	}
 
 	.site-header__inner {
@@ -123,14 +177,15 @@
 		align-items: center;
 		justify-content: space-between;
 		gap: 1rem;
-		min-height: 4.25rem;
+		min-height: 4.5rem;
 	}
 
 	.brand {
 		display: inline-flex;
 		align-items: center;
 		gap: 0.65rem;
-		font-weight: 750;
+		font-size: 1.04rem;
+		font-weight: 780;
 		text-decoration: none;
 		letter-spacing: -0.02em;
 	}
@@ -139,27 +194,32 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		gap: 0.125rem;
+		gap: 0.105rem;
 		width: 2rem;
 		height: 2rem;
 		border-radius: 0.55rem;
-		background: linear-gradient(145deg, #756af1, #4d40d7);
-		box-shadow: 0 0.5rem 1.5rem rgb(24 16 96 / 35%);
+		background: linear-gradient(145deg, #835cff, #5031de);
+		box-shadow: 0 0.5rem 1.5rem rgb(86 48 224 / 34%);
 	}
 
 	.brand__mark span {
 		display: block;
-		width: 0.15rem;
+		width: 0.12rem;
 		border-radius: 999px;
 		background: white;
 	}
 
 	.brand__mark span:nth-child(1),
-	.brand__mark span:nth-child(3) {
+	.brand__mark span:nth-child(5) {
+		height: 0.42rem;
+	}
+
+	.brand__mark span:nth-child(2),
+	.brand__mark span:nth-child(4) {
 		height: 0.55rem;
 	}
 
-	.brand__mark span:nth-child(2) {
+	.brand__mark span:nth-child(3) {
 		height: 1rem;
 	}
 
@@ -167,7 +227,7 @@
 		display: flex;
 		align-items: center;
 		justify-content: flex-end;
-		gap: 0.25rem;
+		gap: 0.45rem;
 		margin-left: auto;
 	}
 
@@ -177,10 +237,10 @@
 		align-items: center;
 		min-height: 2.75rem;
 		padding: 0.55rem 0.75rem;
-		color: #cbd5e1;
+		color: #c5ccdc;
 		border-radius: 0.5rem;
 		font-size: 0.875rem;
-		font-weight: 650;
+		font-weight: 680;
 		text-decoration: none;
 	}
 
@@ -188,6 +248,29 @@
 	.mobile-navigation a:hover {
 		color: white;
 		background: rgb(255 255 255 / 8%);
+	}
+
+	.nav-link[aria-current='page'],
+	.mobile-navigation a[aria-current='page'] {
+		color: #967cff;
+		background: rgb(104 71 245 / 10%);
+	}
+
+	.nav-link--primary,
+	.mobile-navigation .mobile-navigation__primary {
+		min-width: 6rem;
+		justify-content: center;
+		color: white;
+		background: linear-gradient(135deg, #6040ed, #7547f5);
+		box-shadow: 0 0.55rem 1.25rem rgb(80 45 213 / 24%);
+	}
+
+	.nav-link--primary:hover,
+	.mobile-navigation .mobile-navigation__primary:hover,
+	.nav-link--primary[aria-current='page'],
+	.mobile-navigation .mobile-navigation__primary[aria-current='page'] {
+		color: white;
+		background: linear-gradient(135deg, #7352f7, #875cff);
 	}
 
 	.nav-link:focus-visible,
@@ -211,7 +294,7 @@
 		color: #dbe3ef;
 		border: 1px solid rgb(255 255 255 / 14%);
 		border-radius: 0.65rem;
-		background: rgb(255 255 255 / 6%);
+		background: rgb(255 255 255 / 5%);
 		cursor: pointer;
 	}
 
@@ -227,7 +310,7 @@
 
 	@media (max-width: 48rem) {
 		.site-header__inner {
-			min-height: 4rem;
+			min-height: 4.25rem;
 		}
 
 		.desktop-navigation {
@@ -244,10 +327,12 @@
 		.mobile-navigation {
 			display: block;
 			border-top: 1px solid rgb(255 255 255 / 9%);
+			background: rgb(6 10 24 / 98%);
 		}
 
 		.mobile-navigation__inner {
 			display: flex;
+			flex-wrap: wrap;
 			gap: 0.25rem;
 			padding-block: 0.5rem;
 		}

@@ -657,10 +657,10 @@ used for any real service.
 - [ ] While signed in and audio is playing, note its seek position and volume, then navigate through Home, Browse, Upload, My Tracks, Account, and a public track detail page.
 - [ ] Expected: The selected track, position, duration, volume, and playing or paused state remain intact without a second audio element.
 
-### PLY-004 — Seek, details, close, and failure recovery
+### PLY-004 — Seek, details, and failure recovery
 
-- [ ] Seek from the bottom player, open its track-details link, then close the player. In a disposable environment, make a selected stream unavailable and retry it.
-- [ ] Expected: Seeking works, the numeric public detail URL opens, Close clears the player, and failure feedback is safe and recoverable.
+- [ ] Seek from the bottom player and open its track-details link. In a disposable environment, make a selected stream unavailable and retry it.
+- [ ] Expected: Seeking works, the numeric public detail URL opens, no close/X control is present, and failure feedback is safe and recoverable.
 
 ### NAV-006 — Compact authenticated navigation
 

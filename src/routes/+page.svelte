@@ -1,7 +1,11 @@
 <script lang="ts">
+	import { AudioWaveform } from '$lib';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
+	let heroHeading = $derived(
+		data.user ? `Welcome back, ${data.user.username}` : 'Discover community audio'
+	);
 </script>
 
 <svelte:head>
@@ -10,26 +14,32 @@
 
 <section class="hero">
 	<div class="page-container hero__inner">
-		<p class="eyebrow">Your audio, ready to share</p>
-		<h1>
-			{data.user
-				? `Welcome back, ${data.user.username}.`
-				: 'Discover community audio.'}
-		</h1>
-		<p class="lead">
-			Upload and organize your audio, browse public tracks, search titles, artists, and
-			descriptions, then play, seek, and download. Your own tracks stay easy to manage from
-			one secure library.
-		</p>
-		<div class="hero__actions">
-			<a class="hero__link hero__link--primary" href="/tracks">Browse Tracks</a>
-			{#if data.user}
-				<a class="hero__link" href="/upload">Upload a Track</a>
-			{:else}
-				<a class="hero__link" href="/login">Login</a>
-				<a class="hero__link" href="/register">Register</a>
-			{/if}
+		<div class="hero__copy">
+			<p class="eyebrow">Your audio, ready to share</p>
+			<h1>{heroHeading}<span class="hero__punctuation">.</span></h1>
+			<p class="lead">
+				Upload and organize your audio, browse public tracks, search titles, artists, and
+				descriptions, then play, seek, and download. Your own tracks stay easy to manage
+				from one secure library.
+			</p>
+			<div class="hero__actions">
+				<a class="hero__link hero__link--primary" href="/tracks">
+					<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+						<path d="m10.7 4.2 1.1 2.1 2.2 1.1-2.2 1.1-1.1 2.2-1.1-2.2-2.2-1.1 2.2-1.1zM5.5 12l.8 1.6 1.7.9-1.7.8-.8 1.7-.8-1.7-1.7-.8 1.7-.9zm10.2-1.7.9 1.8 1.9.9-1.9.9-.9 1.9-.9-1.9-1.8-.9 1.8-.9z"></path>
+						<path d="M14.5 15.2a5.25 5.25 0 1 0-1.3 1.3l3.9 3.9 1.3-1.3zM6.8 12.3a3.45 3.45 0 1 1 6.9 0 3.45 3.45 0 0 1-6.9 0"></path>
+					</svg>
+					Browse Tracks
+				</a>
+				{#if data.user}
+					<a class="hero__link" href="/upload">Upload a Track</a>
+				{:else}
+					<a class="hero__link" href="/login">Login</a>
+					<a class="hero__link" href="/register">Register</a>
+				{/if}
+			</div>
 		</div>
+
+		<AudioWaveform class="hero__waveform" />
 	</div>
 </section>
 
@@ -96,18 +106,31 @@
 
 <style>
 	.hero {
+		position: relative;
 		display: grid;
 		align-items: center;
-		min-height: clamp(31rem, 66vh, 36rem);
-		padding-block: clamp(4.5rem, 8vw, 7rem);
+		min-height: clamp(38rem, 76vh, 46rem);
+		padding-block: clamp(5rem, 9vw, 8rem);
+		overflow: hidden;
 		color: white;
 		background:
-			linear-gradient(120deg, rgb(17 24 39 / 98%), rgb(32 38 75 / 94%)),
-			#111827;
+			radial-gradient(circle at 77% 45%, rgb(98 37 207 / 19%), transparent 28rem),
+			radial-gradient(circle at 18% 28%, rgb(36 60 139 / 19%), transparent 28rem),
+			linear-gradient(115deg, #080d1f 0%, #0b1026 52%, #100824 100%);
 	}
 
 	.hero__inner {
-		max-width: calc(64rem + (2 * var(--page-gutter)));
+		position: relative;
+		display: grid;
+		grid-template-columns: minmax(0, 0.95fr) minmax(28rem, 1.05fr);
+		align-items: center;
+		gap: clamp(1rem, 3vw, 3rem);
+	}
+
+	.hero__copy {
+		position: relative;
+		z-index: 1;
+		min-width: 0;
 	}
 
 	.eyebrow {
@@ -120,31 +143,38 @@
 	}
 
 	h1 {
-		max-width: 15ch;
+		max-width: 11ch;
 		margin: 0;
-		font-size: clamp(2.65rem, 8vw, 5.75rem);
-		line-height: 0.98;
+		font-size: clamp(3.2rem, 6vw, 5.75rem);
+		line-height: 0.99;
 		letter-spacing: -0.055em;
 		overflow-wrap: anywhere;
+		text-wrap: balance;
+		text-shadow: 0 0.8rem 2.5rem rgb(0 0 0 / 22%);
+	}
+
+	.hero__punctuation {
+		color: #795cff;
 	}
 
 	.lead {
-		max-width: 42rem;
+		max-width: 39rem;
 		margin: clamp(1.5rem, 3vw, 2rem) 0;
-		color: #cbd5e1;
-		font-size: clamp(1rem, 2vw, 1.25rem);
-		line-height: 1.75;
+		color: #b7bfd2;
+		font-size: clamp(1rem, 1.55vw, 1.18rem);
+		line-height: 1.72;
 	}
 
 	.hero__link {
 		display: inline-flex;
 		align-items: center;
 		gap: 0.6rem;
-		padding: 0.8rem 1rem;
+		min-height: 3.4rem;
+		padding: 0.8rem 1.15rem;
 		color: white;
-		border: 1px solid rgb(255 255 255 / 18%);
-		border-radius: 0.65rem;
-		background: rgb(255 255 255 / 7%);
+		border: 1px solid rgb(155 166 203 / 29%);
+		border-radius: 0.7rem;
+		background: rgb(12 18 42 / 64%);
 		font-size: 0.9rem;
 		font-weight: 700;
 		text-decoration: none;
@@ -161,7 +191,14 @@
 
 	.hero__link--primary {
 		border-color: transparent;
-		background: var(--accent);
+		background: linear-gradient(135deg, #6040ed, #7547f5);
+		box-shadow: 0 0.8rem 2rem rgb(79 44 218 / 30%);
+	}
+
+	.hero__link svg {
+		width: 1.15rem;
+		height: 1.15rem;
+		fill: currentColor;
 	}
 
 	.hero__link:hover {
@@ -170,7 +207,12 @@
 	}
 
 	.hero__link--primary:hover {
-		background: var(--accent-strong);
+		background: linear-gradient(135deg, #7352f7, #875cff);
+	}
+
+	:global(.hero__waveform) {
+		width: min(48rem, 53vw);
+		margin-right: -8rem;
 	}
 
 	.features {
@@ -209,7 +251,7 @@
 		border: 1px solid var(--border);
 		border-radius: 1rem;
 		background: var(--surface);
-		box-shadow: 0 1rem 3rem rgb(24 32 51 / 5%);
+		box-shadow: 0 1rem 3rem rgb(0 2 12 / 25%);
 	}
 
 	.card-number {
@@ -276,7 +318,7 @@
 	@media (max-width: 48rem) {
 		.hero {
 			min-height: auto;
-			padding-block: clamp(4rem, 14vw, 5.5rem);
+			padding-block: clamp(4.5rem, 14vw, 6.5rem);
 		}
 
 		.card-grid {
@@ -285,6 +327,42 @@
 
 		article {
 			min-height: auto;
+		}
+	}
+
+	@media (max-width: 64rem) {
+		.hero__inner {
+			grid-template-columns: minmax(0, 1fr);
+		}
+
+		.hero__copy {
+			max-width: 44rem;
+		}
+
+		:global(.hero__waveform) {
+			position: absolute;
+			z-index: 0;
+			right: -15rem;
+			bottom: -8rem;
+			width: 48rem;
+			margin: 0;
+			opacity: 0.32;
+		}
+	}
+
+	@media (max-width: 32rem) {
+		h1 {
+			font-size: clamp(2.75rem, 14vw, 4rem);
+		}
+
+		.hero__actions,
+		.hero__link {
+			width: 100%;
+		}
+
+		:global(.hero__waveform) {
+			right: -23rem;
+			opacity: 0.24;
 		}
 	}
 </style>
