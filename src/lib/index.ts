@@ -8,6 +8,8 @@ export { default as GlobalAudioPlayer } from './components/GlobalAudioPlayer.sve
 export { default as TrackPlayButton } from './components/TrackPlayButton.svelte';
 export { default as TrackFilters } from './components/TrackFilters.svelte';
 export { default as AddToPlaylist } from './components/AddToPlaylist.svelte';
+export { default as PlaylistArtwork } from './components/PlaylistArtwork.svelte';
+export { default as PlaylistImageField } from './components/PlaylistImageField.svelte';
 export {
 	AudioPlayerController,
 	createAudioPlayerController

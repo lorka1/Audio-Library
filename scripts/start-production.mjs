@@ -7,7 +7,8 @@ import {
 	assertProductionRuntimeConfig,
 	parseOperationalConfig,
 	preparePrivateAudioStorage,
-	preparePrivateCoverImageStorage
+	preparePrivateCoverImageStorage,
+	preparePrivatePlaylistImageStorage
 } from '../src/lib/server/operational/config.ts';
 import { verifyMongoOperationalState } from '../src/lib/server/mongodb/verification.ts';
 import { installShutdownSignalHandlers } from '../src/lib/server/operational/signals.ts';
@@ -17,6 +18,7 @@ assertProductionRuntimeConfig(process.env);
 const config = parseOperationalConfig(process.env);
 await preparePrivateAudioStorage(config.audioStoragePath);
 await preparePrivateCoverImageStorage(config.coverImageStoragePath);
+await preparePrivatePlaylistImageStorage(config.playlistImageStoragePath);
 const startupManager = new MongoClientManager(config.mongo);
 let server;
 let shutdownPromise;

@@ -522,6 +522,21 @@ used for any real service.
 - [ ] Check `/playlists`, one long-name playlist detail, and Add to playlist at approximately 1920×1080, 1440×900, 1024×768, 768×1024, and 390×844.
 - [ ] Expected: Cards and rows do not overflow, names truncate/wrap safely, action controls remain usable, mobile navigation includes Playlists, and the global player hides no content.
 
+### PLY-008 — Optional playlist images
+
+- [ ] Create playlists with valid JPEG, PNG, WebP, and no image; submit an invalid type, mismatched extension/MIME, and oversized image.
+- [ ] Expected: Valid images appear in the private list, detail, and picker; image-less playlists use deterministic local fallback art; invalid images preserve name/description and write no file.
+
+### PLY-009 — Owner-only image lifecycle
+
+- [ ] As the owner, request the image endpoint, replace the image, remove it, and delete an imaged playlist; repeat image requests signed out and as another user.
+- [ ] Expected: only the owner receives the correct private/no-store image response; replacement removes the prior file only after success, removal shows fallback art, deletion removes only its image, and non-owners receive the same safe 404.
+
+### PLY-010 — Playlist image recovery
+
+- [ ] Run the synthetic recovery drill with both imaged and image-less playlists.
+- [ ] Expected: MongoDB metadata and private image bytes restore with matching fingerprints; a zero-image backup is valid; owned databases and temporary roots are cleaned exactly.
+
 ## My Tracks
 
 ### MYT-001 — Protected route while signed out

@@ -83,4 +83,32 @@ describe('backup destination safety', () => {
 		expect(JSON.stringify(manifest)).not.toContain('fixture.invalid');
 		expect(JSON.stringify(manifest)).not.toContain(root);
 	});
+
+	it('accepts and fingerprints a backup containing zero playlist images', async () => {
+		const root = await mkdtemp(join(tmpdir(), 'audio-library-backup-test-'));
+		roots.push(root);
+		const audio = resolve(root, 'audio-source');
+		const playlistImages = resolve(root, 'playlist-image-source');
+		const backups = resolve(root, 'backups');
+		await mkdir(audio);
+		await mkdir(playlistImages);
+		await writeFile(resolve(audio, 'fixture.mp3'), 'synthetic audio');
+		const result = spawnSync(process.execPath, [
+			'--experimental-strip-types',
+			resolve('scripts/audio-backup.mjs')
+		], {
+			encoding: 'utf8',
+			env: {
+				...process.env,
+				AUDIO_STORAGE_PATH: audio,
+				PLAYLIST_IMAGE_STORAGE_PATH: playlistImages,
+				AUDIO_BACKUP_ROOT: backups
+			}
+		});
+		expect(result.status).toBe(0);
+		const [entry] = await readdir(backups);
+		const manifest = JSON.parse(await readFile(resolve(backups, entry, 'manifest.json'), 'utf8'));
+		expect(manifest.playlistImageAggregate).toMatchObject({ fileCount: 0, byteSize: 0 });
+		expect(manifest.playlistImageAggregate.contentHash).toMatch(/^[a-f0-9]{64}$/);
+	});
 });

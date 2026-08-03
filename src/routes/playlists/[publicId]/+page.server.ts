@@ -3,8 +3,10 @@ import type { Actions, PageServerLoad } from './$types';
 import { requireUser } from '$lib/server/auth/guards';
 import { removeTrackFromPlaylistAction, playlistStatusMessage } from '$lib/server/playlists/actions';
 import { getApplicationPlaylistRepository } from '$lib/server/playlists/persistence';
-import { isValidPlaylistPublicId, validatePlaylistFormData } from '$lib/server/playlists/validation';
+import { isValidPlaylistPublicId } from '$lib/server/playlists/validation';
 import { safeErrorFields, writeSafeLog } from '$lib/server/operational/logging';
+import { getServerConfig } from '$lib/server/config';
+import { deletePlaylist, updatePlaylist } from '$lib/server/playlists/management';
 
 function validPublicId(value: string): string {
 	if (!isValidPlaylistPublicId(value)) error(404, 'Playlist not found.');
@@ -32,6 +34,7 @@ export const load = (async (event) => {
 		if (!playlist) error(404, 'Playlist not found.');
 		return {
 			playlist,
+			maxPlaylistImageSizeMb: getServerConfig().playlistImageMaxSizeMb,
 			updated: event.url.searchParams.get('updated') === '1',
 			playlistNotice: playlistStatusMessage(event.url.searchParams.get('playlistStatus'))
 		};
@@ -46,21 +49,10 @@ export const actions = {
 	update: async (event) => {
 		const user = requireUser(event);
 		const publicId = validPublicId(event.params.publicId);
-		const validation = validatePlaylistFormData(await event.request.formData());
-		if (!validation.success) return fail(400, { action: 'update' as const, values: validation.values, errors: validation.errors });
-		try {
-			const updated = await (
-				await getApplicationPlaylistRepository()
-			).updatePlaylistForOwner(user.id, publicId, validation.input);
-			if (!updated) error(404, 'Playlist not found.');
-		} catch (updateError) {
-			if (typeof updateError === 'object' && updateError && 'status' in updateError && updateError.status === 404) throw updateError;
-			logFailure(event, updateError);
-			return fail(500, {
-				action: 'update' as const,
-				values: validation.values,
-				errors: { general: 'Unable to update the playlist. Please try again.' }
-			});
+		const result = await updatePlaylist(user.id, publicId, await event.request.formData(), getServerConfig().playlistImageMaxSizeBytes);
+		if (!result.success) {
+			if (result.status === 404) error(404, 'Playlist not found.');
+			return fail(result.status, { action: 'update' as const, values: result.values, errors: result.errors });
 		}
 		redirect(303, `/playlists/${publicId}?updated=1`);
 	},
@@ -71,15 +63,10 @@ export const actions = {
 		if (formData.get('confirmDelete') !== 'delete') {
 			return fail(400, { action: 'delete' as const, deleteError: 'Confirm that you want to delete this playlist.' });
 		}
-		try {
-			const deleted = await (
-				await getApplicationPlaylistRepository()
-			).deletePlaylistForOwner(user.id, publicId);
-			if (!deleted) error(404, 'Playlist not found.');
-		} catch (deleteError) {
-			if (typeof deleteError === 'object' && deleteError && 'status' in deleteError && deleteError.status === 404) throw deleteError;
-			logFailure(event, deleteError);
-			return fail(500, { action: 'delete' as const, deleteError: 'Unable to delete the playlist. Please try again.' });
+		const result = await deletePlaylist(user.id, publicId);
+		if (!result.success) {
+			if (result.status === 404) error(404, 'Playlist not found.');
+			return fail(500, { action: 'delete' as const, deleteError: result.message });
 		}
 		redirect(303, '/playlists?deleted=1');
 	},

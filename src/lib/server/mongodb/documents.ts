@@ -67,6 +67,8 @@ export interface PlaylistDocument {
 	ownerId: string;
 	name: string;
 	description: string | null;
+	/** Older playlists legitimately omit this optional private-image metadata. */
+	image?: TrackCoverImageDocument | null;
 	createdAt: Date;
 	updatedAt: Date;
 }

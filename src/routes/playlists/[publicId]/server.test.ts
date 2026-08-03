@@ -21,6 +21,7 @@ const playlist = {
 	publicId,
 	name: 'Synthetic playlist',
 	description: null,
+	imageUrl: null,
 	trackCount: 0,
 	createdAt: '2026-07-30T12:00:00.000Z',
 	updatedAt: '2026-07-30T12:00:00.000Z',
@@ -74,7 +75,10 @@ describe('/playlists/[publicId] owner boundary', () => {
 
 	it('requires explicit confirmation and cascades through the repository', async () => {
 		const deletePlaylist = vi.fn().mockResolvedValue(true);
-		mocks.getApplicationPlaylistRepository.mockResolvedValue({ deletePlaylistForOwner: deletePlaylist });
+		mocks.getApplicationPlaylistRepository.mockResolvedValue({
+			deletePlaylistForOwner: deletePlaylist,
+			findPlaylistImageStorageForOwner: vi.fn().mockResolvedValue({ publicId, image: null })
+		});
 		await expect(actions.delete(event('POST', new FormData()))).resolves.toMatchObject({
 			status: 400,
 			data: { action: 'delete' }
@@ -93,7 +97,8 @@ describe('/playlists/[publicId] owner boundary', () => {
 	it('does not distinguish a missing playlist from a non-owned playlist on mutation', async () => {
 		mocks.getApplicationPlaylistRepository.mockResolvedValue({
 			updatePlaylistForOwner: vi.fn().mockResolvedValue(null),
-			deletePlaylistForOwner: vi.fn().mockResolvedValue(false)
+			deletePlaylistForOwner: vi.fn().mockResolvedValue(false),
+			findPlaylistImageStorageForOwner: vi.fn().mockResolvedValue(null)
 		});
 		const updateBody = new FormData();
 		updateBody.set('name', 'Synthetic');

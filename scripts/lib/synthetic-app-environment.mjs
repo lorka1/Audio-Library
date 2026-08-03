@@ -4,6 +4,7 @@ import { join } from 'node:path';
 export const SYNTHETIC_UPLOAD_LIMIT_ENVIRONMENT = Object.freeze({
 	MAX_AUDIO_FILE_SIZE_MB: '50',
 	COVER_IMAGE_MAX_SIZE_MB: '5',
+	PLAYLIST_IMAGE_MAX_SIZE_MB: '5',
 	BODY_SIZE_LIMIT: '60M'
 });
 
@@ -20,6 +21,11 @@ export const SYNTHETIC_APPLICATION_ENVIRONMENT = Object.freeze({
 		tmpdir(),
 		`audio-library-unit-config-${syntheticProcessToken}`,
 		'audio'
+	),
+	PLAYLIST_IMAGE_STORAGE_PATH: join(
+		tmpdir(),
+		`audio-library-unit-config-${syntheticProcessToken}`,
+		'playlist-images'
 	),
 	SESSION_COOKIE_NAME: 'audio_library_unit_test',
 	SESSION_DURATION_DAYS: '7',

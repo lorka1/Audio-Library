@@ -7,6 +7,7 @@ import { createSyntheticApplicationEnvironment } from './synthetic-app-environme
 
 const require = createRequire(import.meta.url);
 const VITEST_TEMP_PREFIX = 'audio-library-vitest-';
+const DEFAULT_VITEST_TIMEOUT_MS = 120_000;
 
 function isOwnedVitestRoot(path) {
 	const absolute = resolve(path);
@@ -38,6 +39,7 @@ export function buildVitestProcessSpec(vitestArguments, options = {}) {
 	}
 	const executable = options.nodeExecutable ?? process.execPath;
 	const vitestEntry = options.vitestEntry ?? resolveLocalVitestEntry();
+	const cwd = resolve(options.cwd ?? process.cwd());
 	const configurationRoot = resolve(
 		options.configurationRoot ??
 			join(tmpdir(), `${VITEST_TEMP_PREFIX}config-${process.pid}`)
@@ -48,9 +50,11 @@ export function buildVitestProcessSpec(vitestArguments, options = {}) {
 	return {
 		executable,
 		arguments: [vitestEntry, ...vitestArguments],
+		cwd,
 		environment: createSyntheticApplicationEnvironment(
 			{
 				AUDIO_STORAGE_PATH: resolve(configurationRoot, 'audio'),
+				PLAYLIST_IMAGE_STORAGE_PATH: resolve(configurationRoot, 'playlist-images'),
 				...(options.environmentOverrides ?? {})
 			},
 			options.parentEnvironment ?? process.env
@@ -70,6 +74,10 @@ export async function runVitest(vitestArguments, options = {}) {
 	let result;
 	let primaryFailure;
 	try {
+		const timeoutMs = options.timeoutMs ?? DEFAULT_VITEST_TIMEOUT_MS;
+		if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 600_000) {
+			throw new Error('Vitest timeout must be an integer from 1 through 600000 milliseconds.');
+		}
 		ownedRoot = await makeTemporaryRoot();
 		if (!isOwnedVitestRoot(ownedRoot)) {
 			throw new Error('Vitest configuration root is not an owned temporary directory.');
@@ -81,9 +89,10 @@ export async function runVitest(vitestArguments, options = {}) {
 		});
 		const spawnProcess = options.spawnProcess ?? spawn;
 		child = spawnProcess(specification.executable, specification.arguments, {
+			cwd: specification.cwd,
 			env: specification.environment,
 			shell: false,
-			stdio: 'inherit',
+			stdio: ['ignore', 'inherit', 'inherit'],
 			windowsHide: true
 		});
 
@@ -97,17 +106,36 @@ export async function runVitest(vitestArguments, options = {}) {
 
 		result = await new Promise((resolveCode, rejectRun) => {
 			let settled = false;
-			child.once('error', () => {
+			let timedOut = false;
+			let timer = setTimeout(() => {
+				timedOut = true;
+				if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
+			}, timeoutMs);
+			const cleanup = () => {
+				if (timer) clearTimeout(timer);
+				timer = undefined;
+				child.removeListener('error', onError);
+				child.removeListener('close', onClose);
+			};
+			const onError = () => {
 				if (settled) return;
 				settled = true;
+				cleanup();
 				rejectRun(new Error('Unable to start the local Vitest process.'));
-			});
-			child.once('close', (code, signal) => {
+			};
+			const onClose = (code, signal) => {
 				if (settled) return;
 				settled = true;
+				cleanup();
+				if (timedOut) {
+					resolveCode(124);
+					return;
+				}
 				if (code !== null) resolveCode(code);
 				else resolveCode(signal === 'SIGINT' ? 130 : signal === 'SIGTERM' ? 143 : 1);
-			});
+			};
+			child.once('error', onError);
+			child.once('close', onClose);
 		});
 	} catch (error) {
 		primaryFailure = error;
@@ -121,7 +149,7 @@ export async function runVitest(vitestArguments, options = {}) {
 			try {
 				await cleanupTemporaryRoot(ownedRoot);
 			} catch {
-				if (!primaryFailure) {
+				if (!primaryFailure && (result === undefined || result === 0)) {
 					primaryFailure = new Error('Unable to remove the owned Vitest configuration root.');
 				}
 			}

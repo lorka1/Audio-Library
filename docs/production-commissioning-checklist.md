@@ -37,6 +37,8 @@ paths, filenames, or database contents in the completed checklist.
   `/api/tracks/[id]/cover`; private tracks and private storage details are not
   exposed.
 - [ ] Tracks without a cover display the local fallback artwork.
+- [ ] The separate `PLAYLIST_IMAGE_STORAGE_PATH` is private and writable;
+  playlist images are owner-only and image-less playlists show local fallback art.
 - [ ] Authenticated navigation exposes Playlists on desktop and mobile; signed-out
   navigation does not expose the private destination.
 - [ ] Private playlist create, rename, description edit, delete, add, and remove
@@ -59,11 +61,11 @@ paths, filenames, or database contents in the completed checklist.
 - [ ] MongoDB and private-media backup roots are private, explicit, and outside
   Git and public content.
 - [ ] MongoDB and private-media backups are scheduled as one logical recovery
-  set, and the filesystem backup includes both audio and `covers/`.
+  set, and the filesystem backup includes audio, `covers/`, and playlist images.
 - [ ] No automatic destructive retention is assumed; an approved retention
   policy exists separately.
 - [ ] Periodic isolated restore verification covers MongoDB track/playlist metadata plus
-  referenced audio and cover files.
+  referenced audio, cover, and playlist-image files.
 - [ ] A completed synthetic `npm run test:mongodb:recovery` run is recorded.
 - [ ] The historical SQLite backup remains separately retained as migration
   history only.

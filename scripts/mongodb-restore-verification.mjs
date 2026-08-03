@@ -44,6 +44,7 @@ assertMongoTestDatabaseName(restoredDatabaseName, config.databaseName);
 assert.notEqual(restoredDatabaseName, config.testDatabaseName);
 const temporaryAudioRoot = await mkdtemp(join(tmpdir(), 'audio-library-restore-'));
 const restoredAudio = resolve(temporaryAudioRoot, 'audio');
+const restoredPlaylistImages = resolve(temporaryAudioRoot, 'playlist-images');
 const manager = new MongoClientManager(config);
 let restoredDatabaseAuthorizedForCleanup = false;
 let primaryFailure;
@@ -123,6 +124,16 @@ try {
 		preserveTimestamps: true
 	});
 	assert.deepEqual(await directoryAggregate(restoredAudio), audioManifest.aggregate);
+	await cp(resolve(audioBackup, 'playlist-images'), restoredPlaylistImages, {
+		recursive: true,
+		errorOnExist: true,
+		force: false,
+		preserveTimestamps: true
+	});
+	assert.deepEqual(
+		await directoryAggregate(restoredPlaylistImages),
+		audioManifest.playlistImageAggregate
+	);
 
 	const sourceCollections = getMongoCollections(client.db(config.databaseName));
 	const restoredDatabase = client.db(restoredDatabaseName);
@@ -185,12 +196,24 @@ try {
 			})
 		);
 	}
+	const playlistsWithImages = await restoredCollections.playlists.find(
+		{ image: { $type: 'object' } },
+		{ projection: { _id: 0, image: 1 }, maxTimeMS: 5_000 }
+	).toArray();
+	for (const playlist of playlistsWithImages) {
+		assert.ok(playlist.image, 'Synthetic restored playlist image metadata is missing.');
+		const restoredImage = resolveRestoredMediaFile(restoredPlaylistImages, playlist.image.storageKey);
+		const info = await lstat(restoredImage);
+		assert.ok(info.isFile() && !info.isSymbolicLink());
+		assert.equal(info.size, playlist.image.byteSize);
+	}
 	console.log(JSON.stringify({
 		status: 'verified',
 		databaseRestore: true,
 		audioRestore: true,
 		coverRestore: true,
 		playlistRestore: true,
+		playlistImageRestore: true,
 		applicationReadOnlyProbe: true
 	}));
 } catch (error) {

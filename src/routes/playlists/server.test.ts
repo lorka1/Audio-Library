@@ -54,7 +54,7 @@ describe('/playlists server behavior', () => {
 			status: 303,
 			location: '/playlists?created=1'
 		});
-		expect(create).toHaveBeenCalledWith(user.id, { name: 'Synthetic mix', description: null });
+		expect(create).toHaveBeenCalledWith(user.id, { name: 'Synthetic mix', description: null, image: null });
 	});
 
 	it('returns field validation without calling MongoDB', async () => {

@@ -3,7 +3,7 @@
 Audio Library is a SvelteKit application for uploading, browsing, searching,
 streaming, downloading, managing privately stored audio, and organizing tracks
 in private user-owned playlists. MongoDB is the
-only persistence backend. Audio and optional cover-image bytes remain in private
+only persistence backend. Audio, optional cover-image, and optional playlist-image bytes remain in private
 filesystem storage; MongoDB stores users, hashed sessions, track metadata,
 optional cover metadata, ownership, public route IDs, and private storage
 references. Playlist membership stores only internal track references; audio and
@@ -26,6 +26,7 @@ standalone MongoDB server without transaction support is rejected.
 - TypeScript and Vite;
 - MongoDB as the only persistence service;
 - private local filesystem storage for audio and optional cover-image bytes;
+- separate private filesystem storage for owner-only playlist-image bytes;
 - Vitest plus isolated MongoDB/HTTP/recovery integration controllers.
 
 ## Setup
@@ -52,7 +53,9 @@ Configure these values in the untracked `.env`:
 | `AUDIO_STORAGE_PATH` | Private filesystem root for audio bytes. Optional cover images are stored in its private `covers/` subdirectory. |
 | `MAX_AUDIO_FILE_SIZE_MB` | Application upload limit. |
 | `COVER_IMAGE_MAX_SIZE_MB` | Optional cover-image upload limit. |
-| `BODY_SIZE_LIMIT` | Adapter request limit. It must be at least the maximum audio size plus maximum cover size plus 1 MiB of multipart/form-data overhead. |
+| `PLAYLIST_IMAGE_STORAGE_PATH` | Separate private filesystem root for owner-only playlist artwork. |
+| `PLAYLIST_IMAGE_MAX_SIZE_MB` | Optional playlist-image upload limit. |
+| `BODY_SIZE_LIMIT` | Adapter request limit. It must cover the larger of audio plus track cover, or playlist image, plus 1 MiB of multipart/form-data overhead. |
 | `SESSION_COOKIE_NAME` | HttpOnly session cookie name. |
 | `SESSION_DURATION_DAYS` | Session lifetime from 1 through 30 days. |
 | `MONGODB_BACKUP_ROOT` | Explicit private destination root used only by the MongoDB backup command. |
@@ -212,6 +215,13 @@ are optional and limited to JPEG, PNG, or WebP; the server validates both MIME
 type and filename extension. `GET /api/tracks/[id]/cover` serves an eligible
 cover without exposing its private filename or path, while the UI uses local
 fallback artwork when no cover is available.
+
+Optional playlist artwork uses the same validated JPEG/PNG/WebP signature and
+contained-path conventions under `PLAYLIST_IMAGE_STORAGE_PATH`. MongoDB stores
+only generated storage metadata; owner-facing models expose only the protected
+`GET /api/playlists/[publicId]/image` URL. Replacement cleans the previous file
+only after persistence succeeds, and deletion quarantines/restores artwork
+around the playlist transaction.
 
 Upload and cover-replacement filesystem writes use compensating cleanup.
 Deletion quarantines both the audio and cover where present, and restores them

@@ -54,6 +54,7 @@ export interface PlaylistSummary {
 	publicId: string;
 	name: string;
 	description: string | null;
+	imageUrl: string | null;
 	trackCount: number;
 	createdAt: string;
 	updatedAt: string;
@@ -80,5 +81,6 @@ export interface OwnerPlaylist extends PlaylistSummary {
 export interface PlaylistPickerEntry {
 	publicId: string;
 	name: string;
+	imageUrl?: string | null;
 	containsTrack: boolean;
 }

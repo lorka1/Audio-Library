@@ -21,10 +21,10 @@ performs a controlled stop. No particular third-party manager is required.
 ## Private configuration and directories
 
 Copy `.env.example` to an untracked private environment source. Configure the
-MongoDB URI and database names, private media path, audio and cover upload
+MongoDB URI and database names, private media paths, audio, cover, and playlist-image upload
 limits, request-body limit, cookie name and duration, and the production host,
-port, and HTTPS origin. The request-body limit must be at least the combined
-audio and cover limits plus 1 MiB of multipart/form-data overhead. Startup
+port, and HTTPS origin. The request-body limit must cover the larger of
+audio-plus-cover or playlist-image requests plus 1 MiB of multipart/form-data overhead. Startup
 rejects a smaller value instead of changing it silently. Backup commands
 additionally require explicit MongoDB and private-media backup roots.
 
@@ -34,6 +34,8 @@ database. Audio files remain under `AUDIO_STORAGE_PATH`; optional covers use
 its private `covers/` subdirectory. Place the complete root outside `static`,
 `public`, `build`, and every reverse-proxy document root. Covers must be served
 only through `GET /api/tracks/[id]/cover`, never by exposing the storage root.
+Playlist images use the separate `PLAYLIST_IMAGE_STORAGE_PATH` and are served
+only to their owner through `GET /api/playlists/[publicId]/image`.
 Backup roots should be protected and preferably on a separate disk. Logs belong
 in an operator-selected protected location.
 
@@ -75,7 +77,7 @@ npm run backup:audio
 
 The first wraps `mongodump` and naturally captures users, sessions, tracks,
 playlists, playlist items, counters, and migration markers; the second recursively copies private audio and
-the `covers/` subdirectory, then verifies file count, aggregate size, and
+the `covers/` subdirectory plus the separate playlist-image root, then verifies file count, aggregate size, and
 aggregate content hash. Each creates a new timestamped destination, uses an
 `INCOMPLETE` marker until successful, and writes a sanitized manifest. Neither
 overwrites output or deletes old backups. The private-media copy includes every

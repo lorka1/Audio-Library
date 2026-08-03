@@ -22,6 +22,7 @@ const sourceDatabaseName = `${config.testDatabaseName.slice(0, 63 - suffix.lengt
 assertMongoTestDatabaseName(sourceDatabaseName, config.databaseName);
 const temporaryRoot = await mkdtemp(join(tmpdir(), 'audio-library-recovery-'));
 const audioSource = resolve(temporaryRoot, 'source-audio');
+const playlistImageSource = resolve(temporaryRoot, 'source-playlist-images');
 const mongoBackups = resolve(temporaryRoot, 'mongodb-backups');
 const audioBackups = resolve(temporaryRoot, 'audio-backups');
 const manager = new MongoClientManager(config);
@@ -68,6 +69,7 @@ try {
 	const storageKey = `${randomUUID()}.mp3`;
 	const uncoveredStorageKey = `${randomUUID()}.mp3`;
 	const coverStorageKey = `${randomUUID()}.png`;
+	const playlistImageStorageKey = `${randomUUID()}.png`;
 	const content = Buffer.from('synthetic recovery audio');
 	const uncoveredContent = Buffer.from('synthetic recovery audio without a cover');
 	const coverContent = Buffer.from([
@@ -77,6 +79,7 @@ try {
 	]);
 	await mkdir(audioSource, { recursive: true });
 	await mkdir(resolve(audioSource, 'covers'), { recursive: true });
+	await mkdir(playlistImageSource, { recursive: true });
 	await writeFile(resolve(audioSource, storageKey), content, { flag: 'wx', mode: 0o600 });
 	await writeFile(resolve(audioSource, uncoveredStorageKey), uncoveredContent, {
 		flag: 'wx',
@@ -87,6 +90,10 @@ try {
 		coverContent,
 		{ flag: 'wx', mode: 0o600 }
 	);
+	await writeFile(resolve(playlistImageSource, playlistImageStorageKey), coverContent, {
+		flag: 'wx',
+		mode: 0o600
+	});
 	await collections.users.insertOne({
 		_id: userId,
 		username: 'synthetic_restore_owner',
@@ -147,6 +154,11 @@ try {
 		ownerId: userId,
 		name: 'Synthetic restore playlist',
 		description: 'Synthetic recovery-only fixture.',
+		image: {
+			storageKey: playlistImageStorageKey,
+			mimeType: 'image/png',
+			byteSize: coverContent.byteLength
+		},
 		createdAt: now,
 		updatedAt: now
 	});
@@ -156,6 +168,16 @@ try {
 		trackId,
 		addedAt: now
 	});
+	await collections.playlists.insertOne({
+		_id: randomUUID(),
+		publicId: randomBytes(18).toString('base64url'),
+		ownerId: userId,
+		name: 'Synthetic image-less restore playlist',
+		description: null,
+		image: null,
+		createdAt: now,
+		updatedAt: now
+	});
 	await manager.close(true);
 
 	const environment = {
@@ -164,6 +186,7 @@ try {
 		MONGORESTORE_PATH: mongorestore.executablePath,
 		MONGODB_DB_NAME: sourceDatabaseName,
 		AUDIO_STORAGE_PATH: audioSource,
+		PLAYLIST_IMAGE_STORAGE_PATH: playlistImageSource,
 		MONGODB_BACKUP_ROOT: mongoBackups,
 		AUDIO_BACKUP_ROOT: audioBackups
 	};

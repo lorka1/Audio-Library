@@ -11,6 +11,7 @@ it through centralized server-only persistence modules.
 | Registration | Required MongoDB transaction for user plus initial session | Commit, duplicate-conflict rollback, failed-session rollback, and transaction-support checks |
 | Tracks | MongoDB track repository, atomic public-ID counter, and optional cover metadata | Creation, concurrent allocation, legacy tracks without covers, safe public/owner/storage projections, owner CRUD, missing tracks |
 | Private playlists (P1) | Normalized `playlists` and `playlistItems` collections with owner-scoped safe projections and opaque public IDs | Create/list/detail/update/delete; public and owned-private add; idempotent duplicate add; remove; non-owner/missing/inaccessible rejection; track-deletion cleanup |
+| Playlist images | Optional safe MongoDB metadata plus separate private JPEG/PNG/WebP storage and owner-only delivery | Validation, fallback art, authorization, replacement/removal/deletion rollback, and recovery fingerprints |
 | Playlist transactions | Add/remove update `updatedAt`; delete cascades items; track deletion removes all memberships | Commit/rollback boundaries, exact membership uniqueness, session cleanup, unrelated-item preservation |
 | Public browsing | MongoDB aggregation with public visibility enforcement | Literal title/artist/description search, BPM bounds, key, genre, combined filters, no-result behavior |
 | Sorting | MongoDB deterministic aggregation sorts | Newest, oldest, title ascending/descending, BPM ascending/descending, null BPM last, tie ordering |
@@ -21,7 +22,7 @@ it through centralized server-only persistence modules.
 | Privacy | Public, owner, account, navigation, and server-only models | Projection unit tests, safe cover URL/state, storage-key exclusion, full-app payload checks, sanitized error-path tests |
 | Resource safety | Unique owned database, temporary audio/cover storage and port, bounded clients/processes | Every integration controller plus aggregate supervisor and clean-copy postconditions |
 | Operations | Bounded startup/readiness, liveness, structured safe logs, SIGINT/SIGTERM shutdown | Operational failure-path tests and production startup/shutdown probe |
-| Recovery | Native MongoDB dump (including playlists/items), separate aggregate-verified audio-and-cover copy, owned isolated restore | Missing-tool/path/mismatch tests and complete synthetic track/playlist recovery integration |
+| Recovery | Native MongoDB dump (including playlist image metadata), aggregate-verified audio/cover/playlist-image copy, owned isolated restore | Missing-tool/path/mismatch tests and complete synthetic track/playlist/image recovery integration |
 
 ## Full-application traceability
 

@@ -1,10 +1,11 @@
 <script lang="ts">
 	import { formatDate } from '$lib/formatting';
+	import { PlaylistArtwork, PlaylistImageField } from '$lib';
 	import type { PlaylistFormErrors } from '$lib/server/playlists/validation';
 	import type { PageProps } from './$types';
 
 	let { data, form }: PageProps = $props();
-	let createValues = $derived(form?.action === 'create' ? form.values : { name: '', description: '' });
+	let createValues = $derived(form?.action === 'create' ? form.values : { name: '', description: '', removeImage: false });
 	let createErrors: PlaylistFormErrors = $derived(form?.action === 'create' ? form.errors : {});
 </script>
 
@@ -37,7 +38,7 @@
 				{#if createErrors.general}
 					<div class="form-message form-message--error" role="alert">{createErrors.general}</div>
 				{/if}
-				<form class="form-stack" method="POST" action="?/create">
+				<form class="form-stack" method="POST" action="?/create" enctype="multipart/form-data">
 					<div class="form-field">
 						<label for="playlist-name">Name</label>
 						<input
@@ -62,6 +63,7 @@
 						>{createValues.description}</textarea>
 						{#if createErrors.description}<p id="playlist-description-error" class="field-error">{createErrors.description}</p>{/if}
 					</div>
+					<PlaylistImageField maxSizeMb={data.maxPlaylistImageSizeMb} error={createErrors.image} playlistName={createValues.name || 'New playlist'} />
 					<button class="primary-button" type="submit">Create playlist</button>
 				</form>
 			</section>
@@ -75,7 +77,7 @@
 					<div class="playlist-grid">
 						{#each data.playlists as playlist (playlist.publicId)}
 							<a class="playlist-card" href={`/playlists/${playlist.publicId}`}>
-								<span class="playlist-card__icon" aria-hidden="true">♫</span>
+								<PlaylistArtwork imageUrl={playlist.imageUrl} name={playlist.name} variant="card" />
 								<span class="playlist-card__content">
 									<strong title={playlist.name}>{playlist.name}</strong>
 									<span class="playlist-card__description">{playlist.description ?? 'No description'}</span>
@@ -114,7 +116,6 @@
 	.playlist-grid { display: grid; gap: 0.75rem; }
 	.playlist-card { display: grid; grid-template-columns: 3.25rem minmax(0, 1fr); gap: 0.9rem; align-items: center; min-width: 0; padding: 0.9rem; border: 1px solid rgb(139 153 198 / 15%); border-radius: 0.8rem; background: rgb(7 12 29 / 48%); text-decoration: none; }
 	.playlist-card:hover { border-color: rgb(151 129 255 / 38%); background: rgb(104 71 245 / 9%); }
-	.playlist-card__icon { display: grid; place-items: center; width: 3.25rem; height: 3.25rem; color: #b7a9ff; border-radius: 0.7rem; background: linear-gradient(145deg, #34266e, #1a2144); font-size: 1.35rem; }
 	.playlist-card__content { display: grid; min-width: 0; gap: 0.25rem; }
 	.playlist-card strong, .playlist-card__description, .playlist-card__meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 	.playlist-card strong { font-size: 1rem; }

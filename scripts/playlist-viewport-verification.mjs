@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { mkdir, mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
@@ -19,6 +19,7 @@ import { ensureMongoIndexes } from '../src/lib/server/mongodb/indexes.ts';
 import { createSyntheticApplicationEnvironment } from './lib/synthetic-app-environment.mjs';
 import { hashSessionToken } from '../src/lib/server/auth/session-token.ts';
 import { safeMongoAggregateFingerprint } from './lib/mongodb-fingerprint.mjs';
+import { SYNTHETIC_PNG } from './lib/synthetic-image-fixtures.mjs';
 
 const VIEWPORTS = [
 	[1920, 1080],
@@ -203,6 +204,47 @@ async function navigate(cdp, url, selector) {
 	throw new Error('Browser page did not reach the expected playlist state.');
 }
 
+async function waitForDecodedPlaylistImage(cdp, imageSelector, fallbackSelector) {
+	const deadline = Date.now() + 8_000;
+	let state = null;
+	while (Date.now() < deadline) {
+		state = await evaluate(cdp, `(async () => {
+			const image = document.querySelector(${JSON.stringify(imageSelector)});
+			const fallbackPresent = Boolean(document.querySelector(${JSON.stringify(fallbackSelector)}));
+			const base = {
+				exists: Boolean(image),
+				complete: Boolean(image?.complete),
+				naturalWidth: image?.naturalWidth ?? 0,
+				naturalHeight: image?.naturalHeight ?? 0,
+				fallbackPresent,
+				responseStatus: null,
+				contentType: null
+			};
+			if (!image || !image.complete || image.naturalWidth <= 0 || image.naturalHeight <= 0 || fallbackPresent) return base;
+			const response = await fetch(image.currentSrc || image.src, {
+				credentials: 'same-origin',
+				cache: 'no-store'
+			});
+			return {
+				...base,
+				responseStatus: response.status,
+				contentType: response.headers.get('content-type')
+			};
+		})()`);
+		if (
+			state.exists &&
+			state.complete &&
+			state.naturalWidth > 0 &&
+			state.naturalHeight > 0 &&
+			!state.fallbackPresent &&
+			state.responseStatus === 200 &&
+			state.contentType === 'image/png'
+		) return state;
+		await new Promise((resolveDelay) => setTimeout(resolveDelay, 100));
+	}
+	throw new Error(`Playlist image did not decode safely: ${JSON.stringify(state)}.`);
+}
+
 async function openPlaylistDialog(cdp) {
 	const deadline = Date.now() + 8_000;
 	while (Date.now() < deadline) {
@@ -293,6 +335,8 @@ try {
 	})));
 	const playlistId = randomUUID();
 	const playlistPublicId = randomBytes(18).toString('base64url');
+	const playlistImageStorageKey = `${randomUUID()}.png`;
+	const playlistImageBytes = SYNTHETIC_PNG;
 	await collections.playlists.insertMany([
 		{
 			_id: playlistId,
@@ -300,6 +344,7 @@ try {
 			ownerId,
 			name: 'L'.repeat(80),
 			description: 'Synthetic responsive playlist description used only in an isolated browser check.',
+			image: { storageKey: playlistImageStorageKey, mimeType: 'image/png', byteSize: playlistImageBytes.byteLength },
 			createdAt: now,
 			updatedAt: now
 		},
@@ -323,8 +368,11 @@ try {
 	temporaryRoot = await mkdtemp(join(resolve(tmpdir()), TEMP_PREFIX));
 	assert.ok(isOwnedTemporaryRoot(temporaryRoot));
 	const audioRoot = join(temporaryRoot, 'audio');
+	const playlistImageRoot = join(temporaryRoot, 'playlist-images');
 	const browserProfile = join(temporaryRoot, 'browser-profile');
 	await mkdir(audioRoot);
+	await mkdir(playlistImageRoot);
+	await writeFile(join(playlistImageRoot, playlistImageStorageKey), playlistImageBytes, { flag: 'wx', mode: 0o600 });
 	const appPort = await reservePort();
 	const debugPort = await reservePort();
 	const baseUrl = `http://127.0.0.1:${appPort}`;
@@ -341,6 +389,7 @@ try {
 		cwd: resolve('.'),
 		env: createSyntheticApplicationEnvironment({
 			AUDIO_STORAGE_PATH: audioRoot,
+			PLAYLIST_IMAGE_STORAGE_PATH: playlistImageRoot,
 			SESSION_COOKIE_NAME: cookieName,
 			MONGODB_URI: config.uri,
 			MONGODB_DB_NAME: databaseName,
@@ -371,6 +420,7 @@ try {
 	});
 	cdp = await connectCdp(await waitForBrowser(debugPort, browser));
 	console.log('PLAYLIST_VIEWPORT_BROWSER_READY=1');
+	console.log(`PLAYLIST_VIEWPORT_IMAGE_FIXTURE_BYTES=${playlistImageBytes.byteLength}`);
 	await cdp.command('Page.enable');
 	await cdp.command('Runtime.enable');
 	await cdp.command('Network.enable');
@@ -391,6 +441,11 @@ try {
 			mobile: width <= 390
 		});
 		await navigate(cdp, `${baseUrl}/playlists`, '.playlist-card');
+		await waitForDecodedPlaylistImage(
+			cdp,
+			'.playlist-card .playlist-artwork img',
+			'.playlist-card:has(.playlist-artwork img) .playlist-artwork__fallback'
+		);
 		const listState = await evaluate(cdp, `(() => {
 			const cards = [...document.querySelectorAll('.playlist-card')];
 			return {
@@ -401,7 +456,9 @@ try {
 					const rect = card.getBoundingClientRect();
 					return rect.left < -0.5 || rect.right > window.innerWidth + 0.5;
 				}),
-				playlistNavigation: [...document.querySelectorAll('a[href="/playlists"]')].length
+				playlistNavigation: [...document.querySelectorAll('a[href="/playlists"]')].length,
+				artworkImages: document.querySelectorAll('.playlist-card .playlist-artwork img').length,
+				fallbacks: document.querySelectorAll('.playlist-card .playlist-artwork__fallback').length
 			};
 		})()`);
 		assert.equal(listState.innerWidth, width);
@@ -409,21 +466,35 @@ try {
 		assert.equal(listState.cardCount, 2);
 		assert.equal(listState.cardOverflow, false);
 		assert.ok(listState.playlistNavigation >= 2);
+		assert.equal(listState.artworkImages, 1);
+		assert.equal(listState.fallbacks, 1);
 
 		await navigate(cdp, `${baseUrl}/playlists/${playlistPublicId}`, '.playlist-detail-page');
+		const decodedImage = await waitForDecodedPlaylistImage(
+			cdp,
+			'.playlist-detail-heading .playlist-artwork img',
+			'.playlist-detail-heading .playlist-artwork__fallback'
+		);
 		const detailState = await evaluate(cdp, `(() => {
 			const rows = [...document.querySelectorAll('.playlist-tracks li')];
 			return {
 				scrollWidth: document.documentElement.scrollWidth,
 				rowCount: rows.length,
 				rowOverflow: rows.some((row) => row.getBoundingClientRect().right > window.innerWidth + 0.5),
-				bodyTextHasLongName: document.body.textContent.includes('${'L'.repeat(80)}')
+				bodyTextHasLongName: document.body.textContent.includes('${'L'.repeat(80)}'),
+				artworkImage: Boolean(document.querySelector('.playlist-detail-heading .playlist-artwork img'))
 			};
 		})()`);
 		assert.ok(detailState.scrollWidth <= width);
 		assert.equal(detailState.rowCount, 2);
 		assert.equal(detailState.rowOverflow, false);
 		assert.equal(detailState.bodyTextHasLongName, true);
+		assert.equal(detailState.artworkImage, true);
+		assert.equal(decodedImage.complete, true);
+		assert.ok(decodedImage.naturalWidth > 0);
+		assert.ok(decodedImage.naturalHeight > 0);
+		assert.equal(decodedImage.responseStatus, 200);
+		assert.equal(decodedImage.contentType, 'image/png');
 
 		await navigate(cdp, `${baseUrl}/my-tracks`, '.owner-track-grid');
 		await openPlaylistDialog(cdp);

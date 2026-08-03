@@ -7,10 +7,12 @@ import {
 	assertProductionRuntimeConfig,
 	checkPrivateAudioStorage,
 	checkPrivateCoverImageStorage,
+	checkPrivatePlaylistImageStorage,
 	MULTIPART_UPLOAD_OVERHEAD_BYTES,
 	parseOperationalConfig,
 	preparePrivateAudioStorage,
 	preparePrivateCoverImageStorage,
+	preparePrivatePlaylistImageStorage,
 	type OperationalEnvironment
 } from './config';
 
@@ -31,13 +33,15 @@ afterEach(async () => {
 });
 
 describe('operational startup configuration', () => {
-	it('derives private cover storage and applies a backward-compatible 5 MB default', () => {
+	it('derives separate private image storage and applies 5 MB defaults', () => {
 		const config = parseOperationalConfig(valid, resolve('fixture-project'));
 		expect(config.coverImageMaxSizeMb).toBe(5);
 		expect(config.coverImageMaxSizeBytes).toBe(5 * 1024 * 1024);
 		expect(config.coverImageStoragePath).toBe(
 			resolve('fixture-project', 'private-audio', 'covers')
 		);
+		expect(config.playlistImageMaxSizeMb).toBe(5);
+		expect(config.playlistImageStoragePath).toBe(resolve('fixture-project', 'storage/playlist-images'));
 
 		const configured = parseOperationalConfig({
 			...valid,
@@ -64,13 +68,13 @@ describe('operational startup configuration', () => {
 		).toThrow('must not be inside a publicly served directory');
 	});
 
-	it('requires room for maximum audio, maximum cover, and multipart overhead', () => {
+	it('requires room for the larger multipart request shape without adding unrelated uploads', () => {
 		expect(MULTIPART_UPLOAD_OVERHEAD_BYTES).toBe(1024 * 1024);
 		for (const bodySizeLimit of ['51M', '55M']) {
 			expect(() =>
 				parseOperationalConfig({ ...valid, BODY_SIZE_LIMIT: bodySizeLimit })
 			).toThrow(
-				'maximum audio file, maximum cover image, and 1 MB of multipart overhead'
+				'larger of a track upload (audio plus cover) or playlist image upload'
 			);
 		}
 
@@ -87,6 +91,8 @@ describe('operational startup configuration', () => {
 		['COVER_IMAGE_MAX_SIZE_MB', '-1'],
 		['COVER_IMAGE_MAX_SIZE_MB', '0.0000001'],
 		['COVER_IMAGE_MAX_SIZE_MB', 'invalid'],
+		['PLAYLIST_IMAGE_MAX_SIZE_MB', '0'],
+		['PLAYLIST_IMAGE_MAX_SIZE_MB', 'invalid'],
 		['BODY_SIZE_LIMIT', '0'],
 		['BODY_SIZE_LIMIT', '-1'],
 		['BODY_SIZE_LIMIT', 'invalid']
@@ -147,6 +153,9 @@ describe('operational startup configuration', () => {
 		const covers = resolve(storage, 'covers');
 		await expect(preparePrivateCoverImageStorage(covers)).resolves.toBeUndefined();
 		await expect(checkPrivateCoverImageStorage(covers)).resolves.toBeUndefined();
+		const playlistImages = resolve(root, 'playlist-images');
+		await expect(preparePrivatePlaylistImageStorage(playlistImages)).resolves.toBeUndefined();
+		await expect(checkPrivatePlaylistImageStorage(playlistImages)).resolves.toBeUndefined();
 	});
 
 	it('rejects a file where an audio directory is required', async () => {

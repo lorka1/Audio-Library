@@ -10,17 +10,22 @@ import {
 import { extname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { getServerConfig } from '$lib/server/config';
 import { logTrackStorageError } from './logging';
-
-export const COVER_IMAGE_FORMATS = {
-	'.jpg': ['image/jpeg'],
-	'.jpeg': ['image/jpeg'],
-	'.png': ['image/png'],
-	'.webp': ['image/webp']
-} as const;
-
-export type CoverImageExtension = keyof typeof COVER_IMAGE_FORMATS;
-export type CoverImageMimeType =
-	(typeof COVER_IMAGE_FORMATS)[CoverImageExtension][number];
+import {
+	getSafeCoverImageResponseMimeType,
+	getValidatedCoverImageExtension,
+	normalizeCoverImageExtension,
+	type CoverImageExtension,
+	type CoverImageMimeType
+} from './media-formats.ts';
+export {
+	COVER_IMAGE_FORMATS,
+	getSafeCoverImageResponseMimeType,
+	getValidatedCoverImageExtension,
+	isAllowedCoverImageFormat,
+	normalizeCoverImageExtension,
+	type CoverImageExtension,
+	type CoverImageMimeType
+} from './media-formats.ts';
 
 const UUID_V4_PATTERN =
 	/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -90,51 +95,6 @@ function isContainedPath(root: string, path: string): boolean {
 
 function ascii(bytes: Uint8Array, start: number, length: number): string {
 	return String.fromCharCode(...bytes.subarray(start, start + length));
-}
-
-export function normalizeCoverImageExtension(
-	extension: string
-): CoverImageExtension | null {
-	const normalizedExtension = extension.trim().toLowerCase();
-
-	return Object.prototype.hasOwnProperty.call(
-		COVER_IMAGE_FORMATS,
-		normalizedExtension
-	)
-		? (normalizedExtension as CoverImageExtension)
-		: null;
-}
-
-export function isAllowedCoverImageFormat(
-	extension: string,
-	mimeType: string
-): boolean {
-	const normalizedExtension = normalizeCoverImageExtension(extension);
-	if (!normalizedExtension) return false;
-
-	const normalizedMimeType = mimeType.trim().toLowerCase();
-	return COVER_IMAGE_FORMATS[normalizedExtension].some(
-		(allowedMimeType) => allowedMimeType === normalizedMimeType
-	);
-}
-
-export function getValidatedCoverImageExtension(
-	originalFilename: string,
-	mimeType: string
-): CoverImageExtension | null {
-	const extension = normalizeCoverImageExtension(extname(originalFilename));
-	return extension && isAllowedCoverImageFormat(extension, mimeType)
-		? extension
-		: null;
-}
-
-export function getSafeCoverImageResponseMimeType(
-	storedFilename: string,
-	mimeType: string
-): CoverImageMimeType | null {
-	return getValidatedCoverImageExtension(storedFilename, mimeType)
-		? (mimeType.trim().toLowerCase() as CoverImageMimeType)
-		: null;
 }
 
 export function hasValidCoverImageSignature(

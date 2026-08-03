@@ -12,9 +12,10 @@ export async function getPlaylistChoicesForTracks(
 	]);
 	return Object.fromEntries(trackPublicIds.map((trackId) => {
 		const memberOf = new Set(memberships[String(trackId)] ?? []);
-		return [String(trackId), playlists.map(({ publicId, name }) => ({
+		return [String(trackId), playlists.map(({ publicId, name, imageUrl }) => ({
 			publicId,
 			name,
+			imageUrl: imageUrl ?? null,
 			containsTrack: memberOf.has(publicId)
 		}))];
 	}));

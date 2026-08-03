@@ -8,7 +8,8 @@ import { verifyMongoOperationalState } from '../mongodb/verification';
 import {
 	assertProductionRuntimeConfig,
 	preparePrivateAudioStorage,
-	preparePrivateCoverImageStorage
+	preparePrivateCoverImageStorage,
+	preparePrivatePlaylistImageStorage
 } from './config';
 import { safeErrorFields, writeSafeLog } from './logging';
 
@@ -24,6 +25,7 @@ export function initializeApplication(): Promise<void> {
 		configureMongoApplicationConfig(config.mongo);
 		await preparePrivateAudioStorage(config.audioStoragePath);
 		await preparePrivateCoverImageStorage(config.coverImageStoragePath);
+		await preparePrivatePlaylistImageStorage(config.playlistImageStoragePath);
 		const { client, database } = await connectMongoDevelopment();
 		await verifyMongoOperationalState(client, database);
 		writeSafeLog({ severity: 'info', category: 'configuration', code: 'startup_ready' });

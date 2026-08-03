@@ -5,15 +5,15 @@ import {
 	MUSICAL_KEYS,
 	type MusicGenre,
 	type MusicalKey
-} from '$lib/constants/music';
+} from '../../constants/music.ts';
 import {
 	getValidatedAudioExtension,
 	type AudioExtension
-} from './files';
+} from './media-formats.ts';
 import {
 	getValidatedCoverImageExtension,
 	type CoverImageExtension
-} from './cover-files';
+} from './media-formats.ts';
 
 export const TRACK_TITLE_MAX_LENGTH = 120;
 export const TRACK_DESCRIPTION_MAX_LENGTH = 2000;

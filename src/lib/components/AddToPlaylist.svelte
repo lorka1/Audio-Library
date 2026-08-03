@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { PlaylistPickerEntry } from '$lib/types';
+	import PlaylistArtwork from './PlaylistArtwork.svelte';
 
 	let {
 		trackId,
@@ -53,7 +54,8 @@
 			<ul class="playlist-dialog__list">
 				{#each choices as playlist (playlist.publicId)}
 					<li>
-						<span title={playlist.name}>{playlist.name}</span>
+						<PlaylistArtwork imageUrl={playlist.imageUrl ?? null} name={playlist.name} variant="picker" />
+						<span class="playlist-dialog__name" title={playlist.name}>{playlist.name}</span>
 						<form method="POST" action={playlist.containsTrack ? '?/removeFromPlaylist' : '?/addToPlaylist'}>
 							<input type="hidden" name="trackPublicId" value={trackId} />
 							<input type="hidden" name="playlistPublicId" value={playlist.publicId} />
@@ -163,7 +165,9 @@
 		background: rgb(7 12 29 / 58%);
 	}
 
-	.playlist-dialog__list span {
+	.playlist-dialog__name {
+		flex: 1 1 auto;
+		min-width: 0;
 		overflow: hidden;
 		font-weight: 700;
 		text-overflow: ellipsis;

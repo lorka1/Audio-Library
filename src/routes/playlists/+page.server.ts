@@ -3,7 +3,8 @@ import type { Actions, PageServerLoad } from './$types';
 import { requireUser } from '$lib/server/auth/guards';
 import { safeErrorFields, writeSafeLog } from '$lib/server/operational/logging';
 import { getApplicationPlaylistRepository } from '$lib/server/playlists/persistence';
-import { validatePlaylistFormData } from '$lib/server/playlists/validation';
+import { getServerConfig } from '$lib/server/config';
+import { createPlaylist } from '$lib/server/playlists/management';
 
 export const load = (async (event) => {
 	const user = requireUser(event);
@@ -13,7 +14,8 @@ export const load = (async (event) => {
 				await getApplicationPlaylistRepository()
 			).listPlaylistsForOwner(user.id),
 			created: event.url.searchParams.get('created') === '1',
-			deleted: event.url.searchParams.get('deleted') === '1'
+			deleted: event.url.searchParams.get('deleted') === '1',
+			maxPlaylistImageSizeMb: getServerConfig().playlistImageMaxSizeMb
 		};
 	} catch (loadError) {
 		writeSafeLog({
@@ -31,31 +33,13 @@ export const load = (async (event) => {
 export const actions = {
 	create: async (event) => {
 		const user = requireUser(event);
-		const validation = validatePlaylistFormData(await event.request.formData());
-		if (!validation.success) {
-			return fail(400, {
+		const config = getServerConfig();
+		const result = await createPlaylist(user.id, await event.request.formData(), config.playlistImageMaxSizeBytes);
+		if (!result.success) {
+			return fail(result.status, {
 				action: 'create' as const,
-				values: validation.values,
-				errors: validation.errors
-			});
-		}
-		try {
-			await (
-				await getApplicationPlaylistRepository()
-			).createPlaylist(user.id, validation.input);
-		} catch (createError) {
-			writeSafeLog({
-				severity: 'error',
-				category: 'request',
-				...safeErrorFields(createError),
-				requestId: event.locals.requestId,
-				method: event.request.method,
-				route: 'playlists'
-			});
-			return fail(500, {
-				action: 'create' as const,
-				values: validation.values,
-				errors: { general: 'Unable to create the playlist. Please try again.' }
+				values: result.values,
+				errors: result.errors
 			});
 		}
 		redirect(303, '/playlists?created=1');

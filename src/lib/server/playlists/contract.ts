@@ -7,6 +7,18 @@ import type {
 export interface PlaylistInput {
 	name: string;
 	description: string | null;
+	image?: StoredPlaylistImage | null;
+}
+
+export interface StoredPlaylistImage {
+	storageKey: string;
+	mimeType: string;
+	byteSize: number;
+}
+
+export interface OwnerPlaylistImageStorage {
+	publicId: string;
+	image: StoredPlaylistImage | null;
 }
 
 export type AddTrackToPlaylistResult =
@@ -30,6 +42,8 @@ export interface PlaylistRepository {
 		input: PlaylistInput
 	): Promise<PlaylistSummary | null>;
 	deletePlaylistForOwner(ownerId: string, publicId: string): Promise<boolean>;
+	findPlaylistImageForOwner(ownerId: string, publicId: string): Promise<StoredPlaylistImage | null>;
+	findPlaylistImageStorageForOwner(ownerId: string, publicId: string): Promise<OwnerPlaylistImageStorage | null>;
 	addTrackToPlaylist(
 		ownerId: string,
 		playlistPublicId: string,

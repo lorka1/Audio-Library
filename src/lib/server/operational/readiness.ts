@@ -6,7 +6,8 @@ import {
 import { verifyMongoOperationalState } from '../mongodb/verification';
 import {
 	checkPrivateAudioStorage,
-	checkPrivateCoverImageStorage
+	checkPrivateCoverImageStorage,
+	checkPrivatePlaylistImageStorage
 } from './config';
 
 export const READINESS_TIMEOUT_MS = 5_000;
@@ -68,6 +69,7 @@ function defaultReadinessDependencies(): ReadinessDependencies {
 				await checkPrivateCoverImageStorage(
 					config.coverImageStoragePath
 				);
+				await checkPrivatePlaylistImageStorage(config.playlistImageStoragePath);
 			} catch {
 				throw new ReadinessError(
 					'filesystem',

@@ -44,6 +44,7 @@ interface PlaylistSummaryRecord {
 	publicId: string;
 	name: string;
 	description: string | null;
+	image?: PlaylistDocument['image'];
 	trackCount: number;
 	createdAt: Date;
 	updatedAt: Date;
@@ -70,10 +71,24 @@ function summary(record: PlaylistSummaryRecord): PlaylistSummary {
 		publicId: record.publicId,
 		name: record.name,
 		description: record.description,
+		imageUrl: hasPlaylistImage(record.image)
+			? `/api/playlists/${record.publicId}/image`
+			: null,
 		trackCount: record.trackCount,
 		createdAt: record.createdAt.toISOString(),
 		updatedAt: record.updatedAt.toISOString()
 	};
+}
+
+function hasPlaylistImage(image: PlaylistDocument['image']): image is NonNullable<PlaylistDocument['image']> {
+	return Boolean(
+		image &&
+			typeof image.storageKey === 'string' &&
+			image.storageKey.length > 0 &&
+			typeof image.mimeType === 'string' &&
+			Number.isSafeInteger(image.byteSize) &&
+			image.byteSize > 0
+	);
 }
 
 function hasCover(track: NonNullable<PlaylistItemTrackRecord['track']>): boolean {
@@ -183,6 +198,7 @@ export function createMongoPlaylistRepository(
 					publicId: 1,
 					name: 1,
 					description: 1,
+					image: 1,
 					trackCount: { $size: '$items' },
 					createdAt: 1,
 					updatedAt: 1
@@ -237,6 +253,7 @@ export function createMongoPlaylistRepository(
 				ownerId,
 				name: input.name,
 				description: input.description,
+				image: input.image ?? null,
 				createdAt: timestamp,
 				updatedAt: timestamp
 			};
@@ -255,7 +272,7 @@ export function createMongoPlaylistRepository(
 			assertPublicId(publicId);
 			const playlist = await playlists.findOne(
 				{ ownerId, publicId },
-				{ ...operationOptions, projection: { _id: 1, publicId: 1, name: 1, description: 1, createdAt: 1, updatedAt: 1 } }
+				{ ...operationOptions, projection: { _id: 1, publicId: 1, name: 1, description: 1, image: 1, createdAt: 1, updatedAt: 1 } }
 			);
 			if (!playlist) return null;
 
@@ -314,6 +331,9 @@ export function createMongoPlaylistRepository(
 				publicId: playlist.publicId,
 				name: playlist.name,
 				description: playlist.description,
+				imageUrl: hasPlaylistImage(playlist.image)
+					? `/api/playlists/${playlist.publicId}/image`
+					: null,
 				trackCount: visibleTracks.length,
 				createdAt: playlist.createdAt.toISOString(),
 				updatedAt: playlist.updatedAt.toISOString(),
@@ -327,8 +347,8 @@ export function createMongoPlaylistRepository(
 			assertPublicId(publicId);
 			const document = await playlists.findOneAndUpdate(
 				{ ownerId, publicId },
-				{ $set: { name: input.name, description: input.description, updatedAt: now() } },
-				{ ...operationOptions, returnDocument: 'after', projection: { _id: 1, publicId: 1, name: 1, description: 1, createdAt: 1, updatedAt: 1 } }
+				{ $set: { name: input.name, description: input.description, ...(Object.hasOwn(input, 'image') ? { image: input.image ?? null } : {}), updatedAt: now() } },
+				{ ...operationOptions, returnDocument: 'after', projection: { _id: 1, publicId: 1, name: 1, description: 1, image: 1, createdAt: 1, updatedAt: 1 } }
 			);
 			if (!document) return null;
 			const trackCount = await playlistItems.countDocuments(
@@ -351,6 +371,30 @@ export function createMongoPlaylistRepository(
 				const deleted = await playlists.deleteOne({ _id: playlist._id, ownerId }, { ...operationOptions, session });
 				return deleted.deletedCount === 1;
 			});
+		},
+
+		async findPlaylistImageForOwner(ownerId, publicId) {
+			requirePlaylistOwnerId(ownerId);
+			assertPublicId(publicId);
+			const playlist = await playlists.findOne(
+				{ ownerId, publicId },
+				{ ...operationOptions, projection: { _id: 0, image: 1 } }
+			);
+			return playlist && hasPlaylistImage(playlist.image) ? { ...playlist.image } : null;
+		},
+
+		async findPlaylistImageStorageForOwner(ownerId, publicId) {
+			requirePlaylistOwnerId(ownerId);
+			assertPublicId(publicId);
+			const playlist = await playlists.findOne(
+				{ ownerId, publicId },
+				{ ...operationOptions, projection: { _id: 0, publicId: 1, image: 1 } }
+			);
+			if (!playlist) return null;
+			return {
+				publicId: playlist.publicId,
+				image: hasPlaylistImage(playlist.image) ? { ...playlist.image } : null
+			};
 		},
 
 		async addTrackToPlaylist(ownerId, playlistPublicId, trackPublicId) {

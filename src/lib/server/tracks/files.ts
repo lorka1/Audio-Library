@@ -5,14 +5,20 @@ import { extname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { Readable } from 'node:stream';
 import { getServerConfig } from '$lib/server/config';
 import { logTrackStorageError } from './logging';
-
-export const AUDIO_FORMATS = {
-	'.mp3': ['audio/mpeg'],
-	'.wav': ['audio/wav', 'audio/x-wav', 'audio/wave', 'audio/vnd.wave'],
-	'.ogg': ['audio/ogg']
-} as const;
-
-export type AudioExtension = keyof typeof AUDIO_FORMATS;
+import {
+	AUDIO_FORMATS,
+	getValidatedAudioExtension,
+	isAllowedAudioFormat,
+	normalizeAudioExtension,
+	type AudioExtension
+} from './media-formats.ts';
+export {
+	AUDIO_FORMATS,
+	getValidatedAudioExtension,
+	isAllowedAudioFormat,
+	normalizeAudioExtension,
+	type AudioExtension
+} from './media-formats.ts';
 
 const UUID_V4_PATTERN =
 	/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -74,36 +80,6 @@ function readErrorCode(error: unknown): string | number | undefined {
 
 	const code = (error as { code?: unknown }).code;
 	return typeof code === 'string' || typeof code === 'number' ? code : undefined;
-}
-
-export function normalizeAudioExtension(extension: string): AudioExtension | null {
-	const normalizedExtension = extension.trim().toLowerCase();
-
-	return Object.prototype.hasOwnProperty.call(AUDIO_FORMATS, normalizedExtension)
-		? (normalizedExtension as AudioExtension)
-		: null;
-}
-
-export function isAllowedAudioFormat(extension: string, mimeType: string): boolean {
-	const normalizedExtension = normalizeAudioExtension(extension);
-
-	if (!normalizedExtension) {
-		return false;
-	}
-
-	const normalizedMimeType = mimeType.trim().toLowerCase();
-	return AUDIO_FORMATS[normalizedExtension].some(
-		(allowedMimeType) => allowedMimeType === normalizedMimeType
-	);
-}
-
-export function getValidatedAudioExtension(
-	originalFilename: string,
-	mimeType: string
-): AudioExtension | null {
-	const extension = normalizeAudioExtension(extname(originalFilename));
-
-	return extension && isAllowedAudioFormat(extension, mimeType) ? extension : null;
 }
 
 export function getSafeAudioResponseMimeType(

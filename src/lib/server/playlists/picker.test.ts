@@ -19,6 +19,7 @@ describe('playlist picker projection', () => {
 				{
 					publicId: 'abcdefghijklmnopqrstuvwx',
 					name: 'Synthetic playlist',
+					imageUrl: '/api/playlists/abcdefghijklmnopqrstuvwx/image',
 					description: 'Private description',
 					trackCount: 1,
 					createdAt: '2026-07-30T12:00:00.000Z',
@@ -35,6 +36,7 @@ describe('playlist picker projection', () => {
 			'21': [{
 				publicId: 'abcdefghijklmnopqrstuvwx',
 				name: 'Synthetic playlist',
+				imageUrl: '/api/playlists/abcdefghijklmnopqrstuvwx/image',
 				containsTrack: true
 			}]
 		});

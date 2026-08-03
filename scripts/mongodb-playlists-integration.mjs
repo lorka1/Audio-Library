@@ -92,6 +92,7 @@ try {
 	]);
 
 	let clock = now.getTime();
+	const playlistImageStorageKey = `${randomUUID()}.webp`;
 	const repository = createMongoPlaylistRepository(
 		client,
 		collections.playlists,
@@ -102,9 +103,17 @@ try {
 	);
 	const created = await repository.createPlaylist(ownerId, {
 		name: 'Synthetic private playlist',
-		description: null
+		description: null,
+		image: { storageKey: playlistImageStorageKey, mimeType: 'image/webp', byteSize: 64 }
 	});
 	assert.equal(created.trackCount, 0);
+	assert.equal(created.imageUrl, `/api/playlists/${created.publicId}/image`);
+	assert.deepEqual(await repository.findPlaylistImageForOwner(ownerId, created.publicId), {
+		storageKey: playlistImageStorageKey,
+		mimeType: 'image/webp',
+		byteSize: 64
+	});
+	assert.equal(await repository.findPlaylistImageForOwner(otherOwnerId, created.publicId), null);
 	assert.equal(Object.hasOwn(created, 'ownerId'), false);
 	assert.equal(Object.hasOwn(created, '_id'), false);
 	assert.equal((await repository.listPlaylistsForOwner(otherOwnerId)).length, 0);
@@ -137,7 +146,7 @@ try {
 	assert.ok(new Date(detail.updatedAt) > new Date(afterFirstAdd.updatedAt));
 	const serialized = JSON.stringify(detail);
 	assert.equal(serialized.includes('Synthetic playlist artist'), false);
-	for (const secret of [ownerId, otherOwnerId, publicTrackId, ownedPrivateTrackId, inaccessibleTrackId, 'storageKey', 'originalFilename']) {
+	for (const secret of [ownerId, otherOwnerId, publicTrackId, ownedPrivateTrackId, inaccessibleTrackId, playlistImageStorageKey, 'storageKey', 'originalFilename']) {
 		assert.equal(serialized.includes(secret), false);
 	}
 	const memberships = await repository.getTrackPlaylistMembership(ownerId, 1);
@@ -152,6 +161,14 @@ try {
 		description: 'Synthetic description'
 	});
 	assert.equal(renamed?.name, 'Synthetic renamed playlist');
+	assert.equal(renamed?.imageUrl, `/api/playlists/${created.publicId}/image`);
+	const removedImage = await repository.updatePlaylistForOwner(ownerId, created.publicId, {
+		name: 'Synthetic renamed playlist',
+		description: 'Synthetic description',
+		image: null
+	});
+	assert.equal(removedImage?.imageUrl, null);
+	assert.equal(await repository.findPlaylistImageForOwner(ownerId, created.publicId), null);
 
 	const cleanupPlaylist = await repository.createPlaylist(ownerId, { name: 'Track cleanup fixture', description: null });
 	assert.equal(await repository.addTrackToPlaylist(ownerId, cleanupPlaylist.publicId, 2), 'added');

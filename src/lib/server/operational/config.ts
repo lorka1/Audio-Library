@@ -7,12 +7,15 @@ const COOKIE_PATTERN = /^[A-Za-z0-9_-]+$/;
 const BODY_LIMIT_PATTERN = /^(\d+(?:\.\d+)?)\s*([KMG])?B?$/i;
 const MEBIBYTE = 1024 * 1024;
 export const DEFAULT_COVER_IMAGE_MAX_SIZE_MB = 5;
+export const DEFAULT_PLAYLIST_IMAGE_MAX_SIZE_MB = 5;
 export const MULTIPART_UPLOAD_OVERHEAD_BYTES = MEBIBYTE;
 
 export interface OperationalEnvironment extends MongoEnvironment {
 	AUDIO_STORAGE_PATH?: string;
 	MAX_AUDIO_FILE_SIZE_MB?: string;
 	COVER_IMAGE_MAX_SIZE_MB?: string;
+	PLAYLIST_IMAGE_STORAGE_PATH?: string;
+	PLAYLIST_IMAGE_MAX_SIZE_MB?: string;
 	BODY_SIZE_LIMIT?: string;
 	SESSION_COOKIE_NAME?: string;
 	SESSION_DURATION_DAYS?: string;
@@ -24,10 +27,13 @@ export interface OperationalConfig {
 	mongo: MongoConfig;
 	audioStoragePath: string;
 	coverImageStoragePath: string;
+	playlistImageStoragePath: string;
 	maxAudioFileSizeMb: number;
 	maxAudioFileSizeBytes: number;
 	coverImageMaxSizeMb: number;
 	coverImageMaxSizeBytes: number;
+	playlistImageMaxSizeMb: number;
+	playlistImageMaxSizeBytes: number;
 	bodySizeLimitBytes: number;
 	sessionCookieName: string;
 	sessionDurationDays: number;
@@ -93,6 +99,15 @@ export function parseOperationalConfig(
 		? resolve(configuredStorage)
 		: resolve(projectRoot, configuredStorage);
 	assertPrivateAudioStoragePath(audioStoragePath, projectRoot);
+	const configuredPlaylistImageStorage = environment.PLAYLIST_IMAGE_STORAGE_PATH?.trim()
+		|| 'storage/playlist-images';
+	const playlistImageStoragePath = isAbsolute(configuredPlaylistImageStorage)
+		? resolve(configuredPlaylistImageStorage)
+		: resolve(projectRoot, configuredPlaylistImageStorage);
+	assertPrivateAudioStoragePath(playlistImageStoragePath, projectRoot);
+	if (playlistImageStoragePath === audioStoragePath) {
+		throw new Error('PLAYLIST_IMAGE_STORAGE_PATH must use a separate private directory.');
+	}
 
 	const maxAudioFileSizeMb = parsePositiveNumber(
 		required(environment, 'MAX_AUDIO_FILE_SIZE_MB'),
@@ -112,17 +127,23 @@ export function parseOperationalConfig(
 	if (!Number.isSafeInteger(coverImageMaxSizeBytes) || coverImageMaxSizeBytes < 1) {
 		throw new Error('COVER_IMAGE_MAX_SIZE_MB is outside the supported range.');
 	}
+	const playlistImageMaxSizeMb = environment.PLAYLIST_IMAGE_MAX_SIZE_MB?.trim()
+		? parsePositiveNumber(environment.PLAYLIST_IMAGE_MAX_SIZE_MB, 'PLAYLIST_IMAGE_MAX_SIZE_MB')
+		: DEFAULT_PLAYLIST_IMAGE_MAX_SIZE_MB;
+	const playlistImageMaxSizeBytes = Math.floor(playlistImageMaxSizeMb * MEBIBYTE);
+	if (!Number.isSafeInteger(playlistImageMaxSizeBytes) || playlistImageMaxSizeBytes < 1) {
+		throw new Error('PLAYLIST_IMAGE_MAX_SIZE_MB is outside the supported range.');
+	}
 	const bodySizeLimitBytes = parseBodySizeLimit(required(environment, 'BODY_SIZE_LIMIT'));
-	const minimumBodySizeLimitBytes =
-		maxAudioFileSizeBytes +
-		coverImageMaxSizeBytes +
-		MULTIPART_UPLOAD_OVERHEAD_BYTES;
+	const trackRequestLimitBytes = maxAudioFileSizeBytes + coverImageMaxSizeBytes + MULTIPART_UPLOAD_OVERHEAD_BYTES;
+	const playlistRequestLimitBytes = playlistImageMaxSizeBytes + MULTIPART_UPLOAD_OVERHEAD_BYTES;
+	const minimumBodySizeLimitBytes = Math.max(trackRequestLimitBytes, playlistRequestLimitBytes);
 	if (!Number.isSafeInteger(minimumBodySizeLimitBytes)) {
 		throw new Error('The combined upload size limit is outside the supported range.');
 	}
 	if (bodySizeLimitBytes < minimumBodySizeLimitBytes) {
 		throw new Error(
-			'BODY_SIZE_LIMIT must accommodate the maximum audio file, maximum cover image, and 1 MB of multipart overhead.'
+			'BODY_SIZE_LIMIT must accommodate the larger of a track upload (audio plus cover) or playlist image upload, plus 1 MB of multipart overhead.'
 		);
 	}
 
@@ -139,10 +160,13 @@ export function parseOperationalConfig(
 		mongo,
 		audioStoragePath,
 		coverImageStoragePath: resolve(audioStoragePath, 'covers'),
+		playlistImageStoragePath,
 		maxAudioFileSizeMb,
 		maxAudioFileSizeBytes,
 		coverImageMaxSizeMb,
 		coverImageMaxSizeBytes,
+		playlistImageMaxSizeMb,
+		playlistImageMaxSizeBytes,
 		bodySizeLimitBytes,
 		sessionCookieName,
 		sessionDurationDays,
@@ -195,10 +219,18 @@ export async function preparePrivateCoverImageStorage(path: string): Promise<voi
 	await preparePrivateStorage(path, 'Private cover image storage');
 }
 
+export async function preparePrivatePlaylistImageStorage(path: string): Promise<void> {
+	await preparePrivateStorage(path, 'Private playlist image storage');
+}
+
 export async function checkPrivateAudioStorage(path: string): Promise<void> {
 	await checkPrivateStorage(path, 'Private audio storage is unavailable.');
 }
 
 export async function checkPrivateCoverImageStorage(path: string): Promise<void> {
 	await checkPrivateStorage(path, 'Private cover image storage is unavailable.');
+}
+
+export async function checkPrivatePlaylistImageStorage(path: string): Promise<void> {
+	await checkPrivateStorage(path, 'Private playlist image storage is unavailable.');
 }

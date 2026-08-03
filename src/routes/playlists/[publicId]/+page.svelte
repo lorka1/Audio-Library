@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { TrackCover, TrackPlayButton } from '$lib';
+	import { PlaylistArtwork, PlaylistImageField, TrackCover, TrackPlayButton } from '$lib';
 	import { formatDate } from '$lib/formatting';
 	import { toPublicPlayerTrack } from '$lib/player/model';
 	import type { PlaylistFormErrors } from '$lib/server/playlists/validation';
@@ -8,7 +8,8 @@
 	let { data, form }: PageProps = $props();
 	let updateValues = $derived(form?.action === 'update' ? form.values : {
 		name: data.playlist.name,
-		description: data.playlist.description ?? ''
+		description: data.playlist.description ?? '',
+		removeImage: false
 	});
 	let updateErrors: PlaylistFormErrors = $derived(form?.action === 'update' ? form.errors : {});
 </script>
@@ -30,7 +31,7 @@
 		{/if}
 
 		<header class="playlist-detail-heading">
-			<div class="playlist-placeholder" aria-hidden="true">♫</div>
+			<PlaylistArtwork imageUrl={data.playlist.imageUrl} name={data.playlist.name} variant="detail" decorative={false} />
 			<div>
 				<p class="auth-eyebrow">Private playlist</p>
 				<h1>{data.playlist.name}</h1>
@@ -76,7 +77,7 @@
 			<aside class="playlist-settings" aria-labelledby="playlist-settings-heading">
 				<h2 id="playlist-settings-heading">Playlist settings</h2>
 				{#if updateErrors.general}<div class="form-message form-message--error" role="alert">{updateErrors.general}</div>{/if}
-				<form class="form-stack" method="POST" action="?/update">
+				<form class="form-stack" method="POST" action="?/update" enctype="multipart/form-data">
 					<div class="form-field">
 						<label for="playlist-edit-name">Name</label>
 						<input id="playlist-edit-name" name="name" value={updateValues.name} maxlength="80" required aria-invalid={updateErrors.name ? 'true' : undefined} aria-describedby={updateErrors.name ? 'playlist-edit-name-error' : undefined} />
@@ -87,6 +88,7 @@
 						<textarea id="playlist-edit-description" name="description" maxlength="500" aria-invalid={updateErrors.description ? 'true' : undefined} aria-describedby={updateErrors.description ? 'playlist-edit-description-error' : undefined}>{updateValues.description}</textarea>
 						{#if updateErrors.description}<p id="playlist-edit-description-error" class="field-error">{updateErrors.description}</p>{/if}
 					</div>
+					<PlaylistImageField id="playlist-edit-image" maxSizeMb={data.maxPlaylistImageSizeMb} currentImageUrl={data.playlist.imageUrl} error={updateErrors.image} removeRequested={updateValues.removeImage} allowRemoval playlistName={updateValues.name || data.playlist.name} />
 					<button class="primary-button" type="submit">Save changes</button>
 				</form>
 
@@ -108,7 +110,6 @@
 	.playlist-detail-page { padding-block: clamp(3rem, 8vw, 6rem); }
 	.playlist-detail-page__inner { max-width: 82rem; }
 	.playlist-detail-heading { display: grid; grid-template-columns: clamp(7rem, 16vw, 11rem) minmax(0, 1fr); gap: clamp(1.25rem, 4vw, 2.5rem); align-items: center; margin-bottom: 2rem; }
-	.playlist-placeholder { display: grid; place-items: center; aspect-ratio: 1; color: #c1b6ff; border: 1px solid rgb(151 129 255 / 26%); border-radius: 1rem; background: linear-gradient(145deg, #34266e, #141d3b); font-size: clamp(2.5rem, 8vw, 4.5rem); box-shadow: 0 1rem 3rem rgb(0 2 14 / 26%); }
 	.playlist-detail-heading h1 { max-width: 22ch; margin: 0; font-size: clamp(2.35rem, 7vw, 4.5rem); line-height: 1; letter-spacing: -0.05em; overflow-wrap: anywhere; }
 	.playlist-detail-heading p:not(.auth-eyebrow) { margin: 0.8rem 0 0; color: var(--text-muted); line-height: 1.6; white-space: pre-wrap; }
 	.playlist-detail-heading span { display: block; margin-top: 0.75rem; color: #7f89a2; font-size: 0.8rem; }
@@ -131,5 +132,5 @@
 	.playlist-delete label { display: flex; align-items: flex-start; gap: 0.55rem; color: var(--text-muted); font-size: 0.82rem; line-height: 1.45; }
 	.playlist-delete input { margin-top: 0.2rem; accent-color: var(--accent); }
 	@media (max-width: 62rem) { .playlist-detail-layout { grid-template-columns: 1fr; } }
-	@media (max-width: 36rem) { .playlist-detail-heading { grid-template-columns: 1fr; } .playlist-placeholder { width: 8rem; } .playlist-tracks li { grid-template-columns: 3.5rem minmax(0, 1fr) auto; } .playlist-tracks li > :global(button) { grid-column: 3; } .playlist-tracks form { grid-column: 2 / -1; } .playlist-tracks form button { width: 100%; } }
+	@media (max-width: 36rem) { .playlist-detail-heading { grid-template-columns: 1fr; } .playlist-detail-heading :global(.playlist-artwork) { width: 8rem; } .playlist-tracks li { grid-template-columns: 3.5rem minmax(0, 1fr) auto; } .playlist-tracks li > :global(button) { grid-column: 3; } .playlist-tracks form { grid-column: 2 / -1; } .playlist-tracks form button { width: 100%; } }
 </style>
