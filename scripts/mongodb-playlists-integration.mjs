@@ -97,6 +97,7 @@ try {
 		collections.playlists,
 		collections.playlistItems,
 		collections.tracks,
+		collections.users,
 		{ now: () => new Date(clock += 1_000) }
 	);
 	const created = await repository.createPlaylist(ownerId, {
@@ -129,8 +130,13 @@ try {
 	const detail = await repository.findPlaylistForOwner(ownerId, created.publicId);
 	assert.ok(detail);
 	assert.equal(detail.tracks.length, 2);
+	assert.deepEqual(
+		detail.tracks.map(({ artist }) => artist),
+		['synthetic_playlist_other', 'synthetic_playlist_owner']
+	);
 	assert.ok(new Date(detail.updatedAt) > new Date(afterFirstAdd.updatedAt));
 	const serialized = JSON.stringify(detail);
+	assert.equal(serialized.includes('Synthetic playlist artist'), false);
 	for (const secret of [ownerId, otherOwnerId, publicTrackId, ownedPrivateTrackId, inaccessibleTrackId, 'storageKey', 'originalFilename']) {
 		assert.equal(serialized.includes(secret), false);
 	}

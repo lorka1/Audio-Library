@@ -28,7 +28,7 @@ import { DuplicateTrackError } from '../src/lib/server/tracks/contract.ts';
 
 const OPERATION_TIMEOUT_MS = 5_000;
 const TOTAL_TIMEOUT_MS = 120_000;
-const EXPECTED_CHECKS = 31;
+const EXPECTED_CHECKS = 33;
 let checkNumber = 0;
 let activeStep = 'setup';
 
@@ -60,7 +60,6 @@ function syntheticTrack(ownerId, overrides = {}) {
 		id: randomUUID(),
 		ownerId,
 		title: 'Synthetic track',
-		artist: 'Synthetic artist',
 		bpm: 124,
 		musicalKey: 'C minor',
 		genre: 'Techno',
@@ -226,6 +225,8 @@ async function main() {
 			coverImage: originalCoverImage
 		});
 		const created = await repository.createTrack(publicInput);
+		const createdDocument = await collections.tracks.findOne({ publicId: created.id });
+		assert.equal(Object.hasOwn(createdDocument, 'artist'), false);
 		await check('track creation preserves the numeric public URL identity', () => {
 			assert.equal(created.title, publicInput.title);
 			assert.equal(Number.isSafeInteger(created.id), true);
@@ -264,6 +265,8 @@ async function main() {
 
 		await check('public projection contains only browser-safe fields', async () => {
 			const track = await repository.findPublicTrackByPublicId(created.id);
+			assert.equal(track?.artist, 'm4_owner');
+			assert.equal(track?.ownerUsername, 'm4_owner');
 			assert.deepEqual(Object.keys(track ?? {}).sort(), [
 				'artist', 'bpm', 'coverImageUrl', 'createdAt', 'description', 'fileSizeBytes', 'genre',
 				'id', 'musicalKey', 'ownerUsername', 'title', 'updatedAt'
@@ -273,12 +276,44 @@ async function main() {
 
 		await check('owner projection contains only owner-safe fields', async () => {
 			const track = await repository.findOwnerTrack(created.id, ownerId);
+			assert.equal(track?.artist, 'm4_owner');
 			assert.deepEqual(Object.keys(track ?? {}).sort(), [
 				'artist', 'bpm', 'coverImageUrl', 'createdAt', 'description', 'fileSizeBytes', 'genre',
 				'mimeType', 'musicalKey', 'originalFilename', 'publicId', 'title',
 				'updatedAt', 'visibility'
 			]);
 			assert.equal(JSON.stringify(track).includes(originalCoverImage.storageKey), false);
+		});
+
+		await check('legacy attribution is ignored and username changes are reflected without N+1 reads', async () => {
+			await collections.tracks.updateOne(
+				{ publicId: created.id },
+				{ $set: { artist: 'Forged legacy attribution' } }
+			);
+			await collections.users.updateOne(
+				{ _id: ownerId },
+				{ $set: { username: 'm4_owner_renamed' } }
+			);
+			assert.equal((await repository.findPublicTrackByPublicId(created.id))?.artist, 'm4_owner_renamed');
+			assert.equal((await repository.findOwnerTrack(created.id, ownerId))?.artist, 'm4_owner_renamed');
+			await collections.users.updateOne(
+				{ _id: ownerId },
+				{ $set: { username: 'm4_owner' } }
+			);
+		});
+
+		await check('a missing uploader is represented safely without exposing legacy attribution', async () => {
+			const missingOwnerId = randomUUID();
+			const missingOwnerTrack = await repository.createTrack(syntheticTrack(missingOwnerId));
+			await collections.tracks.updateOne(
+				{ publicId: missingOwnerTrack.id },
+				{ $set: { artist: 'Private legacy value' } }
+			);
+			const publicTrack = await repository.findPublicTrackByPublicId(missingOwnerTrack.id);
+			assert.equal(publicTrack?.artist, 'Unknown uploader');
+			assert.equal(publicTrack?.ownerUsername, 'Unknown uploader');
+			assert.equal(JSON.stringify(publicTrack).includes('Private legacy value'), false);
+			assert.equal((await repository.listTracksForOwner(missingOwnerId))[0]?.artist, 'Unknown uploader');
 		});
 
 		await check('storage lookup remains server-only and owner-scoped', async () => {

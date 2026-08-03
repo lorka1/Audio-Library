@@ -58,8 +58,8 @@
 			<span class="card-number" aria-hidden="true">01</span>
 			<h3>Upload and organize</h3>
 			<p>
-				Add MP3, WAV, or OGG audio with a title, artist, BPM, musical key, genre, and
-				description.
+				Add MP3, WAV, or OGG audio with a title, BPM, musical key, genre, and description.
+				Your signed-in username supplies the artist attribution automatically.
 			</p>
 		</article>
 		<article>

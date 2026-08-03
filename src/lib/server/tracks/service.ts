@@ -200,7 +200,6 @@ export async function uploadTrack(
 			id: dependencies.generateId(),
 			ownerId: input.ownerId,
 			title: validation.metadata.title,
-			artist: validation.metadata.artist,
 			bpm: validation.metadata.bpm,
 			musicalKey: validation.metadata.musicalKey,
 			genre: validation.metadata.genre,

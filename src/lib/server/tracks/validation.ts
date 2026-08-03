@@ -16,7 +16,6 @@ import {
 } from './cover-files';
 
 export const TRACK_TITLE_MAX_LENGTH = 120;
-export const TRACK_ARTIST_MAX_LENGTH = 120;
 export const TRACK_DESCRIPTION_MAX_LENGTH = 2000;
 export const ORIGINAL_FILENAME_MAX_LENGTH = 255;
 export const DEFAULT_COVER_IMAGE_MAX_SIZE_BYTES = 5 * 1024 * 1024;
@@ -28,7 +27,6 @@ const INTEGER_PATTERN = /^(?:0|[1-9]\d*)$/;
 
 export interface TrackMetadataFormValues {
 	title: string;
-	artist: string;
 	bpm: string;
 	musicalKey: string;
 	genre: string;
@@ -50,7 +48,6 @@ export type UploadErrors = Partial<Record<UploadErrorField, string>>;
 
 export interface ValidatedTrackMetadata {
 	title: string;
-	artist: string;
 	bpm: number | null;
 	musicalKey: MusicalKey | null;
 	genre: MusicGenre | null;
@@ -127,7 +124,6 @@ export function readUploadFormString(formData: FormData, field: string): string 
 export function emptyTrackMetadataFormValues(): TrackMetadataFormValues {
 	return {
 		title: '',
-		artist: '',
 		bpm: '',
 		musicalKey: '',
 		genre: '',
@@ -142,7 +138,6 @@ export function readTrackMetadataFormValues(
 ): TrackMetadataFormValues {
 	return {
 		title: readUploadFormString(formData, 'title').trim(),
-		artist: readUploadFormString(formData, 'artist').trim(),
 		bpm: readUploadFormString(formData, 'bpm').trim(),
 		musicalKey: readUploadFormString(formData, 'musicalKey').trim(),
 		genre: readUploadFormString(formData, 'genre').trim(),
@@ -167,23 +162,6 @@ export function validateTitle(value: string): FieldValidation<string> {
 	}
 
 	return { value: title, error: null };
-}
-
-export function validateArtist(value: string): FieldValidation<string> {
-	const artist = value.trim();
-
-	if (!artist) {
-		return { value: artist, error: 'Artist is required.' };
-	}
-
-	if (artist.length > TRACK_ARTIST_MAX_LENGTH) {
-		return {
-			value: artist,
-			error: `Artist must be at most ${TRACK_ARTIST_MAX_LENGTH} characters.`
-		};
-	}
-
-	return { value: artist, error: null };
 }
 
 export function validateBpm(value: string): FieldValidation<number | null> {
@@ -366,7 +344,6 @@ export function validateTrackMetadataFormData(
 ): TrackMetadataValidationResult {
 	const values = readTrackMetadataFormValues(formData);
 	const title = validateTitle(values.title);
-	const artist = validateArtist(values.artist);
 	const bpm = validateBpm(values.bpm);
 	const musicalKey = validateMusicalKey(values.musicalKey);
 	const genre = validateGenre(values.genre);
@@ -374,7 +351,6 @@ export function validateTrackMetadataFormData(
 	const errors: TrackMetadataErrors = {};
 
 	if (title.error) errors.title = title.error;
-	if (artist.error) errors.artist = artist.error;
 	if (bpm.error) errors.bpm = bpm.error;
 	if (musicalKey.error) errors.musicalKey = musicalKey.error;
 	if (genre.error) errors.genre = genre.error;
@@ -389,7 +365,6 @@ export function validateTrackMetadataFormData(
 		values,
 		metadata: {
 			title: title.value,
-			artist: artist.value,
 			bpm: bpm.value,
 			musicalKey: musicalKey.value,
 			genre: genre.value,

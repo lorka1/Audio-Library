@@ -177,7 +177,7 @@ function expectedRecords(definitions, query) {
 		if (query.q) {
 			const needle = query.q.toLowerCase();
 			if (
-				![record.title, record.artist, record.description ?? ''].some((value) =>
+				![record.title, 'query_owner', record.description ?? ''].some((value) =>
 					value.toLowerCase().includes(needle)
 				)
 			) return false;
@@ -208,7 +208,7 @@ function expectedRecords(definitions, query) {
 	return records.map((record) => ({
 		id: record.publicId,
 		title: record.title,
-		artist: record.artist,
+		artist: 'query_owner',
 		coverImageUrl: record.coverImage
 			? `/api/tracks/${record.publicId}/cover`
 			: null,
@@ -302,7 +302,10 @@ async function main() {
 		await behavior('private tracks excluded', { sort: 'newest' }, (records) =>
 			assert.equal(records.some(({ title }) => title.startsWith('Private')), false));
 		await behavior('title substring search', { q: 'pulse', sort: 'newest' });
-		await behavior('artist substring search', { q: 'beta crew', sort: 'newest' });
+		await behavior('uploader substring search', { q: 'query_owner', sort: 'newest' }, (records) => {
+			assert.equal(records.length, 6);
+			assert.equal(records.every(({ artist }) => artist === 'query_owner'), true);
+		});
 		await behavior('description substring search', { q: 'sunset', sort: 'newest' });
 		await behavior('ASCII case behavior', { q: 'ALPHA PULSE', sort: 'newest' });
 		await behavior('literal percent search', { q: '%', sort: 'newest' });

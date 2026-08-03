@@ -32,6 +32,7 @@
 				<p>
 					Choose an MP3, WAV, or OGG file and describe the track. The audio file is stored
 					privately, linked to your account, and published for public playback and download.
+					The artist is your signed-in username: <strong>{data.uploaderUsername}</strong>.
 				</p>
 			</header>
 
@@ -102,23 +103,6 @@
 						/>
 						{#if form?.errors.title}
 							<p class="field-error" id="title-error">{form.errors.title}</p>
-						{/if}
-					</div>
-
-					<div class="form-field">
-						<label for="artist">Artist</label>
-						<input
-							id="artist"
-							name="artist"
-							type="text"
-							required
-							maxlength="120"
-							value={form?.values.artist ?? ''}
-							aria-invalid={form?.errors.artist ? 'true' : undefined}
-							aria-describedby={form?.errors.artist ? 'artist-error' : undefined}
-						/>
-						{#if form?.errors.artist}
-							<p class="field-error" id="artist-error">{form.errors.artist}</p>
 						{/if}
 					</div>
 

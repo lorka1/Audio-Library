@@ -12,7 +12,8 @@ export async function getFocusedMongoPlaylistRepository(): Promise<PlaylistRepos
 		client,
 		collections.playlists,
 		collections.playlistItems,
-		collections.tracks
+		collections.tracks,
+		collections.users
 	);
 }
 

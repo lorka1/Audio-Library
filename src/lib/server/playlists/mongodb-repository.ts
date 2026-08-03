@@ -8,7 +8,8 @@ import {
 import type {
 	PlaylistDocument,
 	PlaylistItemDocument,
-	TrackDocument
+	TrackDocument,
+	UserDocument
 } from '../mongodb/documents.ts';
 import type {
 	OwnerPlaylist,
@@ -17,7 +18,10 @@ import type {
 } from '../../types/index.ts';
 import { cleanupPreservingPrimaryFailure } from '../operational/cleanup.ts';
 import { safeErrorFields, writeSafeLog } from '../operational/logging.ts';
-import { assertPositivePublicTrackId } from '../tracks/contract.ts';
+import {
+	assertPositivePublicTrackId,
+	UNKNOWN_TRACK_UPLOADER
+} from '../tracks/contract.ts';
 import type {
 	PlaylistInput,
 	PlaylistRepository
@@ -52,14 +56,13 @@ interface PlaylistItemTrackRecord {
 		| 'publicId'
 		| 'ownerId'
 		| 'title'
-		| 'artist'
 		| 'coverImage'
 		| 'bpm'
 		| 'musicalKey'
 		| 'genre'
 		| 'description'
 		| 'visibility'
-	>;
+	> & { artist: string };
 }
 
 function summary(record: PlaylistSummaryRecord): PlaylistSummary {
@@ -115,6 +118,7 @@ export function createMongoPlaylistRepository(
 	playlists: Collection<PlaylistDocument>,
 	playlistItems: Collection<PlaylistItemDocument>,
 	tracks: Collection<TrackDocument>,
+	users: Collection<UserDocument>,
 	options: MongoPlaylistRepositoryOptions = {}
 ): PlaylistRepository {
 	const timeoutMS = options.timeoutMS ?? MONGODB_PLAYLIST_OPERATION_TIMEOUT_MS;
@@ -264,21 +268,39 @@ export function createMongoPlaylistRepository(
 						localField: 'trackId',
 						foreignField: '_id',
 						as: 'track',
-						pipeline: [{
-							$project: {
-								_id: 0,
-								publicId: 1,
-								ownerId: 1,
-								title: 1,
-								artist: 1,
-								coverImage: 1,
-								bpm: 1,
-								musicalKey: 1,
-								genre: 1,
-								description: 1,
-								visibility: 1
+						pipeline: [
+							{
+								$lookup: {
+									from: users.collectionName,
+									localField: 'ownerId',
+									foreignField: '_id',
+									as: 'uploader',
+									pipeline: [{ $project: { _id: 0, username: 1 } }]
+								}
+							},
+							{
+								$set: {
+									artist: {
+										$ifNull: [{ $first: '$uploader.username' }, UNKNOWN_TRACK_UPLOADER]
+									}
+								}
+							},
+							{
+								$project: {
+									_id: 0,
+									publicId: 1,
+									ownerId: 1,
+									title: 1,
+									artist: 1,
+									coverImage: 1,
+									bpm: 1,
+									musicalKey: 1,
+									genre: 1,
+									description: 1,
+									visibility: 1
+								}
 							}
-						}]
+						]
 					}
 				},
 				{ $set: { track: { $first: '$track' } } },

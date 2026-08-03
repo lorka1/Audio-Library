@@ -28,7 +28,7 @@ const user = {
 function actionEvent(removeCoverImage = true) {
 	const body = new FormData();
 	body.set('title', '');
-	body.set('artist', 'Synthetic artist');
+	body.set('artist', 'Forged artist');
 	body.set('bpm', '120');
 	body.set('musicalKey', 'C minor');
 	body.set('genre', 'Electronic');
@@ -52,7 +52,6 @@ describe('owner track edit failure state', () => {
 			status: 400,
 			values: {
 				title: '',
-				artist: 'Synthetic artist',
 				bpm: '120',
 				musicalKey: 'C minor',
 				genre: 'Electronic',

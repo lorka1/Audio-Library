@@ -38,7 +38,8 @@ export interface TrackDocument {
 	publicId: number;
 	ownerId: string;
 	title: string;
-	artist: string;
+	/** Legacy client-supplied attribution. New writes omit it and reads ignore it. */
+	artist?: string;
 	bpm: number | null;
 	musicalKey: string | null;
 	genre: string | null;

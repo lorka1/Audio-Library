@@ -9,7 +9,6 @@
 	const values = $derived(
 		form?.values ?? {
 			title: data.track.title,
-			artist: data.track.artist,
 			bpm: data.track.bpm === null ? '' : String(data.track.bpm),
 			musicalKey: data.track.musicalKey ?? '',
 			genre: data.track.genre ?? '',
@@ -45,6 +44,7 @@
 			</header>
 
 			<div class="readonly-track-summary">
+				<p><strong>Artist:</strong> {data.track.artist}</p>
 				<p><strong>Audio file:</strong> {data.track.originalFilename}</p>
 				<p><strong>File size:</strong> {formatFileSize(data.track.fileSizeBytes)}</p>
 				<p>
@@ -87,23 +87,6 @@
 						/>
 						{#if form?.errors.title}
 							<p class="field-error" id="title-error">{form.errors.title}</p>
-						{/if}
-					</div>
-
-					<div class="form-field">
-						<label for="artist">Artist</label>
-						<input
-							id="artist"
-							name="artist"
-							type="text"
-							required
-							maxlength="120"
-							value={values.artist}
-							aria-invalid={form?.errors.artist ? 'true' : undefined}
-							aria-describedby={form?.errors.artist ? 'artist-error' : undefined}
-						/>
-						{#if form?.errors.artist}
-							<p class="field-error" id="artist-error">{form.errors.artist}</p>
 						{/if}
 					</div>
 

@@ -42,10 +42,11 @@ function readHttpStatus(error: unknown): number | null {
 }
 
 export const load = ((event) => {
-	requireUser(event);
+	const user = requireUser(event);
 	const config = getServerConfig();
 
 	return {
+		uploaderUsername: user.username,
 		maxAudioFileSizeMb: config.maxAudioFileSizeMb,
 		maxCoverImageSizeMb: config.coverImageMaxSizeMb
 	};

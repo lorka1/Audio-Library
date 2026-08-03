@@ -20,7 +20,7 @@ function pngBytes(): Uint8Array<ArrayBuffer> {
 function validUploadFormData(): FormData {
 	const formData = new FormData();
 	formData.set('title', '  Test Track  ');
-	formData.set('artist', '  Test Artist  ');
+	formData.set('artist', '  Forged Artist  ');
 	formData.set('bpm', '120');
 	formData.set('musicalKey', 'C major');
 	formData.set('genre', 'Electronic');
@@ -104,7 +104,6 @@ describe('uploadTrack', () => {
 			id: INTERNAL_TRACK_ID,
 			ownerId: 'authenticated-owner',
 			title: 'Test Track',
-			artist: 'Test Artist',
 			bpm: 120,
 			musicalKey: 'C major',
 			genre: 'Electronic',
@@ -117,6 +116,7 @@ describe('uploadTrack', () => {
 			createdAt: NOW,
 			updatedAt: NOW
 		});
+		expect(vi.mocked(dependencies.insertTrack).mock.calls[0]?.[0]).not.toHaveProperty('artist');
 		expect(dependencies.deleteFile).not.toHaveBeenCalled();
 	});
 

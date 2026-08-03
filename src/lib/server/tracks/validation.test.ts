@@ -4,11 +4,9 @@ import {
 	BPM_MAX,
 	BPM_MIN,
 	ORIGINAL_FILENAME_MAX_LENGTH,
-	TRACK_ARTIST_MAX_LENGTH,
 	TRACK_DESCRIPTION_MAX_LENGTH,
 	TRACK_TITLE_MAX_LENGTH,
 	readUploadFormValues,
-	validateArtist,
 	validateAudioFile,
 	validateBpm,
 	validateCoverImageFile,
@@ -34,7 +32,6 @@ function audioFile(
 function validUploadFormData(file: File = audioFile()): FormData {
 	const formData = new FormData();
 	formData.set('title', 'Test Track');
-	formData.set('artist', 'Test Artist');
 	formData.set('bpm', '120');
 	formData.set('musicalKey', 'C major');
 	formData.set('genre', 'Electronic');
@@ -62,29 +59,6 @@ describe('track title validation', () => {
 		expect(validateTitle('T'.repeat(TRACK_TITLE_MAX_LENGTH)).error).toBeNull();
 		expect(validateTitle('T'.repeat(TRACK_TITLE_MAX_LENGTH + 1)).error).toBe(
 			`Title must be at most ${TRACK_TITLE_MAX_LENGTH} characters.`
-		);
-	});
-});
-
-describe('track artist validation', () => {
-	it('trims a valid artist', () => {
-		expect(validateArtist('  Test Artist  ')).toEqual({
-			value: 'Test Artist',
-			error: null
-		});
-	});
-
-	it('rejects an empty or whitespace-only artist', () => {
-		expect(validateArtist('   ')).toEqual({
-			value: '',
-			error: 'Artist is required.'
-		});
-	});
-
-	it('accepts the maximum artist length and rejects one character more', () => {
-		expect(validateArtist('A'.repeat(TRACK_ARTIST_MAX_LENGTH)).error).toBeNull();
-		expect(validateArtist('A'.repeat(TRACK_ARTIST_MAX_LENGTH + 1)).error).toBe(
-			`Artist must be at most ${TRACK_ARTIST_MAX_LENGTH} characters.`
 		);
 	});
 });
@@ -348,7 +322,6 @@ describe('metadata-only form validation', () => {
 			success: true,
 			values: {
 				title: 'Test Track',
-				artist: 'Test Artist',
 				bpm: '120',
 				musicalKey: 'C major',
 				genre: 'Electronic',
@@ -356,7 +329,6 @@ describe('metadata-only form validation', () => {
 			},
 			metadata: {
 				title: 'Test Track',
-				artist: 'Test Artist',
 				bpm: 120,
 				musicalKey: 'C major',
 				genre: 'Electronic',
@@ -376,6 +348,7 @@ describe('metadata-only form validation', () => {
 		formData.set('ownerId', 'forged-owner');
 		formData.set('visibility', 'private');
 		formData.set('storageKey', '../secret.mp3');
+		formData.set('artist', 'forged attribution');
 
 		const result = validateTrackMetadataFormData(formData);
 
@@ -384,7 +357,6 @@ describe('metadata-only form validation', () => {
 		if (!result.success) {
 			expect(result.values).toMatchObject({
 				title: '',
-				artist: 'Test Artist',
 				bpm: '120.5',
 				musicalKey: 'forged',
 				genre: 'forged'
@@ -392,6 +364,7 @@ describe('metadata-only form validation', () => {
 			expect(result.values).not.toHaveProperty('ownerId');
 			expect(result.values).not.toHaveProperty('visibility');
 			expect(result.values).not.toHaveProperty('storageKey');
+			expect(result.values).not.toHaveProperty('artist');
 			expect(result.errors).toMatchObject({
 				title: 'Title is required.',
 				bpm: 'BPM must be an integer.',
@@ -407,7 +380,7 @@ describe('complete upload form validation', () => {
 	it('returns normalized metadata for a valid form', () => {
 		const formData = validUploadFormData();
 		formData.set('title', '  Test Track  ');
-		formData.set('artist', '  Test Artist  ');
+		formData.set('artist', '  Forged Artist  ');
 		formData.set('bpm', ' 120 ');
 		formData.set('musicalKey', ' C major ');
 		formData.set('genre', ' Electronic ');
@@ -419,7 +392,6 @@ describe('complete upload form validation', () => {
 		if (result.success) {
 			expect(result.values).toEqual({
 				title: 'Test Track',
-				artist: 'Test Artist',
 				bpm: '120',
 				musicalKey: 'C major',
 				genre: 'Electronic',
@@ -427,12 +399,13 @@ describe('complete upload form validation', () => {
 			});
 			expect(result.metadata).toEqual({
 				title: 'Test Track',
-				artist: 'Test Artist',
 				bpm: 120,
 				musicalKey: 'C major',
 				genre: 'Electronic',
 				description: 'A synthetic test track.'
 			});
+			expect(result.values).not.toHaveProperty('artist');
+			expect(result.metadata).not.toHaveProperty('artist');
 		}
 	});
 
@@ -474,7 +447,7 @@ describe('complete upload form validation', () => {
 	it('retains only safe trimmed text values and never returns the File after validation fails', () => {
 		const formData = validUploadFormData(audioFile('not-audio.txt', 'text/plain'));
 		formData.set('title', '  Retained title  ');
-		formData.set('artist', '  Retained artist  ');
+		formData.set('artist', '  Forged artist  ');
 		formData.set('bpm', ' 120.5 ');
 		formData.set('musicalKey', ' C major ');
 		formData.set('genre', ' Electronic ');
@@ -486,12 +459,12 @@ describe('complete upload form validation', () => {
 		if (!result.success) {
 			expect(result.values).toEqual({
 				title: 'Retained title',
-				artist: 'Retained artist',
 				bpm: '120.5',
 				musicalKey: 'C major',
 				genre: 'Electronic',
 				description: 'Retained description'
 			});
+			expect(result.values).not.toHaveProperty('artist');
 			expect(Object.values(result.values).every((value) => typeof value === 'string')).toBe(true);
 			expect(result).not.toHaveProperty('audioFile');
 			expect(result.errors).toMatchObject({

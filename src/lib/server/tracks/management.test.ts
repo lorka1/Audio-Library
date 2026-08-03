@@ -52,7 +52,7 @@ function ownerTrack(): OwnerTrack {
 function metadataFormData(): FormData {
 	const formData = new FormData();
 	formData.set('title', '  Updated title  ');
-	formData.set('artist', '  Updated artist  ');
+	formData.set('artist', '  Forged artist  ');
 	formData.set('bpm', '128');
 	formData.set('musicalKey', 'D minor');
 	formData.set('genre', 'Techno');
@@ -135,7 +135,6 @@ describe('updateTrackMetadata', () => {
 			OWNER_ID,
 			{
 				title: 'Updated title',
-				artist: 'Updated artist',
 				bpm: 128,
 				musicalKey: 'D minor',
 				genre: 'Techno',
@@ -144,6 +143,7 @@ describe('updateTrackMetadata', () => {
 			}
 		);
 		const updateCalls = vi.mocked(testDependencies.updateMetadata).mock.calls;
+		expect(updateCalls[0]?.[2]).not.toHaveProperty('artist');
 		expect(JSON.stringify(updateCalls)).not.toContain(OTHER_ID);
 		expect(JSON.stringify(updateCalls)).not.toContain(
 			'../forged.mp3'
@@ -154,7 +154,7 @@ describe('updateTrackMetadata', () => {
 		const testDependencies = dependencies();
 		const formData = metadataFormData();
 		formData.set('title', '   ');
-		formData.set('artist', 'A'.repeat(121));
+		formData.set('artist', 'Forged attribution');
 		formData.set('bpm', '+120');
 		formData.set('musicalKey', 'H major');
 		formData.set('genre', 'Forged');
@@ -176,7 +176,6 @@ describe('updateTrackMetadata', () => {
 			},
 			errors: {
 				title: 'Title is required.',
-				artist: 'Artist must be at most 120 characters.',
 				bpm: 'BPM must be an integer.',
 				musicalKey: 'Select a valid musical key.',
 				genre: 'Select a valid genre.',

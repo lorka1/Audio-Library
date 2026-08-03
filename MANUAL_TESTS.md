@@ -81,7 +81,7 @@ used for any real service.
 ### UPL-002 — Upload form while signed in
 
 - [ ] Sign in and open `/upload`.
-- [ ] Expected: The multipart upload form is available with audio file, title, artist, BPM, musical key, genre, and description fields.
+- [ ] Expected: The multipart upload form has audio file, title, BPM, musical key, genre, and description fields, and explains that artist attribution comes from the signed-in username; there is no Artist input.
 
 ### UPL-003 — Valid MP3 upload
 
@@ -367,10 +367,10 @@ used for any real service.
 - [ ] Search using a distinctive part of a public track title rather than the complete title.
 - [ ] Expected: The matching public track appears because title matching supports partial text.
 
-### SRCH-003 — Artist capitalization
+### SRCH-003 — Uploader capitalization
 
-- [ ] Search for a public track's artist using different uppercase or lowercase letters from the stored artist name.
-- [ ] Expected: The matching public track appears because artist matching is case-insensitive.
+- [ ] Search for a public track's uploader username using different uppercase or lowercase letters.
+- [ ] Expected: The matching public track appears because uploader/artist matching is case-insensitive.
 
 ### SRCH-004 — Description text
 
@@ -549,7 +549,7 @@ used for any real service.
 ### EDT-001 — Load an owned public track
 
 - [ ] Open the Edit metadata action for your own public track.
-- [ ] Expected: The form contains the current title, artist, BPM, musical key, genre, and description; visibility and file details are read-only.
+- [ ] Expected: The form contains the current title, BPM, musical key, genre, and description; uploader/artist, visibility, and file details are read-only and no Artist value is submitted.
 
 ### EDT-002 — Submit valid metadata
 

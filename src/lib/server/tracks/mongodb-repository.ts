@@ -29,7 +29,8 @@ import {
 import {
 	assertPositivePublicTrackId,
 	DuplicateTrackError,
-	requireTrackOwnerId
+	requireTrackOwnerId,
+	UNKNOWN_TRACK_UPLOADER
 } from './contract.ts';
 import { toOwnerTrack, type OwnerTrackRecord } from './owner-model.ts';
 import { toPublicTrack, type PublicTrackRecord } from './public-model.ts';
@@ -50,11 +51,11 @@ const TRACK_DELETE_TRANSACTION_TIMEOUT_MS = 8_000;
 
 interface PublicTrackAggregateRecord extends PublicTrackRecord {}
 
-const ownerProjection = {
+const ownerAggregateProjection = {
 	_id: 0,
 	publicId: 1,
 	title: 1,
-	artist: 1,
+	artist: { $ifNull: ['$owner.username', UNKNOWN_TRACK_UPLOADER] },
 	bpm: 1,
 	musicalKey: 1,
 	genre: 1,
@@ -99,14 +100,14 @@ const publicAggregateProjection = {
 	_id: 0,
 	publicId: 1,
 	title: 1,
-	artist: 1,
+	artist: '$displayArtist',
 	bpm: 1,
 	musicalKey: 1,
 	genre: 1,
 	description: 1,
 	fileSizeBytes: 1,
 	coverImage: 1,
-	ownerUsername: '$owner.username',
+	ownerUsername: '$displayArtist',
 	createdAt: 1,
 	updatedAt: 1
 } as const;
@@ -120,10 +121,6 @@ function duplicateTrackField(error: unknown): DuplicateTrackField | null {
 	if (keyPattern && Object.hasOwn(keyPattern, 'storageKey')) return 'storageKey';
 	if (keyPattern && Object.hasOwn(keyPattern, '_id')) return 'id';
 	return null;
-}
-
-function mapOwnerTrack(document: TrackDocument) {
-	return toOwnerTrack(document satisfies OwnerTrackRecord);
 }
 
 function mapStreaming(document: TrackDocument): TrackForStreaming | null {
@@ -306,14 +303,6 @@ export function createMongoTrackRepository(
 		query: TrackSearchFilters
 	): Record<string, unknown> {
 		const match: Record<string, unknown> = { visibility: 'public' };
-		if (query.q) {
-			const literalSubstring = new RegExp(escapeRegexSearchTerm(query.q), 'i');
-			match.$or = [
-				{ title: literalSubstring },
-				{ artist: literalSubstring },
-				{ description: literalSubstring }
-			];
-		}
 		if (query.bpmMin !== undefined || query.bpmMax !== undefined) {
 			match.bpm = {
 				...(query.bpmMin === undefined ? {} : { $gte: query.bpmMin }),
@@ -351,15 +340,6 @@ export function createMongoTrackRepository(
 				[
 					{ $match: { ...match, visibility: 'public' } },
 					{
-						$set: {
-							__sortTitle: { $toLower: '$title' },
-							__bpmMissing: {
-								$cond: [{ $eq: ['$bpm', null] }, 1, 0]
-							}
-						}
-					},
-					{ $sort: publicQuerySort(query) },
-					{
 						$lookup: {
 							from: users.collectionName,
 							localField: 'ownerId',
@@ -368,12 +348,55 @@ export function createMongoTrackRepository(
 							pipeline: [{ $project: { _id: 0, username: 1 } }]
 						}
 					},
-					{ $unwind: '$owner' },
+					{ $unwind: { path: '$owner', preserveNullAndEmptyArrays: true } },
+					{
+						$set: {
+							displayArtist: { $ifNull: ['$owner.username', UNKNOWN_TRACK_UPLOADER] },
+							__sortTitle: { $toLower: '$title' },
+							__bpmMissing: {
+								$cond: [{ $eq: ['$bpm', null] }, 1, 0]
+							}
+						}
+					},
+					...(query.q
+						? [{
+								$match: {
+									$or: [
+										{ title: new RegExp(escapeRegexSearchTerm(query.q), 'i') },
+										{ displayArtist: new RegExp(escapeRegexSearchTerm(query.q), 'i') },
+										{ description: new RegExp(escapeRegexSearchTerm(query.q), 'i') }
+									]
+								}
+							}]
+						: []),
+					{ $sort: publicQuerySort(query) },
 					{ $project: publicAggregateProjection }
 				],
 				operationOptions
 			)
 			.toArray();
+	}
+
+	async function ownerAggregate(
+		match: Record<string, unknown>,
+		limit = MONGODB_BASIC_PUBLIC_TRACK_LIMIT
+	): Promise<OwnerTrackRecord[]> {
+		return tracks.aggregate<OwnerTrackRecord>([
+			{ $match: match },
+			{ $sort: { createdAt: -1, publicId: -1 } },
+			{ $limit: limit },
+			{
+				$lookup: {
+					from: users.collectionName,
+					localField: 'ownerId',
+					foreignField: '_id',
+					as: 'owner',
+					pipeline: [{ $project: { _id: 0, username: 1 } }]
+				}
+			},
+			{ $unwind: { path: '$owner', preserveNullAndEmptyArrays: true } },
+			{ $project: ownerAggregateProjection }
+		], operationOptions).toArray();
 	}
 
 	return {
@@ -386,7 +409,6 @@ export function createMongoTrackRepository(
 				publicId,
 				ownerId: input.ownerId,
 				title: input.title,
-				artist: input.artist,
 				bpm: input.bpm,
 				musicalKey: input.musicalKey,
 				genre: input.genre,
@@ -464,22 +486,14 @@ export function createMongoTrackRepository(
 
 		async listTracksForOwner(ownerId) {
 			requireTrackOwnerId(ownerId);
-			const documents = await tracks
-				.find({ ownerId }, findOptions(ownerProjection))
-				.sort({ createdAt: -1, publicId: -1 })
-				.limit(MONGODB_BASIC_PUBLIC_TRACK_LIMIT)
-				.toArray();
-			return documents.map(mapOwnerTrack);
+			return (await ownerAggregate({ ownerId })).map(toOwnerTrack);
 		},
 
 		async findOwnerTrack(publicId, ownerId) {
 			requireTrackOwnerId(ownerId);
 			assertPositivePublicTrackId(publicId);
-			const document = await tracks.findOne(
-				{ publicId, ownerId },
-				findOptions(ownerProjection)
-			);
-			return document ? mapOwnerTrack(document) : null;
+			const [record] = await ownerAggregate({ publicId, ownerId }, 1);
+			return record ? toOwnerTrack(record) : null;
 		},
 
 		async updateOwnerTrackMetadata(publicId, ownerId, metadata) {
@@ -487,7 +501,6 @@ export function createMongoTrackRepository(
 			assertPositivePublicTrackId(publicId);
 			const update: UpdateOwnerTrackMetadataInput = {
 				title: metadata.title,
-				artist: metadata.artist,
 				bpm: metadata.bpm,
 				musicalKey: metadata.musicalKey,
 				genre: metadata.genre,
@@ -503,10 +516,12 @@ export function createMongoTrackRepository(
 				{
 					...operationOptions,
 					returnDocument: 'after',
-					projection: ownerProjection
+					projection: { _id: 0, publicId: 1 }
 				}
 			);
-			return document ? mapOwnerTrack(document) : null;
+			if (!document) return null;
+			const [record] = await ownerAggregate({ publicId, ownerId }, 1);
+			return record ? toOwnerTrack(record) : null;
 		},
 
 		async deleteOwnerTrack(publicId, ownerId) {

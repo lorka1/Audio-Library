@@ -13,7 +13,6 @@ export interface CreateTrackInput {
 	id: string;
 	ownerId: string;
 	title: string;
-	artist: string;
 	bpm: number | null;
 	musicalKey: MusicalKey | null;
 	genre: MusicGenre | null;
@@ -106,6 +105,8 @@ export interface TrackRepository {
 	deleteOwnerTrack(publicId: number, ownerId: string): Promise<boolean>;
 	getOwnerTrackStorage(publicId: number, ownerId: string): Promise<OwnerTrackStorage | null>;
 }
+
+export const UNKNOWN_TRACK_UPLOADER = 'Unknown uploader' as const;
 
 export function requireTrackOwnerId(ownerId: string): void {
 	if (!ownerId.trim()) {

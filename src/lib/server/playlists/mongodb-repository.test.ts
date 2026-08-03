@@ -3,7 +3,8 @@ import { describe, expect, it, vi } from 'vitest';
 import type {
 	PlaylistDocument,
 	PlaylistItemDocument,
-	TrackDocument
+	TrackDocument,
+	UserDocument
 } from '../mongodb/documents';
 import { createMongoPlaylistRepository } from './mongodb-repository';
 
@@ -56,18 +57,20 @@ function harness(overrides: {
 		findOne: vi.fn().mockResolvedValue(overrides.track === undefined ? { _id: trackId } : overrides.track),
 		find: vi.fn()
 	} as unknown as Collection<TrackDocument>;
+	const users = { collectionName: 'users' } as Collection<UserDocument>;
 	const repository = createMongoPlaylistRepository(
 		client,
 		playlists,
 		playlistItems,
 		tracks,
+		users,
 		{
 			now: () => now,
 			createInternalId: () => '44444444-4444-4444-8444-444444444444',
 			createPublicId: () => publicId
 		}
 	);
-	return { repository, client, session, playlists, playlistItems, tracks, endSession };
+	return { repository, client, session, playlists, playlistItems, tracks, users, endSession };
 }
 
 describe('MongoDB playlist repository transactions', () => {
