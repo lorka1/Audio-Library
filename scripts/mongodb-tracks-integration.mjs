@@ -28,7 +28,7 @@ import { DuplicateTrackError } from '../src/lib/server/tracks/contract.ts';
 
 const OPERATION_TIMEOUT_MS = 5_000;
 const TOTAL_TIMEOUT_MS = 120_000;
-const EXPECTED_CHECKS = 27;
+const EXPECTED_CHECKS = 31;
 let checkNumber = 0;
 let activeStep = 'setup';
 
@@ -217,7 +217,14 @@ async function main() {
 			assert.equal(ids.every((id) => Number.isSafeInteger(id) && id > 0), true);
 		});
 
-		const publicInput = syntheticTrack(ownerId);
+		const originalCoverImage = {
+			storageKey: `${randomUUID()}.png`,
+			mimeType: 'image/png',
+			byteSize: 68
+		};
+		const publicInput = syntheticTrack(ownerId, {
+			coverImage: originalCoverImage
+		});
 		const created = await repository.createTrack(publicInput);
 		await check('track creation preserves the numeric public URL identity', () => {
 			assert.equal(created.title, publicInput.title);
@@ -225,11 +232,18 @@ async function main() {
 		});
 
 		await check('public lookup returns a safe domain model', async () => {
-			assert.equal((await repository.findPublicTrackByPublicId(created.id))?.id, created.id);
+			const track = await repository.findPublicTrackByPublicId(created.id);
+			assert.equal(track?.id, created.id);
+			assert.equal(track?.coverImageUrl, `/api/tracks/${created.id}/cover`);
 		});
 
+		const privateCoverImage = {
+			storageKey: `${randomUUID()}.webp`,
+			mimeType: 'image/webp',
+			byteSize: 42
+		};
 		const privateTrack = await repository.createTrack(
-			syntheticTrack(ownerId),
+			syntheticTrack(ownerId, { coverImage: privateCoverImage }),
 			{ visibility: 'private' }
 		);
 		await check('private tracks are excluded from public reads', async () => {
@@ -251,28 +265,51 @@ async function main() {
 		await check('public projection contains only browser-safe fields', async () => {
 			const track = await repository.findPublicTrackByPublicId(created.id);
 			assert.deepEqual(Object.keys(track ?? {}).sort(), [
-				'artist', 'bpm', 'createdAt', 'description', 'fileSizeBytes', 'genre',
+				'artist', 'bpm', 'coverImageUrl', 'createdAt', 'description', 'fileSizeBytes', 'genre',
 				'id', 'musicalKey', 'ownerUsername', 'title', 'updatedAt'
 			]);
+			assert.equal(JSON.stringify(track).includes(originalCoverImage.storageKey), false);
 		});
 
 		await check('owner projection contains only owner-safe fields', async () => {
 			const track = await repository.findOwnerTrack(created.id, ownerId);
 			assert.deepEqual(Object.keys(track ?? {}).sort(), [
-				'artist', 'bpm', 'createdAt', 'description', 'fileSizeBytes', 'genre',
+				'artist', 'bpm', 'coverImageUrl', 'createdAt', 'description', 'fileSizeBytes', 'genre',
 				'mimeType', 'musicalKey', 'originalFilename', 'publicId', 'title',
 				'updatedAt', 'visibility'
 			]);
+			assert.equal(JSON.stringify(track).includes(originalCoverImage.storageKey), false);
 		});
 
 		await check('storage lookup remains server-only and owner-scoped', async () => {
-			assert.equal(
-				(await repository.getOwnerTrackStorage(created.id, ownerId))?.storedFilename,
-				publicInput.storageKey
-			);
+			const storage = await repository.getOwnerTrackStorage(created.id, ownerId);
+			assert.equal(storage?.storedFilename, publicInput.storageKey);
+			assert.deepEqual(storage?.coverImage, originalCoverImage);
 			assert.equal(
 				await repository.getOwnerTrackStorage(created.id, otherOwnerId),
 				null
+			);
+		});
+
+		await check('cover delivery is public or exact-owner scoped', async () => {
+			assert.deepEqual(
+				await repository.findTrackCoverForAccess(created.id),
+				{ publicId: created.id, ...originalCoverImage }
+			);
+			assert.equal(
+				await repository.findTrackCoverForAccess(privateTrack.id),
+				null
+			);
+			assert.equal(
+				await repository.findTrackCoverForAccess(
+					privateTrack.id,
+					otherOwnerId
+				),
+				null
+			);
+			assert.deepEqual(
+				await repository.findTrackCoverForAccess(privateTrack.id, ownerId),
+				{ publicId: privateTrack.id, ...privateCoverImage }
 			);
 		});
 
@@ -291,6 +328,34 @@ async function main() {
 				(await repository.getOwnerTrackStorage(created.id, ownerId))?.storedFilename,
 				publicInput.storageKey
 			);
+			assert.deepEqual(
+				(await repository.getOwnerTrackStorage(created.id, ownerId))?.coverImage,
+				originalCoverImage
+			);
+		});
+
+		const replacementCoverImage = {
+			storageKey: `${randomUUID()}.jpg`,
+			mimeType: 'image/jpeg',
+			byteSize: 73
+		};
+		await check('owner can replace cover metadata without exposing its storage key', async () => {
+			const updated = await repository.updateOwnerTrackMetadata(created.id, ownerId, {
+				title: 'Updated synthetic track',
+				artist: 'Updated synthetic artist',
+				bpm: 128,
+				musicalKey: 'D minor',
+				genre: 'House',
+				description: null,
+				coverImage: replacementCoverImage,
+				updatedAt: new Date('2026-07-27T14:00:00.000Z')
+			});
+			assert.equal(updated?.coverImageUrl, `/api/tracks/${created.id}/cover`);
+			assert.equal(JSON.stringify(updated).includes(replacementCoverImage.storageKey), false);
+			assert.deepEqual(
+				(await repository.getOwnerTrackStorage(created.id, ownerId))?.coverImage,
+				replacementCoverImage
+			);
 		});
 
 		await check('non-owner metadata edit is rejected safely', async () => {
@@ -302,8 +367,56 @@ async function main() {
 					musicalKey: null,
 					genre: null,
 					description: null,
+					coverImage: null,
 					updatedAt: new Date()
 				}),
+				null
+			);
+			assert.deepEqual(
+				(await repository.getOwnerTrackStorage(created.id, ownerId))?.coverImage,
+				replacementCoverImage
+			);
+		});
+
+		await check('owner can remove cover metadata while retaining the audio file', async () => {
+			const updated = await repository.updateOwnerTrackMetadata(created.id, ownerId, {
+				title: 'Updated synthetic track',
+				artist: 'Updated synthetic artist',
+				bpm: 128,
+				musicalKey: 'D minor',
+				genre: 'House',
+				description: null,
+				coverImage: null,
+				updatedAt: new Date('2026-07-27T15:00:00.000Z')
+			});
+			assert.equal(updated?.coverImageUrl, null);
+			const storage = await repository.getOwnerTrackStorage(created.id, ownerId);
+			assert.equal(storage?.storedFilename, publicInput.storageKey);
+			assert.equal(storage?.coverImage, null);
+			assert.equal(await repository.findTrackCoverForAccess(created.id), null);
+		});
+
+		const explicitNullCover = await repository.createTrack(
+			syntheticTrack(ownerId, { coverImage: null })
+		);
+		const legacyCover = await repository.createTrack(syntheticTrack(ownerId));
+		await collections.tracks.updateOne(
+			{ publicId: legacyCover.id },
+			{ $unset: { coverImage: '' } },
+			{ timeoutMS: OPERATION_TIMEOUT_MS, signal: abortController.signal }
+		);
+		await check('legacy and explicit-null cover documents remain compatible', async () => {
+			assert.equal(
+				(await repository.findPublicTrackByPublicId(explicitNullCover.id))
+					?.coverImageUrl,
+				null
+			);
+			assert.equal(
+				(await repository.findPublicTrackByPublicId(legacyCover.id))?.coverImageUrl,
+				null
+			);
+			assert.equal(
+				await repository.findTrackCoverForAccess(legacyCover.id, ownerId),
 				null
 			);
 		});

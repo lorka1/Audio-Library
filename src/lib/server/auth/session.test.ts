@@ -31,6 +31,7 @@ describe('selected session repository service', () => {
 	let sessions: SessionRepository;
 
 	beforeEach(() => {
+		mocks.getAuthPersistence.mockReset();
 		sessions = sessionRepository();
 		mocks.getAuthPersistence.mockResolvedValue({
 			users: {},
@@ -71,6 +72,7 @@ describe('selected session repository service', () => {
 		const result = await createSession(
 			'11111111-1111-4111-8111-111111111111'
 		);
+		expect(mocks.getAuthPersistence).toHaveBeenCalledTimes(1);
 		expect(sessions.createSession).toHaveBeenCalledWith(
 			expect.objectContaining({
 				tokenHash: hashSessionToken(result.token)

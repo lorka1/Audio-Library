@@ -1,6 +1,7 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { requireUser } from '$lib/server/auth/guards';
+import { getServerConfig } from '$lib/server/config';
 import {
 	GENERIC_METADATA_UPDATE_ERROR,
 	updateTrackMetadata
@@ -10,11 +11,14 @@ import { logTrackStorageError } from '$lib/server/tracks/logging';
 import { getApplicationTrackRepository } from '$lib/server/tracks/persistence';
 import {
 	emptyTrackMetadataFormValues,
+	hasSelectedCoverImage,
+	hasRequestedCoverImageRemoval,
 	type TrackMetadataErrors
 } from '$lib/server/tracks/validation';
 
 export const load = (async (event) => {
 	const user = requireUser(event);
+	const config = getServerConfig();
 	const publicId = parseTrackId(event.params.id);
 
 	if (publicId === null) {
@@ -31,7 +35,10 @@ export const load = (async (event) => {
 			error(404, 'Track not found.');
 		}
 
-		return { track };
+		return {
+			track,
+			maxCoverImageSizeMb: config.coverImageMaxSizeMb
+		};
 	} catch (loadError) {
 		if (
 			typeof loadError === 'object' &&
@@ -50,6 +57,7 @@ export const load = (async (event) => {
 export const actions = {
 	default: async (event) => {
 		const user = requireUser(event);
+		const config = getServerConfig();
 		const publicId = parseTrackId(event.params.id);
 
 		if (publicId === null) {
@@ -68,14 +76,19 @@ export const actions = {
 
 			return fail(400, {
 				values: emptyTrackMetadataFormValues(),
-				errors
+				errors,
+				needsCoverImageReselection: true,
+				removeCoverImageRequested: false
 			});
 		}
 
+		const needsCoverImageReselection = hasSelectedCoverImage(formData);
+		const removeCoverImageRequested = hasRequestedCoverImageRemoval(formData);
 		const result = await updateTrackMetadata({
 			publicId,
 			ownerId: user.id,
-			formData
+			formData,
+			maxCoverImageSizeBytes: config.coverImageMaxSizeBytes
 		});
 
 		if (!result.success) {
@@ -85,7 +98,9 @@ export const actions = {
 
 			return fail(result.status, {
 				values: result.values,
-				errors: result.errors
+				errors: result.errors,
+				needsCoverImageReselection,
+				removeCoverImageRequested
 			});
 		}
 

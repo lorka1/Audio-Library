@@ -7,6 +7,7 @@ const firstTrack: PublicPlayerTrack = {
 	id: 10,
 	title: 'First Fixture',
 	artist: 'Fixture Artist',
+	coverImageUrl: null,
 	streamUrl: '/api/tracks/10/stream',
 	detailsUrl: '/tracks/10'
 };
@@ -15,6 +16,7 @@ const secondTrack: PublicPlayerTrack = {
 	id: 11,
 	title: 'Second Fixture',
 	artist: 'Second Artist',
+	coverImageUrl: '/api/tracks/11/cover',
 	streamUrl: '/api/tracks/11/stream',
 	detailsUrl: '/tracks/11'
 };

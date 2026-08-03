@@ -1,5 +1,5 @@
 import type { Handle, HandleServerError } from '@sveltejs/kit';
-import { serverConfig } from '$lib/server/config';
+import { getServerConfig } from '$lib/server/config';
 import {
 	deleteSessionCookie,
 	validateSessionToken
@@ -37,7 +37,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 	}
 	await initializeApplication();
 
-	const token = event.cookies.get(serverConfig.sessionCookieName);
+	const token = event.cookies.get(getServerConfig().sessionCookieName);
 
 	if (!token) {
 		const response = await resolve(event);

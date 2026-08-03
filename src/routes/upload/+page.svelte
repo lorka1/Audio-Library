@@ -1,4 +1,5 @@
 <script lang="ts">
+	import CoverImageField from '$lib/components/CoverImageField.svelte';
 	import { MUSIC_GENRES, MUSICAL_KEYS } from '$lib/constants/music';
 	import type { PageProps } from './$types';
 
@@ -78,6 +79,13 @@
 						</p>
 					{/if}
 				</div>
+
+				<CoverImageField
+					maxSizeMb={data.maxCoverImageSizeMb}
+					error={form?.errors.coverImage}
+					needsReselection={form?.needsCoverImageReselection}
+					trackTitle={form?.values.title || 'New track'}
+				/>
 
 				<div class="upload-form-grid">
 					<div class="form-field">

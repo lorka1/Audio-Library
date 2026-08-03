@@ -26,12 +26,17 @@ paths, filenames, or database contents in the completed checklist.
 - [ ] `HOST` and `PORT` expose only the intended web listener.
 - [ ] The reverse proxy forwards the intended origin and terminates HTTPS where
   applicable.
-- [ ] The private audio directory exists with the required read/write
-  permissions.
-- [ ] The audio directory is outside `static`, `public`, `build`, and every
+- [ ] The private audio root and its `covers/` subdirectory exist with the
+  required read/write permissions.
+- [ ] The complete media root is outside `static`, `public`, `build`, and every
   reverse-proxy document root.
-- [ ] `MAX_AUDIO_FILE_SIZE_MB` is positive and `BODY_SIZE_LIMIT` safely exceeds
-  it.
+- [ ] `MAX_AUDIO_FILE_SIZE_MB` and `COVER_IMAGE_MAX_SIZE_MB` are positive, and
+  `BODY_SIZE_LIMIT` is at least their combined value plus 1 MiB of
+  multipart/form-data overhead.
+- [ ] JPEG, PNG, and WebP covers are available only through
+  `/api/tracks/[id]/cover`; private tracks and private storage details are not
+  exposed.
+- [ ] Tracks without a cover display the local fallback artwork.
 - [ ] Authenticated navigation exposes Playlists on desktop and mobile; signed-out
   navigation does not expose the private destination.
 - [ ] Private playlist create, rename, description edit, delete, add, and remove
@@ -51,13 +56,14 @@ paths, filenames, or database contents in the completed checklist.
 
 - [ ] MongoDB Database Tools are installed and their version is recorded in
   private operational inventory.
-- [ ] MongoDB and audio backup roots are private, explicit, and outside Git and
-  public content.
-- [ ] MongoDB and audio backups are scheduled as one logical recovery set.
+- [ ] MongoDB and private-media backup roots are private, explicit, and outside
+  Git and public content.
+- [ ] MongoDB and private-media backups are scheduled as one logical recovery
+  set, and the filesystem backup includes both audio and `covers/`.
 - [ ] No automatic destructive retention is assumed; an approved retention
   policy exists separately.
-- [ ] Periodic isolated restore verification covers MongoDB track/playlist metadata
-  plus referenced audio files.
+- [ ] Periodic isolated restore verification covers MongoDB track/playlist metadata plus
+  referenced audio and cover files.
 - [ ] A completed synthetic `npm run test:mongodb:recovery` run is recorded.
 - [ ] The historical SQLite backup remains separately retained as migration
   history only.

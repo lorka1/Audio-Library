@@ -1,10 +1,13 @@
-import { serverConfig } from '../config';
+import { getServerConfig } from '../config';
 import {
 	configureMongoApplicationConfig,
 	connectMongoDevelopment
 } from '../mongodb/client';
 import { verifyMongoOperationalState } from '../mongodb/verification';
-import { checkPrivateAudioStorage } from './config';
+import {
+	checkPrivateAudioStorage,
+	checkPrivateCoverImageStorage
+} from './config';
 
 export const READINESS_TIMEOUT_MS = 5_000;
 
@@ -38,9 +41,10 @@ export interface ReadinessDependencies {
 function defaultReadinessDependencies(): ReadinessDependencies {
 	return {
 		async verify() {
+			const config = getServerConfig();
 			let connection: Awaited<ReturnType<typeof connectMongoDevelopment>>;
 			try {
-				configureMongoApplicationConfig(serverConfig.mongo);
+				configureMongoApplicationConfig(config.mongo);
 				connection = await connectMongoDevelopment();
 			} catch {
 				throw new ReadinessError(
@@ -60,7 +64,10 @@ function defaultReadinessDependencies(): ReadinessDependencies {
 				);
 			}
 			try {
-				await checkPrivateAudioStorage(serverConfig.audioStoragePath);
+				await checkPrivateAudioStorage(config.audioStoragePath);
+				await checkPrivateCoverImageStorage(
+					config.coverImageStoragePath
+				);
 			} catch {
 				throw new ReadinessError(
 					'filesystem',

@@ -56,6 +56,11 @@ describe('MongoDB document models', () => {
 			mimeType: 'audio/mpeg',
 			fileSizeBytes: 128,
 			durationMs: null,
+			coverImage: {
+				storageKey: '55555555-5555-4555-8555-555555555555.webp',
+				mimeType: 'image/webp',
+				byteSize: 64
+			},
 			visibility: 'public',
 			createdAt: now,
 			updatedAt: now
@@ -64,6 +69,35 @@ describe('MongoDB document models', () => {
 		expect(track).not.toHaveProperty('audio');
 		expect(track).not.toHaveProperty('bytes');
 		expect(track.publicId).toBe(42);
+		expect(track.coverImage).toEqual({
+			storageKey: '55555555-5555-4555-8555-555555555555.webp',
+			mimeType: 'image/webp',
+			byteSize: 64
+		});
+	});
+
+	it('keeps existing track documents without cover metadata compatible', () => {
+		const legacyTrack = {
+			_id: '33333333-3333-4333-8333-333333333333',
+			publicId: 43,
+			ownerId: '11111111-1111-4111-8111-111111111111',
+			title: 'Legacy track',
+			artist: 'Fixture Artist',
+			bpm: null,
+			musicalKey: null,
+			genre: null,
+			description: null,
+			originalFilename: 'fixture.mp3',
+			storageKey: '44444444-4444-4444-8444-444444444444.mp3',
+			mimeType: 'audio/mpeg',
+			fileSizeBytes: 128,
+			durationMs: null,
+			visibility: 'public',
+			createdAt: new Date('2026-07-26T12:00:00.000Z'),
+			updatedAt: new Date('2026-07-26T12:00:00.000Z')
+		} satisfies TrackDocument;
+
+		expect(legacyTrack).not.toHaveProperty('coverImage');
 	});
 
 	it('defines one counter for atomic public numeric track IDs', () => {

@@ -4,6 +4,7 @@
 	import { toPublicPlayerTrack } from '$lib/player/model';
 	import type { PlaylistPickerEntry, PublicTrack } from '$lib/types';
 	import AddToPlaylist from './AddToPlaylist.svelte';
+	import TrackCover from './TrackCover.svelte';
 	import TrackPlayButton from './TrackPlayButton.svelte';
 
 	let {
@@ -22,6 +23,11 @@
 
 <article class="track-card">
 	<header>
+		<TrackCover
+			coverImageUrl={track.coverImageUrl}
+			title={track.title}
+			variant="row"
+		/>
 		<div>
 			<p class="track-card__artist">{track.artist}</p>
 			<h2><a href={`/tracks/${track.id}`}>{track.title}</a></h2>

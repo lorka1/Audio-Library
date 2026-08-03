@@ -2,11 +2,12 @@ import 'dotenv/config';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { existsSync } from 'node:fs';
+import { createWriteStream, existsSync } from 'node:fs';
 import { mkdir, mkdtemp, readdir, rm } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
+import { finished } from 'node:stream/promises';
 import { MongoClientManager } from '../src/lib/server/mongodb/client.ts';
 import {
 	assertMongoTestDatabaseName,
@@ -17,8 +18,9 @@ import { getMongoCollections } from '../src/lib/server/mongodb/collections.ts';
 import { TRACK_PUBLIC_ID_COUNTER } from '../src/lib/server/mongodb/documents.ts';
 import { ensureMongoIndexes } from '../src/lib/server/mongodb/indexes.ts';
 import { safeMongoAggregateFingerprint } from './lib/mongodb-fingerprint.mjs';
+import { createSyntheticApplicationEnvironment } from './lib/synthetic-app-environment.mjs';
 
-const EXPECTED_CHECKS = 31;
+const EXPECTED_CHECKS = 39;
 const STARTUP_TIMEOUT_MS = 45_000;
 const REQUEST_TIMEOUT_MS = 12_000;
 const SHUTDOWN_TIMEOUT_MS = 8_000;
@@ -28,6 +30,12 @@ const SYNTHETIC_AUDIO = new Uint8Array([
 	0x00, 0x0f, 0x54, 0x49, 0x54, 0x32, 0x00, 0x00,
 	0x00, 0x05, 0x00, 0x00, 0x4d, 0x37, 0x00, 0x01
 ]);
+const SYNTHETIC_PNG = Uint8Array.from(
+	Buffer.from(
+		'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+		'base64'
+	)
+);
 
 let checkNumber = 0;
 let activeStep = 'controller setup';
@@ -80,17 +88,41 @@ function safeStatusError(actualStatus, expectedStatus) {
 	});
 }
 
-function safeServerLogCategory(stderr) {
-	for (const category of [
-		'MongoInvalidArgumentError',
-		'MongoServerError',
-		'MongoOperationTimeoutError',
-		'Registration failed',
-		'Vite startup failure'
-	]) {
-		if (stderr.includes(category)) return category;
+function knownServerFailure(stderr) {
+	if (
+		stderr.includes(
+			'BODY_SIZE_LIMIT must accommodate the maximum audio file, maximum cover image, and 1 MB of multipart overhead.'
+		)
+	) {
+		return {
+			category: 'operational configuration failure',
+			setting: 'BODY_SIZE_LIMIT',
+			requiredMinimumBytes: 56 * 1024 * 1024
+		};
 	}
-	return stderr.length > 0 ? 'unclassified stderr' : 'none';
+	if (/replica set|replicaSet|writable PRIMARY|transaction topology/i.test(stderr)) {
+		return { category: 'replica-set or PRIMARY failure' };
+	}
+	if (/MongoServerSelectionError|MongoOperationTimeoutError|ECONNREFUSED/i.test(stderr)) {
+		return { category: 'MongoDB connection or server-selection failure' };
+	}
+	if (/EADDRINUSE/i.test(stderr)) return { category: 'port conflict' };
+	return null;
+}
+
+function safeServerStatus(stdout, stderr, failure) {
+	const knownFailure = knownServerFailure(stderr);
+	if (knownFailure) return knownFailure;
+	if (failure instanceof Error && failure.message.includes('did not become ready in time')) {
+		return { category: 'startup timeout' };
+	}
+	if (failure instanceof Error && failure.message.includes('exited before startup')) {
+		return { category: 'unexpected process exit' };
+	}
+	return {
+		category: stderr.length > 0 ? 'unexpected startup stderr' : 'unexpected startup failure',
+		stdoutCategory: stdout.length > 0 ? 'Vite emitted startup output' : 'none'
+	};
 }
 
 function isOwnedTemporaryRoot(path) {
@@ -138,9 +170,15 @@ async function waitForPortRelease(port) {
 	return false;
 }
 
-async function waitForStartup(baseUrl, child) {
+async function waitForStartup(baseUrl, child, readServerFailure = () => null) {
 	const deadline = Date.now() + STARTUP_TIMEOUT_MS;
 	while (Date.now() < deadline) {
+		const serverFailure = readServerFailure();
+		if (serverFailure) {
+			throw Object.assign(new Error('Owned Vite process reported a known startup failure.'), {
+				safeContext: serverFailure
+			});
+		}
 		if (child.exitCode !== null) {
 			throw new Error('Owned Vite process exited before startup.');
 		}
@@ -207,6 +245,28 @@ function form(values) {
 	return new URLSearchParams(values);
 }
 
+function trackUploadForm({
+	title,
+	audioFilename,
+	coverImage
+}) {
+	const uploadForm = new FormData();
+	uploadForm.set('title', title);
+	uploadForm.set('artist', 'M7 synthetic artist');
+	uploadForm.set('bpm', '128');
+	uploadForm.set('musicalKey', 'C minor');
+	uploadForm.set('genre', 'Electronic');
+	uploadForm.set('description', 'Synthetic isolated cutover fixture.');
+	uploadForm.set(
+		'audioFile',
+		new File([SYNTHETIC_AUDIO], audioFilename, {
+			type: 'audio/mpeg'
+		})
+	);
+	if (coverImage) uploadForm.set('coverImage', coverImage);
+	return uploadForm;
+}
+
 async function directoryFileNames(root) {
 	if (!existsSync(root)) return [];
 	const entries = await readdir(root, { withFileTypes: true });
@@ -225,15 +285,20 @@ async function main() {
 	let collections;
 	let child;
 	let childClosePromise = Promise.resolve();
+	let serverLogStream;
+	let serverLogPath;
 	let temporaryRoot;
 	let temporaryAudioRoot;
+	let temporaryCoverRoot;
 	let testPort;
 	let ownedName;
 	let initialTestDatabases;
 	let realFingerprintBefore;
 	let realCounterBefore;
 	let primaryFailure;
+	let stdoutTail = '';
 	let stderrTail = '';
+	let childUploadLimits;
 	const cleanupFailures = [];
 	const cleanup = {
 		databaseRemoved: false,
@@ -241,7 +306,9 @@ async function main() {
 		temporaryRootRemoved: false,
 		childStopped: false,
 		portReleased: false,
-		clientClosed: false
+		clientClosed: false,
+		serverLogClosed: false,
+		serverLogRemoved: false
 	};
 
 	try {
@@ -274,6 +341,12 @@ async function main() {
 		temporaryRoot = await mkdtemp(join(resolve(tmpdir()), TEMP_PREFIX));
 		assert.ok(isOwnedTemporaryRoot(temporaryRoot));
 		temporaryAudioRoot = join(temporaryRoot, 'audio');
+		temporaryCoverRoot = join(temporaryAudioRoot, 'covers');
+		serverLogPath = join(temporaryRoot, 'application.log');
+		serverLogStream = createWriteStream(serverLogPath, {
+			flags: 'wx',
+			mode: 0o600
+		});
 		await mkdir(temporaryAudioRoot);
 		manager = new MongoClientManager({
 			...config,
@@ -295,6 +368,18 @@ async function main() {
 		const cookieName = `m7_cutover_${randomBytes(4).toString('hex')}`;
 		let stdoutBytes = 0;
 		let stderrBytes = 0;
+		const childEnvironment = createSyntheticApplicationEnvironment({
+			AUDIO_STORAGE_PATH: temporaryAudioRoot,
+			SESSION_COOKIE_NAME: cookieName,
+			MONGODB_URI: config.uri,
+			MONGODB_DB_NAME: ownedName,
+			MONGODB_TEST_DB_NAME: config.testDatabaseName
+		});
+		childUploadLimits = {
+			MAX_AUDIO_FILE_SIZE_MB: childEnvironment.MAX_AUDIO_FILE_SIZE_MB ?? null,
+			COVER_IMAGE_MAX_SIZE_MB: childEnvironment.COVER_IMAGE_MAX_SIZE_MB ?? null,
+			BODY_SIZE_LIMIT: childEnvironment.BODY_SIZE_LIMIT ?? null
+		};
 		child = spawn(
 			process.execPath,
 			[
@@ -308,13 +393,7 @@ async function main() {
 			],
 			{
 				cwd: resolve('.'),
-				env: {
-					...process.env,
-					AUDIO_STORAGE_PATH: temporaryAudioRoot,
-					SESSION_COOKIE_NAME: cookieName,
-					MONGODB_DB_NAME: ownedName,
-					MONGODB_TEST_DB_NAME: config.testDatabaseName
-				},
+				env: childEnvironment,
 				detached: false,
 				shell: false,
 				stdio: ['ignore', 'pipe', 'pipe'],
@@ -326,14 +405,17 @@ async function main() {
 		});
 		child.stdout.on('data', (chunk) => {
 			stdoutBytes += chunk.length;
+			stdoutTail = `${stdoutTail}${chunk.toString()}`.slice(-16 * 1024);
+			serverLogStream.write(chunk);
 		});
 		child.stderr.on('data', (chunk) => {
 			stderrBytes += chunk.length;
 			stderrTail = `${stderrTail}${chunk.toString()}`.slice(-16 * 1024);
+			serverLogStream.write(chunk);
 		});
 
 		beginStep('isolated MongoDB application startup');
-		await waitForStartup(baseUrl, child);
+		await waitForStartup(baseUrl, child, () => knownServerFailure(stderrTail));
 		await check('isolated MongoDB backend application starts', () => {
 			assert.equal(child.exitCode, null);
 			assert.ok(stdoutBytes >= 0);
@@ -408,19 +490,13 @@ async function main() {
 		});
 		await ownerLogin.body?.cancel();
 
-		const uploadForm = new FormData();
-		uploadForm.set('title', 'M7 synthetic upload');
-		uploadForm.set('artist', 'M7 synthetic artist');
-		uploadForm.set('bpm', '128');
-		uploadForm.set('musicalKey', 'C minor');
-		uploadForm.set('genre', 'Electronic');
-		uploadForm.set('description', 'Synthetic isolated cutover fixture.');
-		uploadForm.set(
-			'audioFile',
-			new File([SYNTHETIC_AUDIO], 'm7-cutover.mp3', {
-				type: 'audio/mpeg'
+		const uploadForm = trackUploadForm({
+			title: 'M7 synthetic upload',
+			audioFilename: 'm7-cutover.mp3',
+			coverImage: new File([SYNTHETIC_PNG], 'm7-cover.png', {
+				type: 'image/png'
 			})
-		);
+		});
 		const upload = await request(baseUrl, '/upload', {
 			method: 'POST',
 			headers: {
@@ -436,12 +512,104 @@ async function main() {
 		);
 		assert.ok(uploadMatch);
 		const publicId = Number(uploadMatch[1]);
-		await check('upload persists MongoDB metadata and temporary audio', async () => {
+		let storedCoverKey;
+		await check('upload persists MongoDB metadata, audio, and private cover', async () => {
 			assert.equal(upload.status, 303);
 			assert.equal(await collections.tracks.countDocuments({}), 1);
 			assert.equal((await directoryFileNames(temporaryAudioRoot)).length, 1);
+			assert.equal((await directoryFileNames(temporaryCoverRoot)).length, 1);
+			const document = await collections.tracks.findOne(
+				{ publicId },
+				{ projection: { _id: 0, coverImage: 1 } }
+			);
+			assert.equal(document?.coverImage?.mimeType, 'image/png');
+			assert.equal(document?.coverImage?.byteSize, SYNTHETIC_PNG.byteLength);
+			assert.match(
+				document?.coverImage?.storageKey ?? '',
+				/^[0-9a-f-]{36}\.png$/
+			);
+			storedCoverKey = document?.coverImage?.storageKey;
 		});
 		await upload.body?.cancel();
+
+		const noCoverUpload = await request(baseUrl, '/upload', {
+			method: 'POST',
+			headers: {
+				accept: 'text/html',
+				origin: baseUrl,
+				cookie: ownerCookie
+			},
+			body: trackUploadForm({
+				title: 'M7 synthetic upload without cover',
+				audioFilename: 'm7-cutover-no-cover.mp3'
+			})
+		});
+		const noCoverLocation = noCoverUpload.headers.get('location') ?? '';
+		const noCoverMatch = /^\/tracks\/([1-9]\d*)\?uploaded=1$/.exec(
+			noCoverLocation
+		);
+		assert.ok(noCoverMatch);
+		const noCoverPublicId = Number(noCoverMatch[1]);
+		const missingCover = await request(
+			baseUrl,
+			`/api/tracks/${noCoverPublicId}/cover`
+		);
+		await check('HTTP upload without a cover remains compatible', async () => {
+			assert.equal(noCoverUpload.status, 303);
+			assert.equal(await collections.tracks.countDocuments({}), 2);
+			assert.equal((await directoryFileNames(temporaryAudioRoot)).length, 2);
+			assert.equal((await directoryFileNames(temporaryCoverRoot)).length, 1);
+			assert.equal(
+				(
+					await collections.tracks.findOne(
+						{ publicId: noCoverPublicId },
+						{ projection: { _id: 0, coverImage: 1 } }
+					)
+				)?.coverImage,
+				null
+			);
+			assert.equal(missingCover.status, 404);
+		});
+		await noCoverUpload.body?.cancel();
+		await missingCover.body?.cancel();
+
+		for (const invalidCover of [
+			{
+				label: 'SVG cover upload is rejected without orphan files',
+				file: new File(
+					['<svg xmlns="http://www.w3.org/2000/svg"></svg>'],
+					'forbidden.svg',
+					{ type: 'image/svg+xml' }
+				)
+			},
+			{
+				label: 'invalid raster contents are rejected without orphan files',
+				file: new File(['not-a-real-png'], 'forged.png', {
+					type: 'image/png'
+				})
+			}
+		]) {
+			const rejectedUpload = await request(baseUrl, '/upload', {
+				method: 'POST',
+				headers: {
+					accept: 'text/html',
+					origin: baseUrl,
+					cookie: ownerCookie
+				},
+				body: trackUploadForm({
+					title: `Rejected ${invalidCover.label}`,
+					audioFilename: 'must-not-remain.mp3',
+					coverImage: invalidCover.file
+				})
+			});
+			await check(invalidCover.label, async () => {
+				assert.equal(rejectedUpload.status, 400);
+				assert.equal(await collections.tracks.countDocuments({}), 2);
+				assert.equal((await directoryFileNames(temporaryAudioRoot)).length, 2);
+				assert.equal((await directoryFileNames(temporaryCoverRoot)).length, 1);
+			});
+			await rejectedUpload.body?.cancel();
+		}
 
 		const createPlaylist = await request(baseUrl, '/playlists?/create', {
 			method: 'POST',
@@ -512,18 +680,49 @@ async function main() {
 			headers: formHeaders(baseUrl, ownerCookie),
 			body: form({ playlistPublicId, trackPublicId: String(publicId) })
 		});
+		const addSecond = await request(baseUrl, `/tracks/${noCoverPublicId}?/addToPlaylist`, {
+			method: 'POST',
+			headers: formHeaders(baseUrl, ownerCookie),
+			body: form({ playlistPublicId, trackPublicId: String(noCoverPublicId) })
+		});
+		const membershipCountAfterAdds = await collections.playlistItems.countDocuments({
+			playlistId: playlistDocument._id
+		});
+		const addFirstLocation = addFirst.headers.get('location') ?? '';
+		const addDuplicateLocation = addDuplicate.headers.get('location') ?? '';
+		const addSecondLocation = addSecond.headers.get('location') ?? '';
+		if (
+			addFirst.status !== 303 ||
+			addDuplicate.status !== 303 ||
+			addSecond.status !== 303 ||
+			!addFirstLocation.includes('playlistStatus=added') ||
+			!addDuplicateLocation.includes('playlistStatus=already-added') ||
+			!addSecondLocation.includes('playlistStatus=added') ||
+			membershipCountAfterAdds !== 2
+		) {
+			throw Object.assign(new Error('Playlist HTTP add flow did not reach its safe state.'), {
+				safeContext: {
+					addFirstStatus: addFirst.status,
+					addDuplicateStatus: addDuplicate.status,
+					addSecondStatus: addSecond.status,
+					addFirstLocation,
+					addDuplicateLocation,
+					addSecondLocation,
+					membershipCountAfterAdds
+				}
+			});
+		}
 		await check('add-to-playlist is transactional and duplicate membership is idempotent', async () => {
 			assert.equal(addFirst.status, 303);
 			assert.match(addFirst.headers.get('location') ?? '', /playlistStatus=added/);
 			assert.equal(addDuplicate.status, 303);
 			assert.match(addDuplicate.headers.get('location') ?? '', /playlistStatus=already-added/);
-			assert.equal(
-				await collections.playlistItems.countDocuments({ playlistId: playlistDocument._id }),
-				1
-			);
+			assert.equal(addSecond.status, 303);
+			assert.equal(membershipCountAfterAdds, 2);
 		});
 		await addFirst.body?.cancel();
 		await addDuplicate.body?.cancel();
+		await addSecond.body?.cancel();
 
 		const removeFirst = await request(
 			baseUrl,
@@ -542,11 +741,8 @@ async function main() {
 		await check('playlist detail removes one exact membership without deleting the track', async () => {
 			assert.equal(removeFirst.status, 303);
 			assert.equal(readdFirst.status, 303);
-			assert.equal(await collections.tracks.countDocuments({}), 1);
-			assert.equal(
-				await collections.playlistItems.countDocuments({ playlistId: playlistDocument._id }),
-				1
-			);
+			assert.equal(await collections.tracks.countDocuments({}), 2);
+			assert.equal(await collections.playlistItems.countDocuments({ playlistId: playlistDocument._id }), 2);
 		});
 		await removeFirst.body?.cancel();
 		await readdFirst.body?.cancel();
@@ -558,7 +754,7 @@ async function main() {
 			assert.equal(
 				(browseHtml.match(/<article class="track-card(?:\s|")/g) ?? [])
 					.length,
-				1
+				2
 			);
 		});
 		await check('logged-out Browse uses the real login flow for playlist actions', () => {
@@ -567,8 +763,55 @@ async function main() {
 		});
 
 		const detail = await request(baseUrl, `/tracks/${publicId}`);
+		const detailHtml = await detail.text();
 		await check('public detail resolves', () => assert.equal(detail.status, 200));
-		await detail.body?.cancel();
+
+		const publicCover = await request(
+			baseUrl,
+			`/api/tracks/${publicId}/cover`
+		);
+		const publicCoverBytes = new Uint8Array(await publicCover.arrayBuffer());
+		await check('public cover returns bounded PNG bytes and safe headers', () => {
+			assert.equal(typeof storedCoverKey, 'string');
+			assert.equal(publicCover.status, 200);
+			assert.equal(publicCover.headers.get('content-type'), 'image/png');
+			assert.equal(
+				publicCover.headers.get('content-length'),
+				String(SYNTHETIC_PNG.byteLength)
+			);
+			assert.deepEqual(publicCoverBytes, SYNTHETIC_PNG);
+			assert.equal(
+				[...publicCover.headers.values()].join('\n').includes(storedCoverKey),
+				false
+			);
+		});
+
+		await collections.tracks.updateOne(
+			{ publicId },
+			{ $set: { visibility: 'private' } }
+		);
+		const anonymousPrivateCover = await request(
+			baseUrl,
+			`/api/tracks/${publicId}/cover`
+		);
+		const ownerPrivateCover = await request(
+			baseUrl,
+			`/api/tracks/${publicId}/cover`,
+			{ headers: { cookie: ownerCookie } }
+		);
+		const ownerPrivateCoverBytes = new Uint8Array(
+			await ownerPrivateCover.arrayBuffer()
+		);
+		await collections.tracks.updateOne(
+			{ publicId },
+			{ $set: { visibility: 'public' } }
+		);
+		await check('private cover is hidden publicly but available to its exact owner', () => {
+			assert.equal(anonymousPrivateCover.status, 404);
+			assert.equal(ownerPrivateCover.status, 200);
+			assert.deepEqual(ownerPrivateCoverBytes, SYNTHETIC_PNG);
+		});
+		await anonymousPrivateCover.body?.cancel();
 
 		const fullStream = await request(
 			baseUrl,
@@ -612,7 +855,7 @@ async function main() {
 			assert.equal(
 				(myTracksHtml.match(/<article class="owner-track-card(?:\s|")/g) ??
 					[]).length,
-				1
+				2
 			);
 		});
 		await check('authenticated add-to-playlist UI lists owned membership safely', () => {
@@ -620,6 +863,13 @@ async function main() {
 			assert.ok(myTracksHtml.includes('?/removeFromPlaylist'));
 			assert.equal(myTracksHtml.includes(playlistDocument._id), false);
 			assert.equal(myTracksHtml.includes(playlistDocument.ownerId), false);
+		});
+		await check('browser HTML never exposes the private cover storage key', () => {
+			assert.equal(typeof storedCoverKey, 'string');
+			for (const html of [browseHtml, detailHtml, myTracksHtml]) {
+				assert.equal(html.includes(storedCoverKey), false);
+				assert.equal(html.includes(temporaryCoverRoot), false);
+			}
 		});
 
 		const edit = await request(
@@ -647,7 +897,8 @@ async function main() {
 						_id: 0,
 						title: 1,
 						bpm: 1,
-						ownerId: 1
+						ownerId: 1,
+						coverImage: 1
 					}
 				}
 			);
@@ -658,6 +909,7 @@ async function main() {
 			assert.equal(track?.title, 'M7 synthetic upload updated');
 			assert.equal(track?.bpm, 129);
 			assert.equal(track?.ownerId, owner?._id);
+			assert.equal(track?.coverImage?.storageKey, storedCoverKey);
 		});
 		await edit.body?.cancel();
 
@@ -698,10 +950,7 @@ async function main() {
 			assert.equal(forbiddenPlaylist.status, 404);
 			assert.equal(forbiddenPlaylistAdd.status, 303);
 			assert.match(forbiddenPlaylistAdd.headers.get('location') ?? '', /playlistStatus=error/);
-			assert.equal(
-				await collections.playlistItems.countDocuments({ playlistId: playlistDocument._id }),
-				1
-			);
+			assert.equal(await collections.playlistItems.countDocuments({ playlistId: playlistDocument._id }), 2);
 		});
 		await forbiddenPlaylist.body?.cancel();
 		await forbiddenPlaylistAdd.body?.cancel();
@@ -715,6 +964,26 @@ async function main() {
 			assert.equal(forbiddenEdit.status, 404)
 		);
 		await forbiddenEdit.body?.cancel();
+
+		await collections.tracks.updateOne(
+			{ publicId },
+			{ $set: { visibility: 'private' } }
+		);
+		const forbiddenPrivateCover = await request(
+			baseUrl,
+			`/api/tracks/${publicId}/cover`,
+			{ headers: { cookie: otherCookie } }
+		);
+		await collections.tracks.updateOne(
+			{ publicId },
+			{ $set: { visibility: 'public' } }
+		);
+		const forbiddenPrivateCoverBody = await forbiddenPrivateCover.text();
+		await check('private cover denies a different authenticated owner safely', () => {
+			assert.equal(forbiddenPrivateCover.status, 404);
+			assert.equal(forbiddenPrivateCoverBody.includes(storedCoverKey), false);
+			assert.equal(forbiddenPrivateCoverBody.includes(temporaryCoverRoot), false);
+		});
 
 		const forbiddenDelete = await request(
 			baseUrl,
@@ -743,14 +1012,33 @@ async function main() {
 		await check('owner delete removes MongoDB metadata', async () => {
 			assert.equal(ownerDelete.status, 303);
 			assert.equal(await collections.tracks.countDocuments({ publicId }), 0);
-			assert.equal(
-				await collections.playlistItems.countDocuments({ playlistId: playlistDocument._id }),
-				0
-			);
+			assert.equal(await collections.tracks.countDocuments({}), 1);
+			assert.equal(await collections.playlistItems.countDocuments({ playlistId: playlistDocument._id }), 1);
 		});
 		await ownerDelete.body?.cancel();
+
+		const ownerNoCoverDelete = await request(
+			baseUrl,
+			`/my-tracks/${noCoverPublicId}/delete`,
+			{
+				method: 'POST',
+				headers: formHeaders(baseUrl, ownerCookie),
+				body: form({})
+			}
+		);
+		await check('owner deletion also handles an upload without a cover', async () => {
+			assert.equal(ownerNoCoverDelete.status, 303);
+			assert.equal(
+				await collections.tracks.countDocuments({ publicId: noCoverPublicId }),
+				0
+			);
+			assert.equal(await collections.tracks.countDocuments({}), 0);
+			assert.equal(await collections.playlistItems.countDocuments({ playlistId: playlistDocument._id }), 0);
+		});
+		await ownerNoCoverDelete.body?.cancel();
 		await check('owner delete removes audio and quarantine artifacts', async () => {
 			assert.deepEqual(await directoryFileNames(temporaryAudioRoot), []);
+			assert.deepEqual(await directoryFileNames(temporaryCoverRoot), []);
 		});
 
 		const unconfirmedPlaylistDelete = await request(
@@ -819,6 +1107,17 @@ async function main() {
 			cleanupFailures.push({ error, step: activeStep });
 		}
 
+		beginStep('owned application log closure');
+		try {
+			if (serverLogStream) {
+				serverLogStream.end();
+				await finished(serverLogStream);
+			}
+			cleanup.serverLogClosed = true;
+		} catch (error) {
+			cleanupFailures.push({ error, step: activeStep });
+		}
+
 		beginStep('exact owned MongoDB database cleanup');
 		try {
 			if (database && ownedName) {
@@ -859,6 +1158,7 @@ async function main() {
 				assert.ok(isOwnedTemporaryRoot(temporaryRoot));
 				await rm(temporaryRoot, { recursive: true, force: true });
 				cleanup.temporaryRootRemoved = !existsSync(temporaryRoot);
+				cleanup.serverLogRemoved = serverLogPath ? !existsSync(serverLogPath) : true;
 			}
 		} catch (error) {
 			cleanupFailures.push({ error, step: activeStep });
@@ -883,7 +1183,13 @@ async function main() {
 		);
 		console.error(
 			`SERVER STATUS: ${JSON.stringify({
-				stderrCategory: safeServerLogCategory(stderrTail)
+				...safeServerStatus(stdoutTail, stderrTail, primaryFailure.error),
+				effectiveUploadLimits: {
+					MAX_AUDIO_FILE_SIZE_MB: childUploadLimits?.MAX_AUDIO_FILE_SIZE_MB ?? 'missing',
+					COVER_IMAGE_MAX_SIZE_MB:
+						childUploadLimits?.COVER_IMAGE_MAX_SIZE_MB ?? 'missing; 5 MB default applies',
+					BODY_SIZE_LIMIT: childUploadLimits?.BODY_SIZE_LIMIT ?? 'missing'
+				}
 			})}`
 		);
 	}
@@ -905,7 +1211,18 @@ async function main() {
 		assert.equal(cleanup.unknownDatabasesPreserved, true);
 	});
 	await check('temporary audio and integration root are removed', () =>
-		assert.equal(cleanup.temporaryRootRemoved, true)
+		assert.deepEqual(
+			{
+				temporaryRootRemoved: cleanup.temporaryRootRemoved,
+				serverLogClosed: cleanup.serverLogClosed,
+				serverLogRemoved: cleanup.serverLogRemoved
+			},
+			{
+				temporaryRootRemoved: true,
+				serverLogClosed: true,
+				serverLogRemoved: true
+			}
+		)
 	);
 	await check('owned process, port, MongoClient, and sessions are closed', () => {
 		assert.equal(cleanup.childStopped, true);

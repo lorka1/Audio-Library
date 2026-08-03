@@ -148,6 +148,7 @@ describe('MongoDB playlist repository safe detail projection', () => {
 					ownerId: 'another-owner',
 					title: 'Synthetic public track',
 					artist: 'Synthetic artist',
+					coverImage: { storageKey: 'private-cover.webp', mimeType: 'image/webp', byteSize: 64 },
 					bpm: null,
 					musicalKey: null,
 					genre: null,
@@ -162,6 +163,7 @@ describe('MongoDB playlist repository safe detail projection', () => {
 					ownerId: 'another-owner',
 					title: 'Hidden private track',
 					artist: 'Hidden artist',
+					coverImage: null,
 					bpm: null,
 					musicalKey: null,
 					genre: null,
@@ -185,8 +187,9 @@ describe('MongoDB playlist repository safe detail projection', () => {
 		expect(result?.tracks).toHaveLength(1);
 		expect(result?.unavailableTrackCount).toBe(2);
 		const serialized = JSON.stringify(result);
-		for (const secret of [playlistId, ownerId, 'another-owner', 'Hidden private track']) {
+		for (const secret of [playlistId, ownerId, 'another-owner', 'private-cover.webp', 'Hidden private track']) {
 			expect(serialized).not.toContain(secret);
 		}
+		expect(serialized).toContain('/api/tracks/21/cover');
 	});
 });

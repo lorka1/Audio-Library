@@ -3,7 +3,7 @@ import { lstat, mkdir, open, realpath, rename, unlink } from 'node:fs/promises';
 import type { ReadStream } from 'node:fs';
 import { extname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { Readable } from 'node:stream';
-import { serverConfig } from '$lib/server/config';
+import { getServerConfig } from '$lib/server/config';
 import { logTrackStorageError } from './logging';
 
 export const AUDIO_FORMATS = {
@@ -152,7 +152,7 @@ export function resolveStorageFilePath(root: string, storedFilename: string): st
 }
 
 export async function ensureAudioStorageDirectory(
-	root = serverConfig.audioStoragePath
+	root = getServerConfig().audioStoragePath
 ): Promise<string> {
 	const storageRoot = resolveStorageRoot(root);
 	await mkdir(storageRoot, { recursive: true });
@@ -162,7 +162,7 @@ export async function ensureAudioStorageDirectory(
 export async function saveAudioFile(
 	file: File,
 	extension: AudioExtension,
-	root = serverConfig.audioStoragePath
+	root = getServerConfig().audioStoragePath
 ): Promise<{ storedFilename: string; fileSizeBytes: number }> {
 	if (!(file instanceof File)) {
 		throw new Error('A valid audio File is required.');
@@ -225,7 +225,7 @@ export async function saveAudioFile(
 
 export async function deleteStoredAudioFile(
 	storedFilename: string,
-	root = serverConfig.audioStoragePath
+	root = getServerConfig().audioStoragePath
 ): Promise<void> {
 	const filePath = resolveStorageFilePath(root, storedFilename);
 
@@ -243,7 +243,7 @@ export async function deleteStoredAudioFile(
 
 export async function quarantineStoredAudioFile(
 	storedFilename: string,
-	root = serverConfig.audioStoragePath
+	root = getServerConfig().audioStoragePath
 ): Promise<QuarantineStoredAudioFileResult> {
 	let filePath: string;
 
@@ -347,7 +347,7 @@ export async function deleteQuarantinedAudioFile(
 
 export async function openStoredAudioFile(
 	storedFilename: string,
-	root = serverConfig.audioStoragePath
+	root = getServerConfig().audioStoragePath
 ): Promise<OpenStoredAudioFileResult> {
 	let filePath: string;
 

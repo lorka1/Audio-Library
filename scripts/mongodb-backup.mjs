@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { spawn, spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { mkdir, readdir, rm, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
@@ -10,6 +10,11 @@ import {
 	requireSafeDestinationRoot,
 	safeDatabaseIdentifier
 } from './lib/backup-safety.mjs';
+import {
+	MongoDatabaseToolResolutionError,
+	probeMongoDatabaseTool,
+	resolveMongoDatabaseTool
+} from './lib/mongodb-database-tools.mjs';
 
 const config = readMongoConfig(process.env);
 const root = requireSafeDestinationRoot(process.env.MONGODB_BACKUP_ROOT, 'MONGODB_BACKUP_ROOT');
@@ -17,23 +22,10 @@ const destination = await createExclusiveBackupDirectory(root, 'mongodb');
 const incompleteMarker = resolve(destination, 'INCOMPLETE');
 const manifestPath = resolve(destination, 'manifest.json');
 await writeFile(incompleteMarker, 'Backup has not completed.\n', { flag: 'wx' });
-const mongodumpBinary = process.env.MONGODUMP_BINARY?.trim() || 'mongodump';
-
-function toolVersion(command) {
-	const result = spawnSync(command, ['--version'], {
-		encoding: 'utf8',
-		timeout: 5_000,
-		windowsHide: true
-	});
-	if (result.error || result.status !== 0) throw result.error ?? new Error('Unable to read mongodump version.');
-	const version = `${result.stdout}${result.stderr}`.match(/\b\d+\.\d+\.\d+\b/)?.[0];
-	if (!version) throw new Error('Unable to identify mongodump version safely.');
-	return version;
-}
-
 function run(command, args, timeoutMs = 10 * 60_000) {
 	return new Promise((resolveRun, rejectRun) => {
 		const child = spawn(command, args, {
+			shell: false,
 			stdio: ['ignore', 'ignore', 'pipe'],
 			windowsHide: true
 		});
@@ -51,17 +43,21 @@ function run(command, args, timeoutMs = 10 * 60_000) {
 			clearTimeout(timer);
 			rejectRun(error);
 		});
-		child.once('close', (code) => {
+		child.once('close', (code, signal) => {
 			clearTimeout(timer);
 			if (code === 0) resolveRun(stderr);
-			else rejectRun(new Error('mongodump exited unsuccessfully.'));
+			else rejectRun(Object.assign(new Error('mongodump exited unsuccessfully.'), {
+				code,
+				signal
+			}));
 		});
 	});
 }
 
 try {
-	const version = toolVersion(mongodumpBinary);
-	await run(mongodumpBinary, [
+	const mongodump = await resolveMongoDatabaseTool('mongodump');
+	const version = probeMongoDatabaseTool('mongodump', mongodump.executablePath);
+	await run(mongodump.executablePath, [
 		'--uri', config.uri,
 		'--db', config.databaseName,
 		'--out', resolve(destination, 'dump'),
@@ -99,8 +95,8 @@ try {
 		{ flag: existsSync(manifestPath) ? 'w' : 'wx' }
 	).catch(() => undefined);
 	console.error(
-		error?.code === 'ENOENT'
-			? 'MongoDB backup failed because mongodump is not installed or not on PATH.'
+		error instanceof MongoDatabaseToolResolutionError
+			? error.message
 			: 'MongoDB backup failed; the destination remains clearly marked incomplete.'
 	);
 	process.exitCode = 1;

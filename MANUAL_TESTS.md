@@ -14,15 +14,15 @@ used for any real service.
 
 - [ ] Register with synthetic details, then verify duplicate username/email and invalid-field feedback.
 - [ ] Log in, refresh the session, log out through POST, and confirm protected routes return to their original safe destination after login.
-- [ ] Upload one valid MP3, WAV, and OGG file; confirm each creates exactly one owned public track and one private stored file.
+- [ ] Upload one valid MP3, WAV, and OGG file, with and without optional cover images; confirm each creates exactly one owned public track and only the expected private stored files.
 - [ ] Try empty, oversized, unsupported, extension/MIME-mismatched, and invalid-metadata uploads; confirm no file or row remains.
 - [ ] Browse public list, detail, and empty states while signed out.
 - [ ] Exercise title/artist/description search, BPM/key/genre filters, all sort modes, URL refresh/reset/share behavior, and private-track exclusion.
 - [ ] Play, pause, seek, and inspect a 206 range response; verify the native-player fallback link.
 - [ ] Download a track with spaces and Croatian characters; verify its safe original-facing name, byte count, and security headers.
 - [ ] Open My Tracks with owners who have public, private, and empty libraries; confirm owner isolation and text visibility labels.
-- [ ] Edit an owned track, then try a non-owner URL and forged immutable fields; confirm safe 404 behavior and unchanged IDs, ownership, filenames, visibility, and audio.
-- [ ] Cancel one deletion, confirm another through POST, try a non-owner deletion, refresh the redirect, and replay an unrelated track.
+- [ ] Edit an owned track and retain, replace, then remove its cover; try a non-owner URL and forged immutable fields, and confirm safe 404 behavior and unchanged IDs, ownership, filenames, visibility, and audio.
+- [ ] Cancel one deletion, confirm another through POST, try a non-owner deletion, refresh the redirect, and confirm the owned audio and cover are removed without affecting unrelated media.
 - [ ] Review signed-in and signed-out navigation, forms, filters, cards, metadata, player, and action groups at 360, 768, 1024, and 1440 px with no horizontal overflow.
 - [ ] Complete every workflow by keyboard; verify the skip link, visible focus, labels, error announcements, success announcements, and text status cues.
 - [ ] Open invalid, missing, private, and unauthorized URLs and simulate an unexpected error in a disposable environment; confirm clean pages with no internal details.
@@ -179,6 +179,68 @@ used for any real service.
 
 - [ ] Refresh the detail page reached after UPL-020.
 - [ ] Expected: No duplicate track row or physical audio file is created.
+
+## Optional cover images
+
+### COV-001 — Upload without a cover
+
+- [ ] Upload a valid track without choosing a cover image.
+- [ ] Expected: The upload succeeds, no cover file is written, and the local fallback artwork appears on Browse, public detail, My Tracks, the owner edit page, and the global player.
+
+### COV-002 — Supported raster formats
+
+- [ ] In separate disposable uploads, select a non-empty `.jpg`/`.jpeg` reported as `image/jpeg`, a `.png` reported as `image/png`, and a `.webp` reported as `image/webp`.
+- [ ] Expected: Each upload succeeds within `COVER_IMAGE_MAX_SIZE_MB`, stores one generated file in the private `AUDIO_STORAGE_PATH/covers` directory, and displays it in every applicable track view.
+
+### COV-003 — Unsafe or mismatched format
+
+- [ ] Attempt SVG and HTML uploads, then forge a supported extension with the wrong MIME type and a supported MIME type with the wrong extension.
+- [ ] Expected: The server rejects every file with a clear cover-field error; no audio, cover, or track row is left behind.
+
+### COV-004 — Empty and oversized cover
+
+- [ ] Submit a zero-byte cover, then a valid raster image larger than `COVER_IMAGE_MAX_SIZE_MB`.
+- [ ] Expected: Both are rejected with cover-specific validation feedback and no orphan audio or cover file.
+
+### COV-005 — Safe generated storage name
+
+- [ ] Upload a cover whose original filename contains path separators or traversal text and inspect only the disposable private storage and MongoDB document.
+- [ ] Expected: The stored cover uses a generated UUID-based name inside `AUDIO_STORAGE_PATH/covers`; the original name cannot affect its path, and browser data never contains the storage key or physical path.
+
+### COV-006 — Public cover delivery
+
+- [ ] Request `/api/tracks/{id}/cover` for a covered public track.
+- [ ] Expected: The response has the correct JPEG, PNG, or WebP `Content-Type`, bounded `Content-Length`, safe caching and nosniff headers, and contains only that track's cover bytes.
+
+### COV-007 — Private, missing, and legacy cover behavior
+
+- [ ] Request the cover route for a private track, an invalid or missing ID, a legacy track without cover metadata, and a disposable track whose cover file was temporarily removed.
+- [ ] Expected: Public requests receive the same safe unavailable/not-found behavior without storage details, while every UI surface shows fallback artwork instead of a broken-image icon.
+
+### COV-008 — Owner retain, replace, and remove
+
+- [ ] Open an owned track's edit page, first submit while retaining its cover, then replace it with another supported image, and finally remove it.
+- [ ] Expected: Retain leaves the original unchanged; replace shows the new cover everywhere and removes the old file only after persistence succeeds; remove switches every view to fallback artwork.
+
+### COV-009 — Non-owner cover protection
+
+- [ ] As another user, request the edit URL and forge POST bodies that attempt cover replacement or removal.
+- [ ] Expected: The application returns the same safe 404 as other owner operations and changes neither MongoDB metadata nor either user's files.
+
+### COV-010 — Upload and replacement rollback
+
+- [ ] In a disposable environment, simulate cover-write and MongoDB failures during covered upload and replacement.
+- [ ] Expected: Cover-write failure leaves no orphan audio; failed database insertion removes only newly written audio and cover files; failed replacement preserves the previous metadata and cover.
+
+### COV-011 — Delete and rollback
+
+- [ ] Delete a disposable covered track, then repeat with a simulated database deletion failure and with an already missing cover file.
+- [ ] Expected: Successful deletion quarantines and removes its audio and cover; database failure restores both; a missing cover remains safe and does not prevent removal of the owned row and audio.
+
+### COV-012 — Cover accessibility and responsive fallback
+
+- [ ] Inspect covered and fallback tracks at 390×844, 768×1024, 1024×768, 1440×900, and 1920×1080 using keyboard and a screen reader.
+- [ ] Expected: Images have meaningful or intentionally empty alt text, artwork is not required to identify a track, player and rows do not overflow, and image-load failure changes to the fallback without a broken-image icon.
 
 ## Public track browsing
 
@@ -617,6 +679,6 @@ used for any real service.
 - [ ] Confirm public search covers title, artist, and description; BPM, musical-key, and genre filters can be combined; and all five server-side sort options work.
 - [ ] Confirm filter state is URL-driven, survives refresh and sharing, works without JavaScript, and can be reset to `/tracks`.
 - [ ] Confirm `/my-tracks` includes only the authenticated owner's public and private tracks.
-- [ ] Confirm owner-only metadata editing preserves ownership, visibility, IDs, filenames, and audio bytes.
-- [ ] Confirm deletion requires confirmation and POST, removes only the owned row and correct file, and uses Post/Redirect/Get.
+- [ ] Confirm owner-only metadata and cover editing preserves ownership, visibility, IDs, filenames, and audio bytes while safely retaining, replacing, or removing the optional cover.
+- [ ] Confirm deletion requires confirmation and POST, removes only the owned row and its correct audio/cover files, restores quarantined files on database failure, and uses Post/Redirect/Get.
 - [ ] Confirm private user-owned playlists remain available, and that the remaining future features are absent: audio-file replacement, visibility controls, pagination, automatic analysis, transcoding, waveform generation, comments, ratings, recommendations, and administrator functionality.

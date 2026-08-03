@@ -4,17 +4,22 @@ export interface PublicPlayerTrack {
 	id: number;
 	title: string;
 	artist: string;
+	coverImageUrl: string | null;
 	streamUrl: string;
 	detailsUrl: string;
 }
 
-export type PlayerTrackSource = Pick<PublicTrack, 'id' | 'title' | 'artist'>;
+export type PlayerTrackSource = Pick<
+	PublicTrack,
+	'id' | 'title' | 'artist' | 'coverImageUrl'
+>;
 
 export function toPublicPlayerTrack(track: PlayerTrackSource): PublicPlayerTrack {
 	return {
 		id: track.id,
 		title: track.title,
 		artist: track.artist,
+		coverImageUrl: track.coverImageUrl,
 		streamUrl: `/api/tracks/${track.id}/stream`,
 		detailsUrl: `/tracks/${track.id}`
 	};

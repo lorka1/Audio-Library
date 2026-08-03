@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { AudioPlayerController } from '$lib/player/controller';
 	import { formatPlaybackTime } from '$lib/player/model';
+	import TrackCover from './TrackCover.svelte';
 
 	let { player }: { player: AudioPlayerController } = $props();
 
@@ -80,17 +81,25 @@
 	<aside class="global-player" aria-label="Now playing">
 		<div class="global-player__inner">
 			<div class="global-player__identity">
-				<p class="global-player__status">
-					{state.status === 'error'
-						? 'Playback unavailable'
-						: state.status === 'loading'
-							? 'Loading'
-							: state.status === 'playing'
-								? 'Now playing'
-								: 'Paused'}
-				</p>
-				<a href={state.track.detailsUrl}>{state.track.title}</a>
-				<p>{state.track.artist}</p>
+				<TrackCover
+					coverImageUrl={state.track.coverImageUrl}
+					title={state.track.title}
+					variant="player"
+					loading="eager"
+				/>
+				<div class="global-player__track-copy">
+					<p class="global-player__status">
+						{state.status === 'error'
+							? 'Playback unavailable'
+							: state.status === 'loading'
+								? 'Loading'
+								: state.status === 'playing'
+									? 'Now playing'
+									: 'Paused'}
+					</p>
+					<a href={state.track.detailsUrl}>{state.track.title}</a>
+					<p>{state.track.artist}</p>
+				</div>
 			</div>
 
 			<div class="global-player__playback">
@@ -189,6 +198,14 @@
 	}
 
 	.global-player__identity {
+		display: grid;
+		grid-template-columns: auto minmax(0, 1fr);
+		align-items: center;
+		gap: 0.75rem;
+		min-width: 0;
+	}
+
+	.global-player__track-copy {
 		min-width: 0;
 	}
 

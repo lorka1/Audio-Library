@@ -114,7 +114,17 @@ try {
 				}
 			),
 			collections.tracks
-				.find({}, { projection: { _id: 0, storageKey: 1 }, timeoutMS: 5_000 })
+				.find(
+					{},
+					{
+						projection: {
+							_id: 0,
+							storageKey: 1,
+							'coverImage.storageKey': 1
+						},
+						timeoutMS: 5_000
+					}
+				)
 				.toArray()
 		]);
 
@@ -137,9 +147,17 @@ try {
 			names.every((name) => actualIndexes[collection].includes(name))
 	);
 	const audioRoot = configuredPath(process.env.AUDIO_STORAGE_PATH, 'storage/audio');
+	const storageReferences = new Set(
+		tracks.flatMap(({ storageKey, coverImage }) => [
+			storageKey.split('\\').join('/'),
+			...(coverImage?.storageKey
+				? [`covers/${coverImage.storageKey.split('\\').join('/')}`]
+				: [])
+		])
+	);
 	const audio = await audioAudit(
 		audioRoot,
-		new Set(tracks.map(({ storageKey }) => storageKey.split('\\').join('/')))
+		storageReferences
 	);
 	const aggregateAfter = await safeMongoAggregateFingerprint(collections);
 	const markerComplete =

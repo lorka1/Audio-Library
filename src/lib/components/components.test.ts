@@ -5,8 +5,10 @@ import type { PublicPlayerTrack } from '$lib/player/model';
 import type { PublicTrack } from '$lib/types';
 import GlobalAudioPlayer from './GlobalAudioPlayer.svelte';
 import AddToPlaylist from './AddToPlaylist.svelte';
+import CoverImageField from './CoverImageField.svelte';
 import SiteHeader from './SiteHeader.svelte';
 import TrackCard from './TrackCard.svelte';
+import TrackCover from './TrackCover.svelte';
 import TrackFilters from './TrackFilters.svelte';
 import TrackPlayButton from './TrackPlayButton.svelte';
 
@@ -14,6 +16,7 @@ const playerTrack: PublicPlayerTrack = {
 	id: 21,
 	title: 'Release Fixture Track',
 	artist: 'Fixture Artist',
+	coverImageUrl: '/api/tracks/21/cover',
 	streamUrl: '/api/tracks/21/stream',
 	detailsUrl: '/tracks/21'
 };
@@ -26,6 +29,7 @@ const publicTrack: PublicTrack = {
 	musicalKey: 'A minor',
 	genre: 'Electronic',
 	description: 'Synthetic fixture.',
+	coverImageUrl: '/api/tracks/21/cover',
 	fileSizeBytes: 1024,
 	ownerUsername: 'fixture_owner',
 	createdAt: '2026-07-26T12:00:00.000Z',
@@ -42,6 +46,7 @@ describe('global playback components', () => {
 		expect(body).toContain('Release Fixture Track');
 		expect(body).toContain('Fixture Artist');
 		expect(body).toContain('href="/tracks/21"');
+		expect(body).toContain('src="/api/tracks/21/cover"');
 		expect(body).toContain('aria-label="Seek Release Fixture Track"');
 		expect(body).toContain('aria-label="Volume"');
 		expect(body).not.toContain('aria-label="Close audio player"');
@@ -55,7 +60,21 @@ describe('global playback components', () => {
 
 		expect(body).toContain('aria-label="Play Release Fixture Track"');
 		expect(body).toContain('href="/tracks/21"');
+		expect(body).toContain('src="/api/tracks/21/cover"');
 		expect(body).not.toContain('<audio');
+	});
+
+	it('renders the local fallback cover when a track has no uploaded cover', () => {
+		const { body } = render(TrackCover, {
+			props: {
+				coverImageUrl: null,
+				title: 'Fallback Fixture',
+				variant: 'row'
+			}
+		});
+
+		expect(body).toContain('track-cover__fallback');
+		expect(body).not.toContain('<img');
 	});
 
 	it('uses active and paused accessibility labels for the selected track', () => {
@@ -76,6 +95,39 @@ describe('global playback components', () => {
 		}).body;
 		expect(paused).toContain('aria-label="Resume Release Fixture Track"');
 		expect(paused).toContain('Paused');
+	});
+});
+
+describe('cover image controls', () => {
+	it('renders an optional private-upload control with safe formats and fallback preview', () => {
+		const { body } = render(CoverImageField, {
+			props: {
+				maxSizeMb: 5,
+				currentCoverImageUrl: null,
+				trackTitle: 'New track'
+			}
+		});
+
+		expect(body).toContain('name="coverImage"');
+		expect(body).toContain('image/jpeg,image/png,image/webp');
+		expect(body).toContain('Maximum file size: 5 MB');
+		expect(body).toContain('track-cover__fallback');
+		expect(body).not.toContain('removeCoverImage');
+	});
+
+	it('offers owner removal without exposing a private storage key', () => {
+		const { body } = render(CoverImageField, {
+			props: {
+				maxSizeMb: 5,
+				currentCoverImageUrl: '/api/tracks/21/cover',
+				allowRemoval: true,
+				trackTitle: 'Covered track'
+			}
+		});
+
+		expect(body).toContain('src="/api/tracks/21/cover"');
+		expect(body).toContain('name="removeCoverImage"');
+		expect(body).not.toContain('storageKey');
 	});
 });
 

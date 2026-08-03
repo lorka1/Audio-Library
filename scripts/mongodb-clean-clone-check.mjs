@@ -23,6 +23,8 @@ import {
 import { getMongoCollections } from '../src/lib/server/mongodb/collections.ts';
 import { TRACK_PUBLIC_ID_COUNTER } from '../src/lib/server/mongodb/documents.ts';
 import { safeMongoAggregateFingerprint } from './lib/mongodb-fingerprint.mjs';
+import { resolveMongoDatabaseTool } from './lib/mongodb-database-tools.mjs';
+import { createSyntheticApplicationEnvironment } from './lib/synthetic-app-environment.mjs';
 
 const COMMAND_TIMEOUT_MS = 10 * 60_000;
 const STARTUP_TIMEOUT_MS = 45_000;
@@ -219,9 +221,12 @@ let server;
 let serverClosePromise = Promise.resolve();
 let serverPort;
 let primaryFailure;
+let ownedDatabaseAuthorizedForCleanup = false;
 const cleanupFailures = [];
 
 try {
+	const mongodump = await resolveMongoDatabaseTool('mongodump');
+	const mongorestore = await resolveMongoDatabaseTool('mongorestore');
 	const client = await manager.connect();
 	const listed = await client.db('admin').admin().listDatabases({ nameOnly: true });
 	initialTestDatabases = listed.databases
@@ -229,6 +234,7 @@ try {
 		.filter((name) => name.startsWith(MONGODB_TEST_DATABASE_PREFIX))
 		.sort();
 	assert.equal(initialTestDatabases.includes(ownedDatabase), false);
+	ownedDatabaseAuthorizedForCleanup = true;
 	const collections = getMongoCollections(client.db(config.databaseName));
 	realBefore = {
 		fingerprint: await safeMongoAggregateFingerprint(collections),
@@ -252,15 +258,17 @@ try {
 		false
 	);
 
-	const environment = {
-		...process.env,
+	const environment = createSyntheticApplicationEnvironment({
 		AUDIO_STORAGE_PATH: audioRoot,
 		CI: '1',
+		MONGODUMP_PATH: mongodump.executablePath,
+		MONGORESTORE_PATH: mongorestore.executablePath,
+		MONGODB_URI: config.uri,
 		MONGODB_DB_NAME: ownedDatabase,
 		MONGODB_TEST_DB_NAME: config.testDatabaseName,
 		NO_COLOR: '1',
 		SESSION_COOKIE_NAME: `clean_${randomBytes(4).toString('hex')}`
-	};
+	});
 	delete environment.PORT;
 	delete environment.ORIGIN;
 
@@ -324,17 +332,22 @@ try {
 		try {
 			const client = await cleanupManager.connect();
 			const listed = await client.db('admin').admin().listDatabases({ nameOnly: true });
-			if (listed.databases.some(({ name }) => name === ownedDatabase)) {
+			if (
+				ownedDatabaseAuthorizedForCleanup &&
+				listed.databases.some(({ name }) => name === ownedDatabase)
+			) {
 				await client.db(ownedDatabase).dropDatabase({ timeoutMS: 10_000 });
 			}
 			const listedAfter = await client.db('admin').admin().listDatabases({ nameOnly: true });
-			assert.deepEqual(
-				listedAfter.databases
-					.map(({ name }) => name)
-					.filter((name) => name.startsWith(MONGODB_TEST_DATABASE_PREFIX))
-					.sort(),
-				initialTestDatabases
-			);
+			if (initialTestDatabases) {
+				assert.deepEqual(
+					listedAfter.databases
+						.map(({ name }) => name)
+						.filter((name) => name.startsWith(MONGODB_TEST_DATABASE_PREFIX))
+						.sort(),
+					initialTestDatabases
+				);
+			}
 			const collections = getMongoCollections(client.db(config.databaseName));
 			assert.equal(await safeMongoAggregateFingerprint(collections), realBefore.fingerprint);
 			assert.deepEqual(

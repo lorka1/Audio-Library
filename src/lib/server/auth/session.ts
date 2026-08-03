@@ -1,7 +1,7 @@
 import { dev } from '$app/environment';
 import type { Cookies } from '@sveltejs/kit';
 import { randomUUID } from 'node:crypto';
-import { serverConfig } from '$lib/server/config';
+import { getServerConfig } from '$lib/server/config';
 import { getAuthPersistence } from './persistence';
 import {
 	generateSessionToken,
@@ -21,7 +21,7 @@ const cookieBaseOptions = {
 
 export function prepareSession(userId: string, now = new Date()): PreparedSession {
 	const token = generateSessionToken();
-	const expiresAt = new Date(now.getTime() + serverConfig.sessionDurationMs);
+	const expiresAt = new Date(now.getTime() + getServerConfig().sessionDurationMs);
 
 	return {
 		token,
@@ -75,7 +75,7 @@ export async function deleteExpiredSessions(now = new Date()): Promise<void> {
 export function setSessionCookie(cookies: Cookies, token: string, expiresAt: Date): void {
 	const maxAge = Math.max(0, Math.floor((expiresAt.getTime() - Date.now()) / 1000));
 
-	cookies.set(serverConfig.sessionCookieName, token, {
+	cookies.set(getServerConfig().sessionCookieName, token, {
 		...cookieBaseOptions,
 		expires: expiresAt,
 		maxAge
@@ -83,5 +83,5 @@ export function setSessionCookie(cookies: Cookies, token: string, expiresAt: Dat
 }
 
 export function deleteSessionCookie(cookies: Cookies): void {
-	cookies.delete(serverConfig.sessionCookieName, cookieBaseOptions);
+	cookies.delete(getServerConfig().sessionCookieName, cookieBaseOptions);
 }

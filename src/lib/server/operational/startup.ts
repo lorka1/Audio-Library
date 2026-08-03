@@ -1,11 +1,15 @@
-import { serverConfig } from '../config';
+import { getServerConfig } from '../config';
 import {
 	closeMongoClient,
 	configureMongoApplicationConfig,
 	connectMongoDevelopment
 } from '../mongodb/client';
 import { verifyMongoOperationalState } from '../mongodb/verification';
-import { assertProductionRuntimeConfig, preparePrivateAudioStorage } from './config';
+import {
+	assertProductionRuntimeConfig,
+	preparePrivateAudioStorage,
+	preparePrivateCoverImageStorage
+} from './config';
 import { safeErrorFields, writeSafeLog } from './logging';
 
 const STARTUP_KEY = Symbol.for('audio-library.operational-startup');
@@ -16,8 +20,10 @@ export function initializeApplication(): Promise<void> {
 	if (state.promise) return state.promise;
 	const attempt = (async () => {
 		assertProductionRuntimeConfig(process.env);
-		configureMongoApplicationConfig(serverConfig.mongo);
-		await preparePrivateAudioStorage(serverConfig.audioStoragePath);
+		const config = getServerConfig();
+		configureMongoApplicationConfig(config.mongo);
+		await preparePrivateAudioStorage(config.audioStoragePath);
+		await preparePrivateCoverImageStorage(config.coverImageStoragePath);
 		const { client, database } = await connectMongoDevelopment();
 		await verifyMongoOperationalState(client, database);
 		writeSafeLog({ severity: 'info', category: 'configuration', code: 'startup_ready' });

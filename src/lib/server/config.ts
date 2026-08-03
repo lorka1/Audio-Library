@@ -1,8 +1,17 @@
 import { env } from '$env/dynamic/private';
-import { parseOperationalConfig } from './operational/config';
+import {
+	parseOperationalConfig,
+	type OperationalConfig,
+	type OperationalEnvironment
+} from './operational/config';
 
-export const serverConfig = parseOperationalConfig({
-	...env,
-	NODE_ENV: process.env.NODE_ENV,
-	ORIGIN: process.env.ORIGIN
-});
+export function getServerConfig(
+	environment: OperationalEnvironment = {
+		...env,
+		NODE_ENV: process.env.NODE_ENV,
+		ORIGIN: process.env.ORIGIN
+	},
+	projectRoot = process.cwd()
+): OperationalConfig {
+	return parseOperationalConfig(environment, projectRoot);
+}

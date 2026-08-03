@@ -10,11 +10,16 @@ import {
 	getValidatedAudioExtension,
 	type AudioExtension
 } from './files';
+import {
+	getValidatedCoverImageExtension,
+	type CoverImageExtension
+} from './cover-files';
 
 export const TRACK_TITLE_MAX_LENGTH = 120;
 export const TRACK_ARTIST_MAX_LENGTH = 120;
 export const TRACK_DESCRIPTION_MAX_LENGTH = 2000;
 export const ORIGINAL_FILENAME_MAX_LENGTH = 255;
+export const DEFAULT_COVER_IMAGE_MAX_SIZE_BYTES = 5 * 1024 * 1024;
 export { BPM_MAX, BPM_MIN };
 
 const musicalKeySet = new Set<string>(MUSICAL_KEYS);
@@ -31,9 +36,16 @@ export interface TrackMetadataFormValues {
 }
 
 export type UploadFormValues = TrackMetadataFormValues;
-export type TrackMetadataErrorField = keyof TrackMetadataFormValues | 'general';
+export type TrackMetadataErrorField =
+	| keyof TrackMetadataFormValues
+	| 'coverImage'
+	| 'general';
 export type TrackMetadataErrors = Partial<Record<TrackMetadataErrorField, string>>;
-export type UploadErrorField = keyof TrackMetadataFormValues | 'audioFile' | 'general';
+export type UploadErrorField =
+	| keyof TrackMetadataFormValues
+	| 'audioFile'
+	| 'coverImage'
+	| 'general';
 export type UploadErrors = Partial<Record<UploadErrorField, string>>;
 
 export interface ValidatedTrackMetadata {
@@ -52,17 +64,42 @@ export interface ValidatedAudioFile {
 	mimeType: string;
 }
 
+export interface ValidatedCoverImageFile {
+	file: File;
+	extension: CoverImageExtension;
+	mimeType: string;
+}
+
+export type CoverImageEditOperation =
+	| { kind: 'retain' }
+	| { kind: 'remove' }
+	| { kind: 'replace'; coverImage: ValidatedCoverImageFile };
+
 export type UploadValidationResult =
 	| {
 			success: true;
 			values: UploadFormValues;
 			metadata: ValidatedTrackMetadata;
 			audioFile: ValidatedAudioFile;
+			coverImage: ValidatedCoverImageFile | null;
 	  }
 	| {
 			success: false;
 			values: UploadFormValues;
 			errors: UploadErrors;
+	  };
+
+export type TrackEditValidationResult =
+	| {
+			success: true;
+			values: TrackMetadataFormValues;
+			metadata: ValidatedTrackMetadata;
+			coverOperation: CoverImageEditOperation;
+	  }
+	| {
+			success: false;
+			values: TrackMetadataFormValues;
+			errors: TrackMetadataErrors;
 	  };
 
 export type TrackMetadataValidationResult =
@@ -226,6 +263,10 @@ export function audioFileTooLargeMessage(maxFileSizeBytes: number): string {
 	return `Audio file must not be larger than ${formatMegabytes(maxFileSizeBytes)} MB.`;
 }
 
+export function coverImageTooLargeMessage(maxFileSizeBytes: number): string {
+	return `Cover image must not be larger than ${formatMegabytes(maxFileSizeBytes)} MB.`;
+}
+
 export function validateAudioFile(
 	value: FormDataEntryValue | null,
 	maxFileSizeBytes: number
@@ -272,6 +313,54 @@ export function validateAudioFile(
 	};
 }
 
+export function validateCoverImageFile(
+	value: FormDataEntryValue | null,
+	maxFileSizeBytes: number
+): { value: ValidatedCoverImageFile | null; error: string | null } {
+	if (value === null || (value instanceof File && !value.name.trim() && value.size === 0)) {
+		return { value: null, error: null };
+	}
+
+	if (!(value instanceof File) || !value.name.trim()) {
+		return { value: null, error: 'Select a JPEG, PNG, or WebP cover image.' };
+	}
+
+	if (value.name.length > ORIGINAL_FILENAME_MAX_LENGTH || value.name.includes('\0')) {
+		return {
+			value: null,
+			error: `Cover image filename must be at most ${ORIGINAL_FILENAME_MAX_LENGTH} characters.`
+		};
+	}
+
+	if (value.size === 0) {
+		return { value: null, error: 'Cover image must not be empty.' };
+	}
+
+	if (!Number.isSafeInteger(value.size) || value.size > maxFileSizeBytes) {
+		return {
+			value: null,
+			error: coverImageTooLargeMessage(maxFileSizeBytes)
+		};
+	}
+
+	const extension = getValidatedCoverImageExtension(value.name, value.type);
+	if (!extension) {
+		return {
+			value: null,
+			error: 'Unsupported cover image format. Upload a JPEG, PNG, or WebP image.'
+		};
+	}
+
+	return {
+		value: {
+			file: value,
+			extension,
+			mimeType: value.type.trim().toLowerCase()
+		},
+		error: null
+	};
+}
+
 export function validateTrackMetadataFormData(
 	formData: FormData
 ): TrackMetadataValidationResult {
@@ -311,18 +400,24 @@ export function validateTrackMetadataFormData(
 
 export function validateUploadFormData(
 	formData: FormData,
-	maxFileSizeBytes: number
+	maxFileSizeBytes: number,
+	maxCoverImageSizeBytes = DEFAULT_COVER_IMAGE_MAX_SIZE_BYTES
 ): UploadValidationResult {
 	const metadataValidation = validateTrackMetadataFormData(formData);
 	const values = metadataValidation.values;
 	const audioFile = validateAudioFile(formData.get('audioFile'), maxFileSizeBytes);
+	const coverImage = validateCoverImageFile(
+		formData.get('coverImage'),
+		maxCoverImageSizeBytes
+	);
 	const errors: UploadErrors = metadataValidation.success
 		? {}
 		: { ...metadataValidation.errors };
 
 	if (audioFile.error) errors.audioFile = audioFile.error;
+	if (coverImage.error) errors.coverImage = coverImage.error;
 
-	if (!metadataValidation.success || !audioFile.value) {
+	if (!metadataValidation.success || !audioFile.value || coverImage.error) {
 		return { success: false, values, errors };
 	}
 
@@ -330,6 +425,67 @@ export function validateUploadFormData(
 		success: true,
 		values,
 		metadata: metadataValidation.metadata,
-		audioFile: audioFile.value
+		audioFile: audioFile.value,
+		coverImage: coverImage.value
+	};
+}
+
+export function hasSelectedCoverImage(formData: FormData): boolean {
+	const value = formData.get('coverImage');
+	return value instanceof File && Boolean(value.name.trim());
+}
+
+export function hasRequestedCoverImageRemoval(formData: FormData): boolean {
+	const value = formData.get('removeCoverImage');
+	return value === '1' || value === 'on' || value === 'true';
+}
+
+export function validateTrackEditFormData(
+	formData: FormData,
+	maxCoverImageSizeBytes = DEFAULT_COVER_IMAGE_MAX_SIZE_BYTES
+): TrackEditValidationResult {
+	const metadataValidation = validateTrackMetadataFormData(formData);
+	const values = metadataValidation.values;
+	const coverImage = validateCoverImageFile(
+		formData.get('coverImage'),
+		maxCoverImageSizeBytes
+	);
+	const removeValue = formData.get('removeCoverImage');
+	const removeCoverImage = hasRequestedCoverImageRemoval(formData);
+	const invalidRemoveValue =
+		removeValue !== null &&
+		!removeCoverImage &&
+		!(typeof removeValue === 'string' && removeValue.trim() === '');
+	const errors: TrackMetadataErrors = metadataValidation.success
+		? {}
+		: { ...metadataValidation.errors };
+
+	if (coverImage.error) errors.coverImage = coverImage.error;
+	if (invalidRemoveValue) {
+		errors.coverImage = 'Choose a valid cover image action.';
+	}
+	if (removeCoverImage && coverImage.value) {
+		errors.coverImage =
+			'Choose either a replacement cover image or removal, not both.';
+	}
+
+	if (
+		!metadataValidation.success ||
+		coverImage.error ||
+		invalidRemoveValue ||
+		(removeCoverImage && coverImage.value)
+	) {
+		return { success: false, values, errors };
+	}
+
+	return {
+		success: true,
+		values,
+		metadata: metadataValidation.metadata,
+		coverOperation: removeCoverImage
+			? { kind: 'remove' }
+			: coverImage.value
+				? { kind: 'replace', coverImage: coverImage.value }
+				: { kind: 'retain' }
 	};
 }

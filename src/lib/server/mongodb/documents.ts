@@ -26,6 +26,12 @@ export interface SessionDocument {
 	createdAt: Date;
 }
 
+export interface TrackCoverImageDocument {
+	storageKey: string;
+	mimeType: string;
+	byteSize: number;
+}
+
 export interface TrackDocument {
 	/** Existing internal track UUID. */
 	_id: string;
@@ -42,6 +48,11 @@ export interface TrackDocument {
 	mimeType: string;
 	fileSizeBytes: number;
 	durationMs: number | null;
+	/**
+	 * Older MongoDB documents legitimately omit this field. New writes use
+	 * either validated private-storage metadata or null.
+	 */
+	coverImage?: TrackCoverImageDocument | null;
 	visibility: TrackVisibility;
 	createdAt: Date;
 	updatedAt: Date;

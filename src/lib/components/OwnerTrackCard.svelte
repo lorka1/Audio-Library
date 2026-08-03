@@ -3,6 +3,7 @@
 	import { toPublicPlayerTrack } from '$lib/player/model';
 	import type { OwnerTrack, PlaylistPickerEntry } from '$lib/types';
 	import AddToPlaylist from './AddToPlaylist.svelte';
+	import TrackCover from './TrackCover.svelte';
 	import TrackPlayButton from './TrackPlayButton.svelte';
 
 	let {
@@ -13,20 +14,28 @@
 		toPublicPlayerTrack({
 			id: track.publicId,
 			title: track.title,
-			artist: track.artist
+			artist: track.artist,
+			coverImageUrl: track.coverImageUrl
 		})
 	);
 </script>
 
 <article class="owner-track-card">
 	<header>
-		<div class="owner-track-card__heading">
-			<p>{track.artist}</p>
-			<span class:private={track.visibility === 'private'}>
-				{track.visibility === 'public' ? 'Public' : 'Private'}
-			</span>
+		<TrackCover
+			coverImageUrl={track.coverImageUrl}
+			title={track.title}
+			variant="owner"
+		/>
+		<div class="owner-track-card__identity">
+			<div class="owner-track-card__heading">
+				<p>{track.artist}</p>
+				<span class:private={track.visibility === 'private'}>
+					{track.visibility === 'public' ? 'Public' : 'Private'}
+				</span>
+			</div>
+			<h2>{track.title}</h2>
 		</div>
-		<h2>{track.title}</h2>
 	</header>
 
 	<dl>
@@ -76,6 +85,18 @@
 		border-radius: 1rem;
 		background: var(--surface);
 		box-shadow: 0 1rem 3rem rgb(24 32 51 / 6%);
+	}
+
+	header {
+		display: flex;
+		align-items: flex-start;
+		gap: 1rem;
+		min-width: 0;
+	}
+
+	.owner-track-card__identity {
+		flex: 1;
+		min-width: 0;
 	}
 
 	.owner-track-card__heading {

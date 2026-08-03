@@ -28,6 +28,7 @@ describe('toPublicTrack', () => {
 			id: 7,
 			title: 'Public track',
 			artist: 'Test Artist',
+			coverImageUrl: null,
 			bpm: 128,
 			musicalKey: 'C minor',
 			genre: 'Techno',
@@ -42,6 +43,31 @@ describe('toPublicTrack', () => {
 		expect(publicTrack).not.toHaveProperty('physicalPath');
 		expect(publicTrack).not.toHaveProperty('ownerId');
 		expect(publicTrack).not.toHaveProperty('ownerEmail');
+	});
+
+	it('exposes only a deterministic cover URL when private cover metadata exists', () => {
+		const publicTrack = toPublicTrack({
+			publicId: 9,
+			title: 'Covered track',
+			artist: 'Test Artist',
+			coverImage: {
+				storageKey: '22222222-2222-4222-8222-222222222222.webp',
+				mimeType: 'image/webp',
+				byteSize: 64
+			},
+			bpm: null,
+			musicalKey: null,
+			genre: null,
+			description: null,
+			fileSizeBytes: 1,
+			ownerUsername: 'owner',
+			createdAt: new Date('2026-07-24T10:00:00.000Z'),
+			updatedAt: new Date('2026-07-24T10:00:00.000Z')
+		});
+
+		expect(publicTrack.coverImageUrl).toBe('/api/tracks/9/cover');
+		expect(JSON.stringify(publicTrack)).not.toContain('22222222');
+		expect(publicTrack).not.toHaveProperty('coverImage');
 	});
 
 	it('preserves null optional metadata without undefined values', () => {
@@ -60,6 +86,7 @@ describe('toPublicTrack', () => {
 		});
 
 		expect(publicTrack).toMatchObject({
+			coverImageUrl: null,
 			bpm: null,
 			musicalKey: null,
 			genre: null,

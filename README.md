@@ -3,10 +3,11 @@
 Audio Library is a SvelteKit application for uploading, browsing, searching,
 streaming, downloading, managing privately stored audio, and organizing tracks
 in private user-owned playlists. MongoDB is the
-only persistence backend. Audio bytes remain in a private filesystem directory;
-MongoDB stores users, hashed sessions, track metadata, ownership, public route
-IDs, and private storage references. Playlist membership stores only internal
-track references; audio and track metadata are never duplicated into a playlist.
+only persistence backend. Audio and optional cover-image bytes remain in private
+filesystem storage; MongoDB stores users, hashed sessions, track metadata,
+optional cover metadata, ownership, public route IDs, and private storage
+references. Playlist membership stores only internal track references; audio and
+track metadata are never duplicated into a playlist.
 
 ## Requirements
 
@@ -24,7 +25,7 @@ standalone MongoDB server without transaction support is rejected.
 - SvelteKit and Svelte with the Node adapter;
 - TypeScript and Vite;
 - MongoDB as the only persistence service;
-- private local filesystem storage for audio bytes;
+- private local filesystem storage for audio and optional cover-image bytes;
 - Vitest plus isolated MongoDB/HTTP/recovery integration controllers.
 
 ## Setup
@@ -48,9 +49,10 @@ Configure these values in the untracked `.env`:
 | `MONGODB_URI` | Private connection string for the transaction-capable deployment; the local production URI includes `replicaSet=rs0`. Never commit credentials. |
 | `MONGODB_DB_NAME` | Application database name. |
 | `MONGODB_TEST_DB_NAME` | Base name for uniquely owned integration databases. It must start with `audio_library_test_` and differ from the application database. |
-| `AUDIO_STORAGE_PATH` | Private filesystem directory for audio bytes. |
+| `AUDIO_STORAGE_PATH` | Private filesystem root for audio bytes. Optional cover images are stored in its private `covers/` subdirectory. |
 | `MAX_AUDIO_FILE_SIZE_MB` | Application upload limit. |
-| `BODY_SIZE_LIMIT` | Adapter request limit, including multipart overhead. |
+| `COVER_IMAGE_MAX_SIZE_MB` | Optional cover-image upload limit. |
+| `BODY_SIZE_LIMIT` | Adapter request limit. It must be at least the maximum audio size plus maximum cover size plus 1 MiB of multipart/form-data overhead. |
 | `SESSION_COOKIE_NAME` | HttpOnly session cookie name. |
 | `SESSION_DURATION_DAYS` | Session lifetime from 1 through 30 days. |
 | `MONGODB_BACKUP_ROOT` | Explicit private destination root used only by the MongoDB backup command. |
@@ -76,7 +78,7 @@ npm run db:mongodb:init
 
 Server startup uses one shared server-only client and refuses to serve traffic
 unless the writable PRIMARY, transaction topology, collections, exact indexes,
-public-ID counter, cookie/request limits, and private audio storage are valid.
+public-ID counter, cookie/request limits, and private media storage are valid.
 Index initialization is separate from read-only startup/readiness verification:
 
 - unique usernames and emails;
@@ -110,8 +112,13 @@ npm run db:mongodb:audit
   ordering with deterministic tie handling;
 - public numeric detail URLs;
 - full streaming, byte Range seeking, invalid Range handling, and downloads;
+- optional JPEG, PNG, or WebP cover images, limited by
+  `COVER_IMAGE_MAX_SIZE_MB` (5 MB in `.env.example`), with local fallback
+  artwork;
+- safe public cover delivery through `GET /api/tracks/[id]/cover`;
 - private owner dashboard, metadata editing, and deletion;
-- quarantine-based filesystem deletion with database-failure restoration;
+- owner-safe cover retention, replacement, and removal;
+- quarantine-based audio and cover deletion with database-failure restoration;
 - private playlists with create, rename, description edit, delete, detail,
   add-track, and remove-track behavior;
 - accessible-track enforcement: public tracks and the current owner's private
@@ -140,10 +147,10 @@ server-only persistence modules provide the MongoDB repositories.
 | `npm run preview` | Preview the production build through Vite. |
 | `npm run db:mongodb:init` | Explicitly initialize a new database's indexes and counter. |
 | `npm run db:mongodb:verify` | Verify connectivity, topology, PRIMARY, collections, exact indexes, counter, and marker structure read-only. |
-| `npm run db:mongodb:audit` | Audit MongoDB and audio using safe aggregates only. |
+| `npm run db:mongodb:audit` | Audit MongoDB and private audio/cover storage using safe aggregates only. |
 | `npm run backup:mongodb` | Create a timestamped native MongoDB dump in an explicit private root. |
-| `npm run backup:audio` | Create and aggregate-verify a timestamped private audio copy. |
-| `npm run verify:mongodb:restore` | Verify a supplied synthetic recovery pair in an owned database and temporary audio root. |
+| `npm run backup:audio` | Create and aggregate-verify a timestamped private copy of audio and cover files. |
+| `npm run verify:mongodb:restore` | Verify a supplied synthetic recovery pair in an owned database and temporary private-media root. |
 | `npm run test:mongodb:recovery` | Create, back up, restore, probe, and exactly clean a synthetic recovery set. |
 | `npm run test:mongodb:users` | Verify the user repository contract in a uniquely owned database. |
 | `npm run test:mongodb:auth` | Verify transactions, duplicate conflicts, sessions, expiration, logout, and cleanup. |
@@ -157,8 +164,8 @@ server-only persistence modules provide the MongoDB repositories.
 
 Integration controllers generate one unique safe test database, record its
 ownership, drop only that exact database, preserve every pre-existing database,
-use temporary audio storage and ports, and close their clients, sessions,
-processes, listeners, and timers.
+use temporary audio and cover storage plus temporary ports, and close their
+clients, sessions, processes, listeners, and timers.
 
 ## Production
 
@@ -178,28 +185,38 @@ Neither exposes contents, paths, counts, credentials, or identifiers. SIGINT
 and SIGTERM stop the listener, allow bounded in-flight completion, then close
 the application-owned listener and shared MongoDB client once.
 
-Keep `AUDIO_STORAGE_PATH` on persistent private storage and never expose it
-through a static file server. MongoDB and audio backups are separate artifacts
-but one logical recovery set. Pair their timestamps, verify restores
-periodically, and never commit backups or `.env`. The complete same-computer
-Windows runbook is in [`docs/operations.md`](docs/operations.md).
+Keep `AUDIO_STORAGE_PATH`, including its `covers/` subdirectory, on persistent
+private storage and never expose it through a static file server. MongoDB and
+private-media backups are separate artifacts but one logical recovery set. Pair
+their timestamps, verify restores periodically, and never commit backups or
+`.env`. The complete same-computer Windows runbook is in
+[`docs/operations.md`](docs/operations.md).
 The final operator commissioning checklist is in
 [`docs/production-commissioning-checklist.md`](docs/production-commissioning-checklist.md).
 
 ## Privacy and storage
 
 Browser payloads never receive password hashes, raw or hashed session tokens,
-internal user/track/playlist/playlist-item identifiers, owner IDs, storage keys, absolute paths,
-database names, connection strings, or private audit information.
+internal user/track/playlist/playlist-item identifiers, owner IDs, audio or cover storage keys,
+absolute paths, database names, connection strings, or private audit
+information. Public and owner-facing track models expose only a safe cover URL
+or cover state.
 
 Operational logs are structured and limited to safe categories, codes,
 request/correlation IDs, route categories, status, and duration. Raw errors,
 request bodies, identities, filenames, storage keys, private paths, cookies,
 authorization headers, documents, URIs, and migration fingerprints are omitted.
 
-Audio is not stored in MongoDB or GridFS. Upload metadata and filesystem writes
-use compensating cleanup, while deletion uses quarantine/restore semantics to
-keep metadata and files consistent across failure paths.
+Audio and cover-image bytes are not stored in MongoDB or GridFS. Cover images
+are optional and limited to JPEG, PNG, or WebP; the server validates both MIME
+type and filename extension. `GET /api/tracks/[id]/cover` serves an eligible
+cover without exposing its private filename or path, while the UI uses local
+fallback artwork when no cover is available.
+
+Upload and cover-replacement filesystem writes use compensating cleanup.
+Deletion quarantines both the audio and cover where present, and restores them
+when database deletion fails. Existing tracks without cover metadata remain
+valid and immediately use the fallback artwork.
 
 ## Historical migration
 

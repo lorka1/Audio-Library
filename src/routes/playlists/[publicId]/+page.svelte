@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { TrackPlayButton } from '$lib';
+	import { TrackCover, TrackPlayButton } from '$lib';
 	import { formatDate } from '$lib/formatting';
 	import { toPublicPlayerTrack } from '$lib/player/model';
 	import type { PlaylistFormErrors } from '$lib/server/playlists/validation';
@@ -52,12 +52,13 @@
 					<ul>
 						{#each data.playlist.tracks as entry (entry.id)}
 							<li>
+								<TrackCover coverImageUrl={entry.coverImageUrl} title={entry.title} variant="row" />
 								<div class="playlist-track__identity">
 									<strong title={entry.title}>{entry.title}</strong>
 									<span>{entry.artist} · {entry.visibility === 'public' ? 'Public' : 'Your private track'}</span>
 								</div>
 								{#if entry.visibility === 'public'}
-									<TrackPlayButton track={toPublicPlayerTrack({ id: entry.id, title: entry.title, artist: entry.artist })} variant="icon" />
+									<TrackPlayButton track={toPublicPlayerTrack({ id: entry.id, title: entry.title, artist: entry.artist, coverImageUrl: entry.coverImageUrl })} variant="icon" />
 								{/if}
 								<form method="POST" action="?/removeFromPlaylist">
 									<input type="hidden" name="trackPublicId" value={entry.id} />
@@ -116,7 +117,7 @@
 	.playlist-tracks, .playlist-settings { min-width: 0; padding: clamp(1.1rem, 3vw, 1.75rem); border: 1px solid var(--border); border-radius: 1rem; background: linear-gradient(135deg, rgb(18 27 52 / 96%), rgb(11 18 37 / 98%)); }
 	.playlist-tracks h2, .playlist-settings h2 { margin: 0 0 1rem; font-size: 1.3rem; }
 	.playlist-tracks ul { display: grid; gap: 0.65rem; margin: 0; padding: 0; list-style: none; }
-	.playlist-tracks li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 0.75rem; align-items: center; min-width: 0; padding: 0.65rem; border: 1px solid rgb(139 153 198 / 14%); border-radius: 0.75rem; background: rgb(7 12 29 / 48%); }
+	.playlist-tracks li { display: grid; grid-template-columns: 3.5rem minmax(0, 1fr) auto auto; gap: 0.75rem; align-items: center; min-width: 0; padding: 0.65rem; border: 1px solid rgb(139 153 198 / 14%); border-radius: 0.75rem; background: rgb(7 12 29 / 48%); }
 	.playlist-track__identity { display: grid; min-width: 0; gap: 0.25rem; }
 	.playlist-track__identity strong, .playlist-track__identity span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 	.playlist-track__identity span { color: var(--text-muted); font-size: 0.78rem; }
@@ -130,5 +131,5 @@
 	.playlist-delete label { display: flex; align-items: flex-start; gap: 0.55rem; color: var(--text-muted); font-size: 0.82rem; line-height: 1.45; }
 	.playlist-delete input { margin-top: 0.2rem; accent-color: var(--accent); }
 	@media (max-width: 62rem) { .playlist-detail-layout { grid-template-columns: 1fr; } }
-	@media (max-width: 36rem) { .playlist-detail-heading { grid-template-columns: 1fr; } .playlist-placeholder { width: 8rem; } .playlist-tracks li { grid-template-columns: minmax(0, 1fr) auto; } .playlist-tracks li > :global(button) { grid-column: 2; } .playlist-tracks form { grid-column: 1 / -1; } .playlist-tracks form button { width: 100%; } }
+	@media (max-width: 36rem) { .playlist-detail-heading { grid-template-columns: 1fr; } .playlist-placeholder { width: 8rem; } .playlist-tracks li { grid-template-columns: 3.5rem minmax(0, 1fr) auto; } .playlist-tracks li > :global(button) { grid-column: 3; } .playlist-tracks form { grid-column: 2 / -1; } .playlist-tracks form button { width: 100%; } }
 </style>

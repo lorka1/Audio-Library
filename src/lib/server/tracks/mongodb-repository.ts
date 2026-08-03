@@ -15,6 +15,8 @@ import type {
 	CreateTrackInput,
 	DuplicateTrackField,
 	OwnerTrackStorage,
+	StoredCoverImage,
+	TrackCoverForDelivery,
 	TrackForDownload,
 	TrackForStreaming,
 	TrackRepository,
@@ -61,6 +63,7 @@ const ownerProjection = {
 	fileSizeBytes: 1,
 	mimeType: 1,
 	originalFilename: 1,
+	coverImage: 1,
 	createdAt: 1,
 	updatedAt: 1
 } as const;
@@ -82,7 +85,14 @@ const downloadProjection = {
 const ownerStorageProjection = {
 	_id: 0,
 	publicId: 1,
-	storageKey: 1
+	storageKey: 1,
+	coverImage: 1
+} as const;
+
+const coverDeliveryProjection = {
+	_id: 0,
+	publicId: 1,
+	coverImage: 1
 } as const;
 
 const publicAggregateProjection = {
@@ -95,6 +105,7 @@ const publicAggregateProjection = {
 	genre: 1,
 	description: 1,
 	fileSizeBytes: 1,
+	coverImage: 1,
 	ownerUsername: '$owner.username',
 	createdAt: 1,
 	updatedAt: 1
@@ -130,6 +141,49 @@ function mapDownload(document: TrackDocument): TrackForDownload | null {
 	const stream = mapStreaming(document);
 	return stream
 		? { ...stream, originalFilename: document.originalFilename }
+		: null;
+}
+
+function mapStoredCoverImage(value: unknown): StoredCoverImage | null {
+	if (
+		typeof value !== 'object' ||
+		value === null ||
+		!('storageKey' in value) ||
+		!('mimeType' in value) ||
+		!('byteSize' in value)
+	) {
+		return null;
+	}
+
+	const coverImage = value as {
+		storageKey?: unknown;
+		mimeType?: unknown;
+		byteSize?: unknown;
+	};
+
+	if (
+		typeof coverImage.storageKey !== 'string' ||
+		typeof coverImage.mimeType !== 'string' ||
+		!Number.isSafeInteger(coverImage.byteSize) ||
+		(coverImage.byteSize as number) <= 0
+	) {
+		return null;
+	}
+
+	return {
+		storageKey: coverImage.storageKey,
+		mimeType: coverImage.mimeType,
+		byteSize: coverImage.byteSize as number
+	};
+}
+
+function mapCoverForDelivery(document: TrackDocument): TrackCoverForDelivery | null {
+	const coverImage = mapStoredCoverImage(document.coverImage);
+	return coverImage
+		? {
+				publicId: document.publicId,
+				...coverImage
+			}
 		: null;
 }
 
@@ -342,6 +396,7 @@ export function createMongoTrackRepository(
 				mimeType: input.mimeType,
 				fileSizeBytes: input.fileSizeBytes,
 				durationMs: null,
+				coverImage: input.coverImage ?? null,
 				visibility: createOptions?.visibility ?? 'public',
 				createdAt: input.createdAt,
 				updatedAt: input.updatedAt
@@ -387,6 +442,26 @@ export function createMongoTrackRepository(
 			return document ? mapDownload(document) : null;
 		},
 
+		async findTrackCoverForAccess(publicId, requesterOwnerId) {
+			assertPositivePublicTrackId(publicId);
+			const normalizedOwnerId = requesterOwnerId?.trim();
+			const document = await tracks.findOne(
+				{
+					publicId,
+					...(normalizedOwnerId
+						? {
+								$or: [
+									{ visibility: 'public' },
+									{ ownerId: normalizedOwnerId }
+								]
+							}
+						: { visibility: 'public' })
+				},
+				findOptions(coverDeliveryProjection)
+			);
+			return document ? mapCoverForDelivery(document) : null;
+		},
+
 		async listTracksForOwner(ownerId) {
 			requireTrackOwnerId(ownerId);
 			const documents = await tracks
@@ -410,9 +485,21 @@ export function createMongoTrackRepository(
 		async updateOwnerTrackMetadata(publicId, ownerId, metadata) {
 			requireTrackOwnerId(ownerId);
 			assertPositivePublicTrackId(publicId);
+			const update: UpdateOwnerTrackMetadataInput = {
+				title: metadata.title,
+				artist: metadata.artist,
+				bpm: metadata.bpm,
+				musicalKey: metadata.musicalKey,
+				genre: metadata.genre,
+				description: metadata.description,
+				updatedAt: metadata.updatedAt,
+				...(Object.hasOwn(metadata, 'coverImage')
+					? { coverImage: metadata.coverImage ?? null }
+					: {})
+			};
 			const document = await tracks.findOneAndUpdate(
 				{ publicId, ownerId },
-				{ $set: metadata satisfies UpdateOwnerTrackMetadataInput },
+				{ $set: update },
 				{
 					...operationOptions,
 					returnDocument: 'after',
@@ -436,7 +523,11 @@ export function createMongoTrackRepository(
 				findOptions(ownerStorageProjection)
 			);
 			return document
-				? { publicId: document.publicId, storedFilename: document.storageKey }
+				? {
+						publicId: document.publicId,
+						storedFilename: document.storageKey,
+						coverImage: mapStoredCoverImage(document.coverImage)
+					}
 				: null;
 		}
 	};

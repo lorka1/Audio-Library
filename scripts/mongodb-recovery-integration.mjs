@@ -14,6 +14,7 @@ import {
 import { getMongoCollections } from '../src/lib/server/mongodb/collections.ts';
 import { TRACK_PUBLIC_ID_COUNTER } from '../src/lib/server/mongodb/documents.ts';
 import { ensureMongoIndexes } from '../src/lib/server/mongodb/indexes.ts';
+import { resolveMongoDatabaseTool } from './lib/mongodb-database-tools.mjs';
 
 const config = readMongoConfig(process.env);
 const suffix = `_recovery_${randomBytes(6).toString('hex')}`;
@@ -26,12 +27,14 @@ const audioBackups = resolve(temporaryRoot, 'audio-backups');
 const manager = new MongoClientManager(config);
 let initialDatabases;
 let primaryFailure;
+let sourceDatabaseAuthorizedForCleanup = false;
 const cleanupFailures = [];
 
 function runScript(script, environment) {
 	return new Promise((resolveRun, rejectRun) => {
 		const child = spawn(process.execPath, ['--experimental-strip-types', resolve(script)], {
 			env: environment,
+			shell: false,
 			stdio: 'inherit',
 			windowsHide: true
 		});
@@ -41,28 +44,49 @@ function runScript(script, environment) {
 		}, 10 * 60_000);
 		timer.unref();
 		child.once('error', rejectRun);
-		child.once('close', (code) => {
+		child.once('close', (code, signal) => {
 			clearTimeout(timer);
 			if (code === 0) resolveRun();
-			else rejectRun(new Error(`${script} failed.`));
+			else rejectRun(Object.assign(new Error(`${script} failed.`), { code, signal }));
 		});
 	});
 }
 
 try {
+	const mongodump = await resolveMongoDatabaseTool('mongodump');
+	const mongorestore = await resolveMongoDatabaseTool('mongorestore');
 	const client = await manager.connect();
 	initialDatabases = (await client.db('admin').admin().listDatabases({ nameOnly: true }))
 		.databases.map(({ name }) => name).sort();
 	assert.equal(initialDatabases.includes(sourceDatabaseName), false);
+	sourceDatabaseAuthorizedForCleanup = true;
 	const collections = getMongoCollections(client.db(sourceDatabaseName));
 	await ensureMongoIndexes(collections, { maxTimeMS: 8_000 });
-	await collections.counters.insertOne({ _id: TRACK_PUBLIC_ID_COUNTER, value: 1 });
+	await collections.counters.insertOne({ _id: TRACK_PUBLIC_ID_COUNTER, value: 2 });
 	const now = new Date('2026-01-01T00:00:00.000Z');
 	const userId = randomUUID();
 	const storageKey = `${randomUUID()}.mp3`;
+	const uncoveredStorageKey = `${randomUUID()}.mp3`;
+	const coverStorageKey = `${randomUUID()}.png`;
 	const content = Buffer.from('synthetic recovery audio');
+	const uncoveredContent = Buffer.from('synthetic recovery audio without a cover');
+	const coverContent = Buffer.from([
+		0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+		0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+		0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01
+	]);
 	await mkdir(audioSource, { recursive: true });
+	await mkdir(resolve(audioSource, 'covers'), { recursive: true });
 	await writeFile(resolve(audioSource, storageKey), content, { flag: 'wx', mode: 0o600 });
+	await writeFile(resolve(audioSource, uncoveredStorageKey), uncoveredContent, {
+		flag: 'wx',
+		mode: 0o600
+	});
+	await writeFile(
+		resolve(audioSource, 'covers', coverStorageKey),
+		coverContent,
+		{ flag: 'wx', mode: 0o600 }
+	);
 	await collections.users.insertOne({
 		_id: userId,
 		username: 'synthetic_restore_owner',
@@ -70,6 +94,26 @@ try {
 		passwordHash: 'synthetic-not-a-real-password-hash',
 		createdAt: now,
 		updatedAt: now
+	});
+	await collections.tracks.insertOne({
+		_id: randomUUID(),
+		publicId: 2,
+		ownerId: userId,
+		title: 'Newer synthetic track without a cover',
+		artist: 'Synthetic artist',
+		bpm: null,
+		musicalKey: null,
+		genre: null,
+		description: null,
+		originalFilename: 'synthetic-uncovered.mp3',
+		storageKey: uncoveredStorageKey,
+		mimeType: 'audio/mpeg',
+		fileSizeBytes: uncoveredContent.byteLength,
+		durationMs: null,
+		coverImage: null,
+		visibility: 'public',
+		createdAt: new Date('2026-01-02T00:00:00.000Z'),
+		updatedAt: new Date('2026-01-02T00:00:00.000Z')
 	});
 	const trackId = randomUUID();
 	await collections.tracks.insertOne({
@@ -87,6 +131,11 @@ try {
 		mimeType: 'audio/mpeg',
 		fileSizeBytes: content.byteLength,
 		durationMs: null,
+		coverImage: {
+			storageKey: coverStorageKey,
+			mimeType: 'image/png',
+			byteSize: coverContent.byteLength
+		},
 		visibility: 'public',
 		createdAt: now,
 		updatedAt: now
@@ -111,6 +160,8 @@ try {
 
 	const environment = {
 		...process.env,
+		MONGODUMP_PATH: mongodump.executablePath,
+		MONGORESTORE_PATH: mongorestore.executablePath,
 		MONGODB_DB_NAME: sourceDatabaseName,
 		AUDIO_STORAGE_PATH: audioSource,
 		MONGODB_BACKUP_ROOT: mongoBackups,
@@ -136,12 +187,15 @@ try {
 		try {
 			const client = await cleanupManager.connect();
 			const listed = await client.db('admin').admin().listDatabases({ nameOnly: true });
-			if (listed.databases.some(({ name }) => name === sourceDatabaseName)) {
+			if (
+				sourceDatabaseAuthorizedForCleanup &&
+				listed.databases.some(({ name }) => name === sourceDatabaseName)
+			) {
 				await client.db(sourceDatabaseName).dropDatabase({ timeoutMS: 10_000 });
 			}
 			const remaining = (await client.db('admin').admin().listDatabases({ nameOnly: true }))
 				.databases.map(({ name }) => name).sort();
-			assert.deepEqual(remaining, initialDatabases);
+			if (initialDatabases) assert.deepEqual(remaining, initialDatabases);
 		} finally {
 			await cleanupManager.close(true);
 		}

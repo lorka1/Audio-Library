@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { AddToPlaylist, TrackPlayButton } from '$lib';
+	import { AddToPlaylist, TrackCover, TrackPlayButton } from '$lib';
 	import { formatDate, formatFileSize } from '$lib/formatting';
 	import { toPublicPlayerTrack } from '$lib/player/model';
 	import type { PageProps } from './$types';
@@ -37,6 +37,13 @@
 		{/if}
 
 		<article class="track-detail">
+			<TrackCover
+				coverImageUrl={data.track.coverImageUrl}
+				title={data.track.title}
+				variant="detail"
+				decorative={false}
+				loading="eager"
+			/>
 			<header class="track-detail__header">
 				<p class="auth-eyebrow">Public track</p>
 				<h1>{data.track.title}</h1>

@@ -16,6 +16,7 @@ import {
 import { getMongoCollections } from '../src/lib/server/mongodb/collections.ts';
 import { TRACK_PUBLIC_ID_COUNTER } from '../src/lib/server/mongodb/documents.ts';
 import { ensureMongoIndexes } from '../src/lib/server/mongodb/indexes.ts';
+import { createSyntheticApplicationEnvironment } from './lib/synthetic-app-environment.mjs';
 import { hashSessionToken } from '../src/lib/server/auth/session-token.ts';
 import { safeMongoAggregateFingerprint } from './lib/mongodb-fingerprint.mjs';
 
@@ -285,6 +286,7 @@ try {
 		mimeType: 'audio/mpeg',
 		fileSizeBytes: 64,
 		durationMs: null,
+		coverImage: null,
 		visibility: index === 0 ? 'public' : 'private',
 		createdAt: now,
 		updatedAt: now
@@ -337,13 +339,13 @@ try {
 		'--strictPort'
 	], {
 		cwd: resolve('.'),
-		env: {
-			...process.env,
+		env: createSyntheticApplicationEnvironment({
 			AUDIO_STORAGE_PATH: audioRoot,
 			SESSION_COOKIE_NAME: cookieName,
+			MONGODB_URI: config.uri,
 			MONGODB_DB_NAME: databaseName,
 			MONGODB_TEST_DB_NAME: config.testDatabaseName
-		},
+		}),
 		stdio: 'ignore',
 		windowsHide: true
 	});

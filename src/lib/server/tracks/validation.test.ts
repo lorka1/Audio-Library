@@ -11,9 +11,11 @@ import {
 	validateArtist,
 	validateAudioFile,
 	validateBpm,
+	validateCoverImageFile,
 	validateDescription,
 	validateGenre,
 	validateMusicalKey,
+	validateTrackEditFormData,
 	validateTrackMetadataFormData,
 	validateTitle,
 	validateUploadFormData
@@ -497,5 +499,108 @@ describe('complete upload form validation', () => {
 				audioFile: 'Unsupported audio format. Upload an MP3, WAV, or OGG file.'
 			});
 		}
+	});
+});
+
+describe('optional cover image validation', () => {
+	it('treats a missing or empty browser file as an omitted optional cover', () => {
+		expect(validateCoverImageFile(null, 1024)).toEqual({
+			value: null,
+			error: null
+		});
+		expect(
+			validateCoverImageFile(
+				new File([], '', { type: 'application/octet-stream' }),
+				1024
+			)
+		).toEqual({ value: null, error: null });
+	});
+
+	it.each([
+		['cover.jpg', 'image/jpeg'],
+		['cover.jpeg', 'image/jpeg'],
+		['cover.png', 'image/png'],
+		['cover.webp', 'image/webp']
+	])('accepts supported extension and MIME pairs: %s', (name, type) => {
+		const result = validateCoverImageFile(
+			new File([new Uint8Array([1, 2, 3, 4])], name, { type }),
+			4
+		);
+		expect(result.error).toBeNull();
+		expect(result.value?.mimeType).toBe(type);
+	});
+
+	it.each([
+		['cover.svg', 'image/svg+xml'],
+		['cover.png', 'image/jpeg'],
+		['cover.exe', 'image/png'],
+		['cover.png.exe', 'image/png']
+	])('rejects unsafe or mismatched cover input: %s', (name, type) => {
+		expect(
+			validateCoverImageFile(
+				new File([new Uint8Array([1])], name, { type }),
+				4
+			).error
+		).toContain('Unsupported cover image format');
+	});
+
+	it('rejects an oversize cover with a bounded user-facing error', () => {
+		const result = validateCoverImageFile(
+			new File([new Uint8Array(5)], 'cover.png', { type: 'image/png' }),
+			4
+		);
+		expect(result.error).toBe('Cover image must not be larger than 0 MB.');
+	});
+
+	it('includes an optional validated cover in a complete upload result', () => {
+		const formData = validUploadFormData();
+		formData.set(
+			'coverImage',
+			new File([new Uint8Array([1, 2, 3, 4])], 'cover.webp', {
+				type: 'image/webp'
+			})
+		);
+		const result = validateUploadFormData(
+			formData,
+			TINY_FILE_LIMIT_BYTES,
+			TINY_FILE_LIMIT_BYTES
+		);
+		expect(result.success).toBe(true);
+		if (result.success) {
+			expect(result.coverImage).toMatchObject({
+				extension: '.webp',
+				mimeType: 'image/webp'
+			});
+		}
+	});
+
+	it('parses retain, replace, and remove edit operations without trusting forged values', () => {
+		const retain = validateTrackEditFormData(validUploadFormData(), 1024);
+		expect(retain.success && retain.coverOperation).toEqual({ kind: 'retain' });
+
+		const replaceForm = validUploadFormData();
+		replaceForm.set(
+			'coverImage',
+			new File([new Uint8Array([1])], 'cover.png', { type: 'image/png' })
+		);
+		const replace = validateTrackEditFormData(replaceForm, 1024);
+		expect(replace.success && replace.coverOperation.kind).toBe('replace');
+
+		const removeForm = validUploadFormData();
+		removeForm.set('removeCoverImage', '1');
+		const remove = validateTrackEditFormData(removeForm, 1024);
+		expect(remove.success && remove.coverOperation).toEqual({ kind: 'remove' });
+
+		removeForm.set(
+			'coverImage',
+			new File([new Uint8Array([1])], 'cover.png', { type: 'image/png' })
+		);
+		const conflict = validateTrackEditFormData(removeForm, 1024);
+		expect(conflict).toMatchObject({
+			success: false,
+			errors: {
+				coverImage: 'Choose either a replacement cover image or removal, not both.'
+			}
+		});
 	});
 });

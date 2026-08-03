@@ -40,6 +40,7 @@ export type {
 	PlaylistDocument,
 	PlaylistItemDocument,
 	SessionDocument,
+	TrackCoverImageDocument,
 	TrackDocument,
 	UserDocument
 } from './documents';

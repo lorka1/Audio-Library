@@ -40,6 +40,7 @@ function trackDocument({ id, publicId, ownerId, visibility, title }) {
 		mimeType: 'audio/mpeg',
 		fileSizeBytes: 64,
 		durationMs: null,
+		coverImage: null,
 		visibility,
 		createdAt: now,
 		updatedAt: now

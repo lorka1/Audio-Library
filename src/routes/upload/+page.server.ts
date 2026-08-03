@@ -1,12 +1,13 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { requireUser } from '$lib/server/auth/guards';
-import { serverConfig } from '$lib/server/config';
+import { getServerConfig } from '$lib/server/config';
 import { logTrackStorageError } from '$lib/server/tracks/logging';
 import { GENERIC_UPLOAD_ERROR, uploadTrack } from '$lib/server/tracks/service';
 import {
 	audioFileTooLargeMessage,
 	emptyUploadFormValues,
+	hasSelectedCoverImage,
 	type UploadErrors,
 	type UploadFormValues
 } from '$lib/server/tracks/validation';
@@ -15,16 +16,19 @@ interface UploadFailureData {
 	values: UploadFormValues;
 	errors: UploadErrors;
 	needsAudioFileReselection: true;
+	needsCoverImageReselection: boolean;
 }
 
 function uploadFailureData(
 	values: UploadFormValues,
-	errors: UploadErrors
+	errors: UploadErrors,
+	needsCoverImageReselection = false
 ): UploadFailureData {
 	return {
 		values,
 		errors,
-		needsAudioFileReselection: true
+		needsAudioFileReselection: true,
+		needsCoverImageReselection
 	};
 }
 
@@ -39,15 +43,18 @@ function readHttpStatus(error: unknown): number | null {
 
 export const load = ((event) => {
 	requireUser(event);
+	const config = getServerConfig();
 
 	return {
-		maxAudioFileSizeMb: serverConfig.maxAudioFileSizeMb
+		maxAudioFileSizeMb: config.maxAudioFileSizeMb,
+		maxCoverImageSizeMb: config.coverImageMaxSizeMb
 	};
 }) satisfies PageServerLoad;
 
 export const actions = {
 	default: async (event) => {
 		const user = requireUser(event);
+		const config = getServerConfig();
 		let formData: FormData;
 		let createdTrackId: number;
 
@@ -64,9 +71,9 @@ export const actions = {
 				requestTooLarge ? 413 : 400,
 				uploadFailureData(emptyUploadFormValues(), {
 					...(requestTooLarge
-						? { audioFile: audioFileTooLargeMessage(serverConfig.maxAudioFileSizeBytes) }
+						? { audioFile: audioFileTooLargeMessage(config.maxAudioFileSizeBytes) }
 						: { general: GENERIC_UPLOAD_ERROR })
-				})
+				}, true)
 			);
 		}
 
@@ -74,11 +81,19 @@ export const actions = {
 			const result = await uploadTrack({
 				ownerId: user.id,
 				formData,
-				maxFileSizeBytes: serverConfig.maxAudioFileSizeBytes
+				maxFileSizeBytes: config.maxAudioFileSizeBytes,
+				maxCoverImageSizeBytes: config.coverImageMaxSizeBytes
 			});
 
 			if (!result.success) {
-				return fail(result.status, uploadFailureData(result.values, result.errors));
+				return fail(
+					result.status,
+					uploadFailureData(
+						result.values,
+						result.errors,
+						result.needsCoverImageReselection
+					)
+				);
 			}
 
 			createdTrackId = result.track.id;
@@ -86,7 +101,11 @@ export const actions = {
 			logTrackStorageError('Unexpected audio upload failure.', error);
 			return fail(
 				500,
-				uploadFailureData(emptyUploadFormValues(), { general: GENERIC_UPLOAD_ERROR })
+				uploadFailureData(
+					emptyUploadFormValues(),
+					{ general: GENERIC_UPLOAD_ERROR },
+					hasSelectedCoverImage(formData)
+				)
 			);
 		}
 

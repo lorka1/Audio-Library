@@ -5,7 +5,7 @@ import { randomBytes } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { cp, lstat, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { MongoClientManager } from '../src/lib/server/mongodb/client.ts';
 import {
 	assertMongoTestDatabaseName,
@@ -17,6 +17,7 @@ import { verifyMongoOperationalState } from '../src/lib/server/mongodb/verificat
 import { createMongoTrackRepository } from '../src/lib/server/tracks/mongodb-repository.ts';
 import { safeMongoAggregateFingerprint } from './lib/mongodb-fingerprint.mjs';
 import { directoryAggregate, requireSafeDestinationRoot } from './lib/backup-safety.mjs';
+import { resolveMongoDatabaseTool } from './lib/mongodb-database-tools.mjs';
 
 const config = readMongoConfig(process.env);
 const databaseBackup = requireSafeDestinationRoot(
@@ -44,23 +45,50 @@ assert.notEqual(restoredDatabaseName, config.testDatabaseName);
 const temporaryAudioRoot = await mkdtemp(join(tmpdir(), 'audio-library-restore-'));
 const restoredAudio = resolve(temporaryAudioRoot, 'audio');
 const manager = new MongoClientManager(config);
-let existedBefore = false;
+let restoredDatabaseAuthorizedForCleanup = false;
 let primaryFailure;
 const cleanupFailures = [];
 
-function runRestore() {
+function resolveRestoredMediaFile(root, storedFilename) {
+	if (
+		typeof storedFilename !== 'string' ||
+		!storedFilename.trim() ||
+		/[\\/]/.test(storedFilename)
+	) {
+		throw new Error('Restored media metadata is invalid.');
+	}
+	const storageRoot = resolve(root);
+	const candidate = resolve(storageRoot, storedFilename);
+	const relation = relative(storageRoot, candidate);
+	if (
+		!relation ||
+		relation === '..' ||
+		relation.startsWith(`..${sep}`) ||
+		isAbsolute(relation) ||
+		relation.includes(sep)
+	) {
+		throw new Error('Restored media metadata escapes its private storage root.');
+	}
+	return candidate;
+}
+
+function runRestore(executablePath) {
 	return new Promise((resolveRun, rejectRun) => {
 		const source = resolve(databaseBackup, 'dump', config.databaseName);
 		if (!existsSync(source)) {
 			rejectRun(new Error('MongoDB backup source is incomplete.'));
 			return;
 		}
-		const child = spawn(process.env.MONGORESTORE_BINARY?.trim() || 'mongorestore', [
+		const child = spawn(executablePath, [
 			'--uri', config.uri,
 			'--db', restoredDatabaseName,
 			'--quiet',
 			source
-		], { stdio: ['ignore', 'ignore', 'ignore'], windowsHide: true });
+		], {
+			shell: false,
+			stdio: ['ignore', 'ignore', 'ignore'],
+			windowsHide: true
+		});
 		const timer = setTimeout(() => {
 			child.kill('SIGKILL');
 			rejectRun(new Error('MongoDB restore verification timed out.'));
@@ -70,20 +98,24 @@ function runRestore() {
 			clearTimeout(timer);
 			rejectRun(error);
 		});
-		child.once('close', (code) => {
+		child.once('close', (code, signal) => {
 			clearTimeout(timer);
 			if (code === 0) resolveRun();
-			else rejectRun(new Error('mongorestore exited unsuccessfully.'));
+			else rejectRun(Object.assign(new Error('mongorestore exited unsuccessfully.'), {
+				code,
+				signal
+			}));
 		});
 	});
 }
 
 try {
+	const mongorestore = await resolveMongoDatabaseTool('mongorestore');
 	const client = await manager.connect();
 	const before = await client.db('admin').admin().listDatabases({ nameOnly: true });
-	existedBefore = before.databases.some(({ name }) => name === restoredDatabaseName);
-	assert.equal(existedBefore, false);
-	await runRestore();
+	assert.equal(before.databases.some(({ name }) => name === restoredDatabaseName), false);
+	restoredDatabaseAuthorizedForCleanup = true;
+	await runRestore(mongorestore.executablePath);
 	await cp(resolve(audioBackup, 'audio'), restoredAudio, {
 		recursive: true,
 		errorOnExist: true,
@@ -110,10 +142,31 @@ try {
 	const detail = await repository.findPublicTrackByPublicId(browse[0].id);
 	const stream = await repository.findTrackForStreaming(browse[0].id);
 	assert.ok(detail && stream, 'Synthetic restored detail/stream lookup failed.');
-	const restoredFile = resolve(restoredAudio, stream.storedFilename);
+	const restoredFile = resolveRestoredMediaFile(restoredAudio, stream.storedFilename);
 	const restoredFileInfo = await lstat(restoredFile);
 	assert.ok(restoredFileInfo.isFile() && !restoredFileInfo.isSymbolicLink());
 	assert.equal(restoredFileInfo.size, stream.fileSizeBytes);
+	const coveredTracks = await restoredCollections.tracks.find(
+		{ coverImage: { $type: 'object' } },
+		{
+			projection: { _id: 0, publicId: 1, ownerId: 1 },
+			maxTimeMS: 5_000
+		}
+	).toArray();
+	for (const coveredTrack of coveredTracks) {
+		const cover = await repository.findTrackCoverForAccess(
+			coveredTrack.publicId,
+			coveredTrack.ownerId
+		);
+		assert.ok(cover, 'Synthetic restored cover lookup failed.');
+		const restoredCoverFile = resolveRestoredMediaFile(
+			resolve(restoredAudio, 'covers'),
+			cover.storageKey
+		);
+		const restoredCoverFileInfo = await lstat(restoredCoverFile);
+		assert.ok(restoredCoverFileInfo.isFile() && !restoredCoverFileInfo.isSymbolicLink());
+		assert.equal(restoredCoverFileInfo.size, cover.byteSize);
+	}
 	const playlistCount = await restoredCollections.playlists.countDocuments({});
 	const playlistItemCount = await restoredCollections.playlistItems.countDocuments({});
 	if (playlistCount > 0) {
@@ -136,6 +189,7 @@ try {
 		status: 'verified',
 		databaseRestore: true,
 		audioRestore: true,
+		coverRestore: true,
 		playlistRestore: true,
 		applicationReadOnlyProbe: true
 	}));
@@ -145,7 +199,10 @@ try {
 	try {
 		const client = await manager.connect();
 		const listed = await client.db('admin').admin().listDatabases({ nameOnly: true });
-		if (listed.databases.some(({ name }) => name === restoredDatabaseName) && !existedBefore) {
+		if (
+			restoredDatabaseAuthorizedForCleanup &&
+			listed.databases.some(({ name }) => name === restoredDatabaseName)
+		) {
 			await client.db(restoredDatabaseName).dropDatabase({ timeoutMS: 10_000 });
 		}
 	} catch (error) {

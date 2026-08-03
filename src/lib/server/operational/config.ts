@@ -6,10 +6,13 @@ import { parseMongoConfig, type MongoConfig, type MongoEnvironment } from '../mo
 const COOKIE_PATTERN = /^[A-Za-z0-9_-]+$/;
 const BODY_LIMIT_PATTERN = /^(\d+(?:\.\d+)?)\s*([KMG])?B?$/i;
 const MEBIBYTE = 1024 * 1024;
+export const DEFAULT_COVER_IMAGE_MAX_SIZE_MB = 5;
+export const MULTIPART_UPLOAD_OVERHEAD_BYTES = MEBIBYTE;
 
 export interface OperationalEnvironment extends MongoEnvironment {
 	AUDIO_STORAGE_PATH?: string;
 	MAX_AUDIO_FILE_SIZE_MB?: string;
+	COVER_IMAGE_MAX_SIZE_MB?: string;
 	BODY_SIZE_LIMIT?: string;
 	SESSION_COOKIE_NAME?: string;
 	SESSION_DURATION_DAYS?: string;
@@ -20,8 +23,11 @@ export interface OperationalEnvironment extends MongoEnvironment {
 export interface OperationalConfig {
 	mongo: MongoConfig;
 	audioStoragePath: string;
+	coverImageStoragePath: string;
 	maxAudioFileSizeMb: number;
 	maxAudioFileSizeBytes: number;
+	coverImageMaxSizeMb: number;
+	coverImageMaxSizeBytes: number;
 	bodySizeLimitBytes: number;
 	sessionCookieName: string;
 	sessionDurationDays: number;
@@ -93,12 +99,31 @@ export function parseOperationalConfig(
 		'MAX_AUDIO_FILE_SIZE_MB'
 	);
 	const maxAudioFileSizeBytes = Math.floor(maxAudioFileSizeMb * MEBIBYTE);
-	if (!Number.isSafeInteger(maxAudioFileSizeBytes)) {
+	if (!Number.isSafeInteger(maxAudioFileSizeBytes) || maxAudioFileSizeBytes < 1) {
 		throw new Error('MAX_AUDIO_FILE_SIZE_MB is outside the supported range.');
 	}
+	const coverImageMaxSizeMb = environment.COVER_IMAGE_MAX_SIZE_MB?.trim()
+		? parsePositiveNumber(
+				environment.COVER_IMAGE_MAX_SIZE_MB,
+				'COVER_IMAGE_MAX_SIZE_MB'
+			)
+		: DEFAULT_COVER_IMAGE_MAX_SIZE_MB;
+	const coverImageMaxSizeBytes = Math.floor(coverImageMaxSizeMb * MEBIBYTE);
+	if (!Number.isSafeInteger(coverImageMaxSizeBytes) || coverImageMaxSizeBytes < 1) {
+		throw new Error('COVER_IMAGE_MAX_SIZE_MB is outside the supported range.');
+	}
 	const bodySizeLimitBytes = parseBodySizeLimit(required(environment, 'BODY_SIZE_LIMIT'));
-	if (bodySizeLimitBytes <= maxAudioFileSizeBytes) {
-		throw new Error('BODY_SIZE_LIMIT must be greater than the maximum audio file size.');
+	const minimumBodySizeLimitBytes =
+		maxAudioFileSizeBytes +
+		coverImageMaxSizeBytes +
+		MULTIPART_UPLOAD_OVERHEAD_BYTES;
+	if (!Number.isSafeInteger(minimumBodySizeLimitBytes)) {
+		throw new Error('The combined upload size limit is outside the supported range.');
+	}
+	if (bodySizeLimitBytes < minimumBodySizeLimitBytes) {
+		throw new Error(
+			'BODY_SIZE_LIMIT must accommodate the maximum audio file, maximum cover image, and 1 MB of multipart overhead.'
+		);
 	}
 
 	const sessionCookieName = required(environment, 'SESSION_COOKIE_NAME');
@@ -113,8 +138,11 @@ export function parseOperationalConfig(
 	return {
 		mongo,
 		audioStoragePath,
+		coverImageStoragePath: resolve(audioStoragePath, 'covers'),
 		maxAudioFileSizeMb,
 		maxAudioFileSizeBytes,
+		coverImageMaxSizeMb,
+		coverImageMaxSizeBytes,
 		bodySizeLimitBytes,
 		sessionCookieName,
 		sessionDurationDays,
@@ -132,11 +160,11 @@ export function assertProductionRuntimeConfig(environment: OperationalEnvironmen
 	required(environment, 'MONGODB_URI');
 }
 
-export async function preparePrivateAudioStorage(path: string): Promise<void> {
+async function preparePrivateStorage(path: string, label: string): Promise<void> {
 	await mkdir(path, { recursive: true });
 	const info = await lstat(path);
 	if (!info.isDirectory() || info.isSymbolicLink()) {
-		throw new Error('AUDIO_STORAGE_PATH must resolve to a private directory.');
+		throw new Error(`${label} must resolve to a private directory.`);
 	}
 	await access(path, constants.R_OK | constants.W_OK);
 	const probe = resolve(path, `.startup-${process.pid}-${Date.now()}.tmp`);
@@ -151,10 +179,26 @@ export async function preparePrivateAudioStorage(path: string): Promise<void> {
 	}
 }
 
-export async function checkPrivateAudioStorage(path: string): Promise<void> {
+async function checkPrivateStorage(path: string, message: string): Promise<void> {
 	const info = await lstat(path);
 	if (!info.isDirectory() || info.isSymbolicLink()) {
-		throw new Error('Private audio storage is unavailable.');
+		throw new Error(message);
 	}
 	await access(path, constants.R_OK);
+}
+
+export async function preparePrivateAudioStorage(path: string): Promise<void> {
+	await preparePrivateStorage(path, 'AUDIO_STORAGE_PATH');
+}
+
+export async function preparePrivateCoverImageStorage(path: string): Promise<void> {
+	await preparePrivateStorage(path, 'Private cover image storage');
+}
+
+export async function checkPrivateAudioStorage(path: string): Promise<void> {
+	await checkPrivateStorage(path, 'Private audio storage is unavailable.');
+}
+
+export async function checkPrivateCoverImageStorage(path: string): Promise<void> {
+	await checkPrivateStorage(path, 'Private cover image storage is unavailable.');
 }

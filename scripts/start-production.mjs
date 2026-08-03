@@ -6,7 +6,8 @@ import { closeMongoClient, MongoClientManager } from '../src/lib/server/mongodb/
 import {
 	assertProductionRuntimeConfig,
 	parseOperationalConfig,
-	preparePrivateAudioStorage
+	preparePrivateAudioStorage,
+	preparePrivateCoverImageStorage
 } from '../src/lib/server/operational/config.ts';
 import { verifyMongoOperationalState } from '../src/lib/server/mongodb/verification.ts';
 import { installShutdownSignalHandlers } from '../src/lib/server/operational/signals.ts';
@@ -15,6 +16,7 @@ const SHUTDOWN_TIMEOUT_MS = 10_000;
 assertProductionRuntimeConfig(process.env);
 const config = parseOperationalConfig(process.env);
 await preparePrivateAudioStorage(config.audioStoragePath);
+await preparePrivateCoverImageStorage(config.coverImageStoragePath);
 const startupManager = new MongoClientManager(config.mongo);
 let server;
 let shutdownPromise;

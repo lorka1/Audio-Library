@@ -6,8 +6,11 @@ import {
 	assertPrivateAudioStoragePath,
 	assertProductionRuntimeConfig,
 	checkPrivateAudioStorage,
+	checkPrivateCoverImageStorage,
+	MULTIPART_UPLOAD_OVERHEAD_BYTES,
 	parseOperationalConfig,
 	preparePrivateAudioStorage,
+	preparePrivateCoverImageStorage,
 	type OperationalEnvironment
 } from './config';
 
@@ -18,7 +21,7 @@ const valid: OperationalEnvironment = {
 	MONGODB_TEST_DB_NAME: 'audio_library_test_unit',
 	AUDIO_STORAGE_PATH: 'private-audio',
 	MAX_AUDIO_FILE_SIZE_MB: '50',
-	BODY_SIZE_LIMIT: '55M',
+	BODY_SIZE_LIMIT: '60M',
 	SESSION_COOKIE_NAME: 'audio_library_session',
 	SESSION_DURATION_DAYS: '7'
 };
@@ -28,6 +31,22 @@ afterEach(async () => {
 });
 
 describe('operational startup configuration', () => {
+	it('derives private cover storage and applies a backward-compatible 5 MB default', () => {
+		const config = parseOperationalConfig(valid, resolve('fixture-project'));
+		expect(config.coverImageMaxSizeMb).toBe(5);
+		expect(config.coverImageMaxSizeBytes).toBe(5 * 1024 * 1024);
+		expect(config.coverImageStoragePath).toBe(
+			resolve('fixture-project', 'private-audio', 'covers')
+		);
+
+		const configured = parseOperationalConfig({
+			...valid,
+			COVER_IMAGE_MAX_SIZE_MB: '2.5'
+		});
+		expect(configured.coverImageMaxSizeMb).toBe(2.5);
+		expect(configured.coverImageMaxSizeBytes).toBe(2.5 * 1024 * 1024);
+	});
+
 	it.each([
 		['MONGODB_URI', undefined, 'Missing required environment variable MONGODB_URI.'],
 		['MONGODB_URI', 'not-a-uri', 'MONGODB_URI must be a valid'],
@@ -39,13 +58,66 @@ describe('operational startup configuration', () => {
 		expect(() => parseOperationalConfig({ ...valid, [name]: value })).toThrow(message);
 	});
 
-	it('rejects public audio storage and incompatible body limits', () => {
+	it('rejects public audio storage', () => {
 		expect(() =>
 			parseOperationalConfig({ ...valid, AUDIO_STORAGE_PATH: 'static/audio' })
 		).toThrow('must not be inside a publicly served directory');
+	});
+
+	it('requires room for maximum audio, maximum cover, and multipart overhead', () => {
+		expect(MULTIPART_UPLOAD_OVERHEAD_BYTES).toBe(1024 * 1024);
+		for (const bodySizeLimit of ['51M', '55M']) {
+			expect(() =>
+				parseOperationalConfig({ ...valid, BODY_SIZE_LIMIT: bodySizeLimit })
+			).toThrow(
+				'maximum audio file, maximum cover image, and 1 MB of multipart overhead'
+			);
+		}
+
 		expect(() =>
-			parseOperationalConfig({ ...valid, BODY_SIZE_LIMIT: '50M' })
-		).toThrow('must be greater');
+			parseOperationalConfig({ ...valid, BODY_SIZE_LIMIT: '56M' })
+		).not.toThrow();
+	});
+
+	it.each([
+		['MAX_AUDIO_FILE_SIZE_MB', '0'],
+		['MAX_AUDIO_FILE_SIZE_MB', '-1'],
+		['MAX_AUDIO_FILE_SIZE_MB', '0.0000001'],
+		['COVER_IMAGE_MAX_SIZE_MB', '0'],
+		['COVER_IMAGE_MAX_SIZE_MB', '-1'],
+		['COVER_IMAGE_MAX_SIZE_MB', '0.0000001'],
+		['COVER_IMAGE_MAX_SIZE_MB', 'invalid'],
+		['BODY_SIZE_LIMIT', '0'],
+		['BODY_SIZE_LIMIT', '-1'],
+		['BODY_SIZE_LIMIT', 'invalid']
+	] as const)('rejects invalid non-positive upload configuration %s=%s', (name, value) => {
+		expect(() => parseOperationalConfig({ ...valid, [name]: value })).toThrow();
+	});
+
+	it('keeps the common request limit valid for uploads that omit a cover', () => {
+		const config = parseOperationalConfig({
+			...valid,
+			COVER_IMAGE_MAX_SIZE_MB: undefined,
+			BODY_SIZE_LIMIT: '60M'
+		});
+		expect(config.bodySizeLimitBytes).toBe(60 * 1024 * 1024);
+		expect(config.coverImageMaxSizeMb).toBe(5);
+	});
+
+	it('reports an incompatible body limit without exposing configuration secrets', () => {
+		const secret = 'body-limit-secret';
+		let message = '';
+		try {
+			parseOperationalConfig({
+				...valid,
+				MONGODB_URI: `mongodb://fixture:${secret}@fixture.example.invalid:27017`,
+				BODY_SIZE_LIMIT: '51M'
+			});
+		} catch (error) {
+			message = error instanceof Error ? error.message : String(error);
+		}
+		expect(message).toContain('BODY_SIZE_LIMIT');
+		expect(message).not.toContain(secret);
 	});
 
 	it('requires HTTPS origin for safe production cookies', () => {
@@ -72,6 +144,9 @@ describe('operational startup configuration', () => {
 		roots.push(root);
 		const storage = resolve(root, 'audio');
 		await expect(preparePrivateAudioStorage(storage)).resolves.toBeUndefined();
+		const covers = resolve(storage, 'covers');
+		await expect(preparePrivateCoverImageStorage(covers)).resolves.toBeUndefined();
+		await expect(checkPrivateCoverImageStorage(covers)).resolves.toBeUndefined();
 	});
 
 	it('rejects a file where an audio directory is required', async () => {

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import CoverImageField from '$lib/components/CoverImageField.svelte';
 	import { MUSIC_GENRES, MUSICAL_KEYS } from '$lib/constants/music';
 	import { formatFileSize } from '$lib/formatting';
 	import type { PageProps } from './$types';
@@ -38,8 +39,8 @@
 				<p class="auth-eyebrow">Owner-only metadata</p>
 				<h1>Edit track</h1>
 				<p>
-					Update descriptive metadata only. The audio file, ownership, visibility, and track
-					identifiers will not change.
+					Update descriptive metadata and optional cover artwork. The audio file, ownership,
+					visibility, and track identifiers will not change.
 				</p>
 			</header>
 
@@ -60,7 +61,17 @@
 				</div>
 			{/if}
 
-			<form method="POST" class="form-stack">
+			<form method="POST" enctype="multipart/form-data" class="form-stack">
+				<CoverImageField
+					maxSizeMb={data.maxCoverImageSizeMb}
+					currentCoverImageUrl={data.track.coverImageUrl}
+					error={form?.errors.coverImage}
+					needsReselection={form?.needsCoverImageReselection}
+					removeCoverImageRequested={form?.removeCoverImageRequested}
+					allowRemoval={true}
+					trackTitle={values.title || data.track.title}
+				/>
+
 				<div class="upload-form-grid">
 					<div class="form-field">
 						<label for="title">Title</label>
@@ -186,7 +197,7 @@
 				</div>
 
 				<div class="management-actions">
-					<button class="primary-button" type="submit">Save metadata</button>
+					<button class="primary-button" type="submit">Save changes</button>
 					<a class="secondary-button" href="/my-tracks">Cancel</a>
 				</div>
 			</form>

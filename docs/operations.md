@@ -21,15 +21,21 @@ performs a controlled stop. No particular third-party manager is required.
 ## Private configuration and directories
 
 Copy `.env.example` to an untracked private environment source. Configure the
-MongoDB URI and database names, private audio path, upload/body limits, cookie
-name and duration, and the production host, port, and HTTPS origin. Backup
-commands additionally require explicit MongoDB and audio backup roots.
+MongoDB URI and database names, private media path, audio and cover upload
+limits, request-body limit, cookie name and duration, and the production host,
+port, and HTTPS origin. The request-body limit must be at least the combined
+audio and cover limits plus 1 MiB of multipart/form-data overhead. Startup
+rejects a smaller value instead of changing it silently. Backup commands
+additionally require explicit MongoDB and private-media backup roots.
 
 Do not print or commit the URI or credentials. Give the application identity
-read/write permission only to its private audio directory and application
-database. Place audio outside `static`, `public`, `build`, and any reverse-proxy
-document root. Backup roots should be protected and preferably on a separate
-disk. Logs belong in an operator-selected protected location.
+read/write permission only to its private media directory and application
+database. Audio files remain under `AUDIO_STORAGE_PATH`; optional covers use
+its private `covers/` subdirectory. Place the complete root outside `static`,
+`public`, `build`, and every reverse-proxy document root. Covers must be served
+only through `GET /api/tracks/[id]/cover`, never by exposing the storage root.
+Backup roots should be protected and preferably on a separate disk. Logs belong
+in an operator-selected protected location.
 
 Secure session cookies require HTTPS. Terminate HTTPS at a trusted reverse proxy,
 forward the original scheme and host correctly, and keep `ORIGIN` equal to the
@@ -46,9 +52,9 @@ external HTTPS origin.
 6. Start with `npm start`.
 7. Probe `/api/health/live` and `/api/health/ready`.
 
-Startup fails before listening when configuration, storage, MongoDB topology,
-indexes (including `playlists` and `playlistItems`), or counter state is unsafe.
-Startup does not reconnect forever.
+Startup fails before listening when configuration, private audio/cover storage,
+MongoDB topology, indexes (including `playlists` and `playlistItems`), or counter state is unsafe. Startup does not
+reconnect forever.
 Readiness is bounded and read-only. Liveness does not depend on MongoDB. SIGINT
 and SIGTERM stop accepting requests, wait a bounded interval, and close
 application-owned listeners and the shared MongoDB client exactly once.
@@ -68,11 +74,12 @@ npm run backup:audio
 ```
 
 The first wraps `mongodump` and naturally captures users, sessions, tracks,
-playlists, playlist items, counters, and migration markers; the second copies private audio and verifies file
-count, aggregate size, and aggregate content hash. Each creates a new
-timestamped destination, uses an `INCOMPLETE` marker until successful, and
-writes a sanitized manifest. Neither overwrites output or deletes old backups.
-The audio copy includes every stored file, including an unreferenced one.
+playlists, playlist items, counters, and migration markers; the second recursively copies private audio and
+the `covers/` subdirectory, then verifies file count, aggregate size, and
+aggregate content hash. Each creates a new timestamped destination, uses an
+`INCOMPLETE` marker until successful, and writes a sanitized manifest. Neither
+overwrites output or deletes old backups. The private-media copy includes every
+stored file, including an unreferenced audio file.
 
 Treat both outputs as one logical recovery set. Record the pairing in private
 operational inventory, apply a separately approved retention policy, and never
@@ -85,17 +92,34 @@ npm run test:mongodb:recovery
 ```
 
 It creates an owned test source and restore database plus temporary private
-audio, then checks indexes, safe aggregates, counter compatibility, referenced
-audio, read-only Browse/detail/stream repository paths, and synthetic playlist
-and membership restore. Cleanup removes only its exact owned databases and
-temporary directories.
+audio and cover storage, then checks indexes, safe aggregates, counter
+compatibility, referenced audio and covers, and read-only
+Browse/detail/stream/cover paths plus synthetic playlist and membership restore.
+Cleanup removes only its exact owned databases
+and temporary directories.
 
 For an operator-supplied synthetic pair, set `MONGODB_RESTORE_SOURCE` and
 `AUDIO_RESTORE_SOURCE` to the two completed directories and run
 `npm run verify:mongodb:restore`. It never targets the configured application
-database, a pre-existing test database, or real audio storage. A real disaster
-restore requires separate approval, a maintenance window, verified targets, and
-a current paired recovery set.
+database, a pre-existing test database, or real audio/cover storage. A real
+disaster restore requires separate approval, a maintenance window, verified
+targets, and a current paired recovery set.
+
+## Cover-image lifecycle
+
+Cover images are optional. The application accepts only JPEG, PNG, and WebP
+files within `COVER_IMAGE_MAX_SIZE_MB` (5 MB in `.env.example`), validates both
+MIME type and extension, and stores bytes under the private
+`AUDIO_STORAGE_PATH/covers` directory using a generated filename. MongoDB
+stores metadata only.
+
+Public cover requests use the numeric route
+`GET /api/tracks/[id]/cover`; private tracks are not exposed publicly. Missing
+or unavailable cover files use the local UI fallback and do not reveal storage
+details. Owner replacement writes the new cover before changing metadata and
+removes the old cover only after persistence succeeds. Removal and track
+deletion use the same quarantine/restore discipline as audio so a database
+failure does not leave metadata and files in contradictory states.
 
 ## Playlist storage lifecycle
 
@@ -106,11 +130,11 @@ lookup/listing, unique membership, deterministic insertion order, and cleanup by
 track UUID. Readiness verifies these collections and exact indexes without
 writing or repairing them.
 
-Playlist actions never copy or touch audio files. Deleting a playlist
+Playlist actions never copy or touch audio/cover files. Deleting a playlist
 transactionally removes only that playlist and its membership rows. Deleting a
 track transactionally removes its membership rows alongside track metadata;
-the existing audio quarantine is restored if that database transaction fails.
-Removing playlist membership alone never deletes the track.
+the existing audio/cover quarantine is restored if that database transaction
+fails. Removing playlist membership alone never deletes the track.
 
 ## Firewall, monitoring, and logs
 
@@ -118,5 +142,6 @@ Expose HTTPS through the reverse proxy and keep MongoDB private. Monitor
 liveness independently from readiness to avoid uncontrolled restart loops.
 Operational logs contain only timestamp, severity, safe category/code, request
 ID, method, route category, status, and duration. Never add request bodies,
-cookies, authorization headers, identities, filenames, storage keys, absolute
-paths, MongoDB documents, URIs, credentials, or migration fingerprints.
+cookies, authorization headers, identities, audio or cover filenames, storage
+keys, absolute paths, MongoDB documents, URIs, credentials, or migration
+fingerprints.

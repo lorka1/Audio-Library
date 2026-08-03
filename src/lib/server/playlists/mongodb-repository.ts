@@ -53,6 +53,7 @@ interface PlaylistItemTrackRecord {
 		| 'ownerId'
 		| 'title'
 		| 'artist'
+		| 'coverImage'
 		| 'bpm'
 		| 'musicalKey'
 		| 'genre'
@@ -72,12 +73,26 @@ function summary(record: PlaylistSummaryRecord): PlaylistSummary {
 	};
 }
 
+function hasCover(track: NonNullable<PlaylistItemTrackRecord['track']>): boolean {
+	return Boolean(
+		track.coverImage &&
+			typeof track.coverImage.storageKey === 'string' &&
+			track.coverImage.storageKey.length > 0 &&
+			typeof track.coverImage.mimeType === 'string' &&
+			Number.isSafeInteger(track.coverImage.byteSize) &&
+			track.coverImage.byteSize > 0
+	);
+}
+
 function playlistTrack(record: PlaylistItemTrackRecord): PlaylistTrack | null {
 	if (!record.track) return null;
 	return {
 		id: record.track.publicId,
 		title: record.track.title,
 		artist: record.track.artist,
+		coverImageUrl: hasCover(record.track)
+			? `/api/tracks/${record.track.publicId}/cover`
+			: null,
 		bpm: record.track.bpm,
 		musicalKey: record.track.musicalKey,
 		genre: record.track.genre,
@@ -256,6 +271,7 @@ export function createMongoPlaylistRepository(
 								ownerId: 1,
 								title: 1,
 								artist: 1,
+								coverImage: 1,
 								bpm: 1,
 								musicalKey: 1,
 								genre: 1,

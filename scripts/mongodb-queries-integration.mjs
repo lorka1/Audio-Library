@@ -17,7 +17,7 @@ import {
 
 const OPERATION_TIMEOUT_MS = 5_000;
 const TOTAL_TIMEOUT_MS = 120_000;
-const EXPECTED_CHECKS = 34;
+const EXPECTED_CHECKS = 35;
 let checkNumber = 0;
 let activeStep = 'setup';
 
@@ -103,6 +103,7 @@ function seedDefinitions(ownerId) {
 		mimeType: 'audio/mpeg',
 		fileSizeBytes: 100 + publicId,
 		durationMs: null,
+		coverImage: null,
 		visibility: 'public',
 		createdAt: new Date((second + publicId) * 1_000),
 		updatedAt: new Date((second + publicId) * 1_000),
@@ -113,7 +114,12 @@ function seedDefinitions(ownerId) {
 			title: 'Zulu Beat',
 			artist: 'Alpha Artist',
 			bpm: 140,
-			description: 'Sunset festival recording.'
+			description: 'Sunset festival recording.',
+			coverImage: {
+				storageKey: `${randomUUID()}.png`,
+				mimeType: 'image/png',
+				byteSize: 68
+			}
 		}),
 		fields(2, {
 			title: 'alpha pulse',
@@ -151,13 +157,17 @@ function seedDefinitions(ownerId) {
 			createdAt: new Date((second + 20) * 1_000),
 			updatedAt: new Date((second + 20) * 1_000)
 		}),
-		fields(7, {
+		(() => {
+			const legacyTrack = fields(7, {
 			title: 'No BPM',
 			artist: 'Null Artist',
 			bpm: null,
 			musicalKey: null,
 			genre: null
-		})
+			});
+			delete legacyTrack.coverImage;
+			return legacyTrack;
+		})()
 	];
 }
 
@@ -199,6 +209,9 @@ function expectedRecords(definitions, query) {
 		id: record.publicId,
 		title: record.title,
 		artist: record.artist,
+		coverImageUrl: record.coverImage
+			? `/api/tracks/${record.publicId}/cover`
+			: null,
 		bpm: record.bpm,
 		musicalKey: record.musicalKey,
 		genre: record.genre,
@@ -261,6 +274,31 @@ async function main() {
 		}
 
 		await behavior('default public listing', { sort: DEFAULT_TRACK_SORT });
+		await behavior(
+			'cover URL and legacy cover compatibility',
+			{ sort: 'oldest' },
+			(records) => {
+				assert.equal(
+					records.find(({ id }) => id === 1)?.coverImageUrl,
+					'/api/tracks/1/cover'
+				);
+				assert.equal(
+					records.find(({ id }) => id === 2)?.coverImageUrl,
+					null
+				);
+				assert.equal(
+					records.find(({ id }) => id === 7)?.coverImageUrl,
+					null
+				);
+				assert.equal(
+					Object.hasOwn(
+						definitions.find(({ publicId }) => publicId === 7) ?? {},
+						'coverImage'
+					),
+					false
+				);
+			}
+		);
 		await behavior('private tracks excluded', { sort: 'newest' }, (records) =>
 			assert.equal(records.some(({ title }) => title.startsWith('Private')), false));
 		await behavior('title substring search', { q: 'pulse', sort: 'newest' });
@@ -297,7 +335,7 @@ async function main() {
 		});
 		await behavior('public-safe projection', { q: 'Zulu', sort: 'newest' }, (records) =>
 			assert.deepEqual(Object.keys(records[0] ?? {}).sort(), [
-				'artist', 'bpm', 'createdAt', 'description', 'fileSizeBytes', 'genre',
+				'artist', 'bpm', 'coverImageUrl', 'createdAt', 'description', 'fileSizeBytes', 'genre',
 				'id', 'musicalKey', 'ownerUsername', 'title', 'updatedAt'
 			]));
 		await check('development MongoDB safe aggregate hash remains unchanged', async () =>

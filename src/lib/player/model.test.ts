@@ -7,6 +7,7 @@ describe('toPublicPlayerTrack', () => {
 			id: 42,
 			title: 'Release Fixture Track',
 			artist: 'Fixture Artist',
+			coverImageUrl: '/api/tracks/42/cover',
 			internalId: '11111111-1111-4111-8111-111111111111',
 			ownerId: 'private-owner-id',
 			ownerEmail: 'private@example.test',
@@ -21,6 +22,7 @@ describe('toPublicPlayerTrack', () => {
 			id: 42,
 			title: 'Release Fixture Track',
 			artist: 'Fixture Artist',
+			coverImageUrl: '/api/tracks/42/cover',
 			streamUrl: '/api/tracks/42/stream',
 			detailsUrl: '/tracks/42'
 		});
@@ -28,6 +30,7 @@ describe('toPublicPlayerTrack', () => {
 			'id',
 			'title',
 			'artist',
+			'coverImageUrl',
 			'streamUrl',
 			'detailsUrl'
 		]);

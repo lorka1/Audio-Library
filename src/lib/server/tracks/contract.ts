@@ -3,6 +3,12 @@ import type { OwnerTrack, PublicTrack, TrackVisibility } from '../../types';
 import type { TrackSearchFilters } from '../../tracks-query';
 import type { ValidatedTrackMetadata } from './validation';
 
+export interface StoredCoverImage {
+	storageKey: string;
+	mimeType: string;
+	byteSize: number;
+}
+
 export interface CreateTrackInput {
 	id: string;
 	ownerId: string;
@@ -16,6 +22,7 @@ export interface CreateTrackInput {
 	storageKey: string;
 	mimeType: string;
 	fileSizeBytes: number;
+	coverImage?: StoredCoverImage | null;
 	createdAt: Date;
 	updatedAt: Date;
 }
@@ -50,10 +57,20 @@ export interface TrackForDownload extends TrackForStreaming {
 export interface OwnerTrackStorage {
 	publicId: number;
 	storedFilename: string;
+	coverImage: StoredCoverImage | null;
 }
 
 export interface UpdateOwnerTrackMetadataInput extends ValidatedTrackMetadata {
+	/**
+	 * Omitted retains the current cover, null removes it, and a value replaces
+	 * it. Storage orchestration remains outside the repository.
+	 */
+	coverImage?: StoredCoverImage | null;
 	updatedAt: Date;
+}
+
+export interface TrackCoverForDelivery extends StoredCoverImage {
+	publicId: number;
 }
 
 export type DuplicateTrackField = 'publicId' | 'storageKey' | 'id';
@@ -75,6 +92,10 @@ export interface TrackRepository {
 	listPublicTracks(query: TrackSearchFilters): Promise<PublicTrack[]>;
 	findTrackForStreaming(publicId: number): Promise<TrackForStreaming | null>;
 	findTrackForDownload(publicId: number): Promise<TrackForDownload | null>;
+	findTrackCoverForAccess(
+		publicId: number,
+		requesterOwnerId?: string | null
+	): Promise<TrackCoverForDelivery | null>;
 	listTracksForOwner(ownerId: string): Promise<OwnerTrack[]>;
 	findOwnerTrack(publicId: number, ownerId: string): Promise<OwnerTrack | null>;
 	updateOwnerTrackMetadata(

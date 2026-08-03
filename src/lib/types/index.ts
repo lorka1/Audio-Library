@@ -22,6 +22,7 @@ export interface PublicTrack {
 	id: number;
 	title: string;
 	artist: string;
+	coverImageUrl: string | null;
 	bpm: number | null;
 	musicalKey: string | null;
 	genre: string | null;
@@ -36,6 +37,7 @@ export interface OwnerTrack {
 	publicId: number;
 	title: string;
 	artist: string;
+	coverImageUrl: string | null;
 	bpm: number | null;
 	musicalKey: string | null;
 	genre: string | null;
@@ -61,6 +63,7 @@ export interface PlaylistTrack {
 	id: number;
 	title: string;
 	artist: string;
+	coverImageUrl: string | null;
 	bpm: number | null;
 	musicalKey: string | null;
 	genre: string | null;

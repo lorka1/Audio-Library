@@ -12,17 +12,30 @@ const OWNER_ID = '11111111-1111-4111-8111-111111111111';
 const OTHER_ID = '22222222-2222-4222-8222-222222222222';
 const PUBLIC_ID = 42;
 const STORED_FILENAME = '33333333-3333-4333-8333-333333333333.mp3';
+const STORED_COVER_FILENAME = '44444444-4444-4444-8444-444444444444.png';
 const NOW = new Date('2026-07-26T12:00:00.000Z');
 const QUARANTINED_FILE = {
 	originalPath: 'C:\\private\\audio\\original.mp3',
 	quarantinePath: 'C:\\private\\audio\\.delete-private.tmp'
 };
+const QUARANTINED_COVER_FILE = {
+	originalPath: 'C:\\private\\audio\\covers\\original.png',
+	quarantinePath: 'C:\\private\\audio\\covers\\.delete-private.tmp'
+};
+
+function pngBytes(): Uint8Array<ArrayBuffer> {
+	const bytes = new Uint8Array(24);
+	bytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+	bytes.set([0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52], 8);
+	return bytes;
+}
 
 function ownerTrack(): OwnerTrack {
 	return {
 		publicId: PUBLIC_ID,
 		title: 'Updated title',
 		artist: 'Updated artist',
+		coverImageUrl: null,
 		bpm: 128,
 		musicalKey: 'D minor',
 		genre: 'Techno',
@@ -57,8 +70,19 @@ function dependencies(): TrackManagementDependencies {
 			.mockResolvedValue(ownerTrack()),
 		findFile: vi.fn<TrackManagementDependencies['findFile']>().mockResolvedValue({
 			publicId: PUBLIC_ID,
-			storedFilename: STORED_FILENAME
+			storedFilename: STORED_FILENAME,
+			coverImage: null
 		}),
+		saveCoverFile: vi
+			.fn<TrackManagementDependencies['saveCoverFile']>()
+			.mockResolvedValue({
+				storedFilename: STORED_COVER_FILENAME,
+				fileSizeBytes: 24,
+				mimeType: 'image/png'
+			}),
+		deleteCoverFile: vi
+			.fn<TrackManagementDependencies['deleteCoverFile']>()
+			.mockResolvedValue(undefined),
 		deleteRecord: vi
 			.fn<TrackManagementDependencies['deleteRecord']>()
 			.mockResolvedValue(true),
@@ -69,11 +93,20 @@ function dependencies(): TrackManagementDependencies {
 				state: 'quarantined',
 				file: QUARANTINED_FILE
 			}),
+		quarantineCoverFile: vi
+			.fn<TrackManagementDependencies['quarantineCoverFile']>()
+			.mockResolvedValue({ success: true, state: 'missing' }),
 		deleteQuarantinedFile: vi
 			.fn<TrackManagementDependencies['deleteQuarantinedFile']>()
 			.mockResolvedValue(undefined),
+		deleteQuarantinedCoverFile: vi
+			.fn<TrackManagementDependencies['deleteQuarantinedCoverFile']>()
+			.mockResolvedValue(undefined),
 		restoreQuarantinedFile: vi
 			.fn<TrackManagementDependencies['restoreQuarantinedFile']>()
+			.mockResolvedValue(undefined),
+		restoreQuarantinedCoverFile: vi
+			.fn<TrackManagementDependencies['restoreQuarantinedCoverFile']>()
 			.mockResolvedValue(undefined),
 		now: vi.fn<TrackManagementDependencies['now']>().mockReturnValue(NOW)
 	};
@@ -191,6 +224,163 @@ describe('updateTrackMetadata', () => {
 		});
 		expect(JSON.stringify(result)).not.toContain('C:\\private');
 		expect(JSON.stringify(consoleError.mock.calls)).not.toContain('C:\\private');
+	});
+
+	it('replaces a cover for the owner and cleans the previous file only after persistence', async () => {
+		const testDependencies = dependencies();
+		testDependencies.findFile = vi
+			.fn<TrackManagementDependencies['findFile']>()
+			.mockResolvedValue({
+				publicId: PUBLIC_ID,
+				storedFilename: STORED_FILENAME,
+				coverImage: {
+					storageKey: '55555555-5555-4555-8555-555555555555.jpg',
+					mimeType: 'image/jpeg',
+					byteSize: 8
+				}
+			});
+		testDependencies.quarantineCoverFile = vi
+			.fn<TrackManagementDependencies['quarantineCoverFile']>()
+			.mockResolvedValue({
+				success: true,
+				state: 'quarantined',
+				file: QUARANTINED_COVER_FILE
+			});
+		const formData = metadataFormData();
+		formData.set(
+			'coverImage',
+			new File([pngBytes()], 'replacement.png', { type: 'image/png' })
+		);
+
+		const result = await updateTrackMetadata(
+			{
+				publicId: PUBLIC_ID,
+				ownerId: OWNER_ID,
+				formData,
+				maxCoverImageSizeBytes: 1024
+			},
+			testDependencies
+		);
+
+		expect(result).toEqual({ success: true });
+		expect(testDependencies.updateMetadata).toHaveBeenCalledWith(
+			PUBLIC_ID,
+			OWNER_ID,
+			expect.objectContaining({
+				coverImage: {
+					storageKey: STORED_COVER_FILENAME,
+					mimeType: 'image/png',
+					byteSize: 24
+				}
+			})
+		);
+		expect(testDependencies.quarantineCoverFile).toHaveBeenCalledWith(
+			'55555555-5555-4555-8555-555555555555.jpg'
+		);
+		expect(testDependencies.deleteQuarantinedCoverFile).toHaveBeenCalledWith(
+			QUARANTINED_COVER_FILE
+		);
+	});
+
+	it('deletes a new replacement and leaves the previous cover untouched on database failure', async () => {
+		const testDependencies = dependencies();
+		testDependencies.findFile = vi
+			.fn<TrackManagementDependencies['findFile']>()
+			.mockResolvedValue({
+				publicId: PUBLIC_ID,
+				storedFilename: STORED_FILENAME,
+				coverImage: {
+					storageKey: '55555555-5555-4555-8555-555555555555.jpg',
+					mimeType: 'image/jpeg',
+					byteSize: 8
+				}
+			});
+		testDependencies.updateMetadata = vi
+			.fn<TrackManagementDependencies['updateMetadata']>()
+			.mockRejectedValue(new Error('synthetic database failure'));
+		const formData = metadataFormData();
+		formData.set(
+			'coverImage',
+			new File([pngBytes()], 'replacement.png', { type: 'image/png' })
+		);
+		vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+		const result = await updateTrackMetadata(
+			{
+				publicId: PUBLIC_ID,
+				ownerId: OWNER_ID,
+				formData,
+				maxCoverImageSizeBytes: 1024
+			},
+			testDependencies
+		);
+
+		expect(result).toMatchObject({ success: false, status: 500 });
+		expect(testDependencies.deleteCoverFile).toHaveBeenCalledWith(
+			STORED_COVER_FILENAME
+		);
+		expect(testDependencies.quarantineCoverFile).not.toHaveBeenCalled();
+	});
+
+	it('removes an owner cover while retaining audio and authenticated ownership', async () => {
+		const testDependencies = dependencies();
+		testDependencies.findFile = vi
+			.fn<TrackManagementDependencies['findFile']>()
+			.mockResolvedValue({
+				publicId: PUBLIC_ID,
+				storedFilename: STORED_FILENAME,
+				coverImage: {
+					storageKey: STORED_COVER_FILENAME,
+					mimeType: 'image/png',
+					byteSize: 24
+				}
+			});
+		testDependencies.quarantineCoverFile = vi
+			.fn<TrackManagementDependencies['quarantineCoverFile']>()
+			.mockResolvedValue({
+				success: true,
+				state: 'quarantined',
+				file: QUARANTINED_COVER_FILE
+			});
+		const formData = metadataFormData();
+		formData.set('removeCoverImage', '1');
+
+		const result = await updateTrackMetadata(
+			{ publicId: PUBLIC_ID, ownerId: OWNER_ID, formData },
+			testDependencies
+		);
+
+		expect(result).toEqual({ success: true });
+		expect(testDependencies.updateMetadata).toHaveBeenCalledWith(
+			PUBLIC_ID,
+			OWNER_ID,
+			expect.objectContaining({ coverImage: null })
+		);
+		expect(testDependencies.quarantineFile).not.toHaveBeenCalled();
+		expect(testDependencies.quarantineCoverFile).toHaveBeenCalledWith(
+			STORED_COVER_FILENAME
+		);
+	});
+
+	it('does not write a replacement cover when the owner-scoped lookup fails', async () => {
+		const testDependencies = dependencies();
+		testDependencies.findFile = vi
+			.fn<TrackManagementDependencies['findFile']>()
+			.mockResolvedValue(null);
+		const formData = metadataFormData();
+		formData.set(
+			'coverImage',
+			new File([pngBytes()], 'replacement.png', { type: 'image/png' })
+		);
+
+		const result = await updateTrackMetadata(
+			{ publicId: PUBLIC_ID, ownerId: OTHER_ID, formData },
+			testDependencies
+		);
+
+		expect(result).toMatchObject({ success: false, status: 404 });
+		expect(testDependencies.saveCoverFile).not.toHaveBeenCalled();
+		expect(testDependencies.updateMetadata).not.toHaveBeenCalled();
 	});
 });
 
@@ -346,5 +536,83 @@ describe('deleteTrack', () => {
 			QUARANTINED_FILE
 		);
 		expect(testDependencies.restoreQuarantinedFile).not.toHaveBeenCalled();
+	});
+
+	it('quarantines and removes both audio and cover for an owner deletion', async () => {
+		const testDependencies = dependencies();
+		testDependencies.findFile = vi
+			.fn<TrackManagementDependencies['findFile']>()
+			.mockResolvedValue({
+				publicId: PUBLIC_ID,
+				storedFilename: STORED_FILENAME,
+				coverImage: {
+					storageKey: STORED_COVER_FILENAME,
+					mimeType: 'image/png',
+					byteSize: 24
+				}
+			});
+		testDependencies.quarantineCoverFile = vi
+			.fn<TrackManagementDependencies['quarantineCoverFile']>()
+			.mockResolvedValue({
+				success: true,
+				state: 'quarantined',
+				file: QUARANTINED_COVER_FILE
+			});
+
+		const result = await deleteTrack(
+			{ publicId: PUBLIC_ID, ownerId: OWNER_ID },
+			testDependencies
+		);
+
+		expect(result).toEqual({ success: true });
+		expect(testDependencies.quarantineFile).toHaveBeenCalledWith(STORED_FILENAME);
+		expect(testDependencies.quarantineCoverFile).toHaveBeenCalledWith(
+			STORED_COVER_FILENAME
+		);
+		expect(testDependencies.deleteQuarantinedFile).toHaveBeenCalledWith(
+			QUARANTINED_FILE
+		);
+		expect(testDependencies.deleteQuarantinedCoverFile).toHaveBeenCalledWith(
+			QUARANTINED_COVER_FILE
+		);
+	});
+
+	it('restores both quarantined files when owner database deletion fails', async () => {
+		const testDependencies = dependencies();
+		testDependencies.findFile = vi
+			.fn<TrackManagementDependencies['findFile']>()
+			.mockResolvedValue({
+				publicId: PUBLIC_ID,
+				storedFilename: STORED_FILENAME,
+				coverImage: {
+					storageKey: STORED_COVER_FILENAME,
+					mimeType: 'image/png',
+					byteSize: 24
+				}
+			});
+		testDependencies.quarantineCoverFile = vi
+			.fn<TrackManagementDependencies['quarantineCoverFile']>()
+			.mockResolvedValue({
+				success: true,
+				state: 'quarantined',
+				file: QUARANTINED_COVER_FILE
+			});
+		testDependencies.deleteRecord = vi
+			.fn<TrackManagementDependencies['deleteRecord']>()
+			.mockRejectedValue(new Error('synthetic database failure'));
+		vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+		const result = await deleteTrack(
+			{ publicId: PUBLIC_ID, ownerId: OWNER_ID },
+			testDependencies
+		);
+
+		expect(result).toMatchObject({ success: false, status: 500 });
+		expect(testDependencies.restoreQuarantinedFile).toHaveBeenCalledWith(
+			QUARANTINED_FILE
+		);
+		expect(testDependencies.restoreQuarantinedCoverFile).toHaveBeenCalledWith(
+			QUARANTINED_COVER_FILE
+		);
 	});
 });
