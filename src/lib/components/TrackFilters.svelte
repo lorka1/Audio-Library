@@ -213,10 +213,10 @@
 		padding: clamp(1.25rem, 3vw, 1.8rem);
 		color: var(--filter-text);
 		border: 1px solid var(--border-strong);
-		border-radius: 0.95rem;
+		border-radius: 1.15rem;
 		background: var(--filter-bg);
 		box-shadow: var(--shadow-card);
-		color-scheme: light;
+		color-scheme: inherit;
 	}
 
 	.track-filters__heading {
@@ -261,7 +261,7 @@
 		color: var(--accent);
 		border: 1px solid var(--accent-border);
 		border-radius: var(--radius-control);
-		background: transparent;
+		background: var(--surface-soft);
 		font-size: 0.86rem;
 		font-weight: 750;
 		text-decoration: none;
@@ -328,6 +328,7 @@
 	.track-filters .form-field select {
 		color: var(--filter-input-text);
 		border-color: var(--filter-input-border);
+		border-radius: 0.8rem;
 		background-color: var(--filter-input-bg);
 	}
 

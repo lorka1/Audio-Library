@@ -86,6 +86,8 @@ describe('global playback components', () => {
 		expect(body).toContain('href="/tracks/21"');
 		expect(body).toContain('aria-label="Download Release Fixture Track"');
 		expect(body).toContain('src="/api/tracks/21/cover"');
+		expect(body).toContain('Uploaded by fixture_owner');
+		expect(body).toMatch(/track-card__genre--tone-[0-3]/);
 		expect(body).not.toContain('<audio');
 	});
 
@@ -281,6 +283,10 @@ describe('Browse track filters', () => {
 		for (const name of ['q', 'bpmMin', 'bpmMax', 'musicalKey', 'genre', 'sort']) {
 			expect(body).toContain(`name="${name}"`);
 		}
+		for (const label of ['Search', 'Minimum BPM', 'Maximum BPM', 'Musical key', 'Genre', 'Sort']) {
+			expect(body).toContain(`>${label}</label>`);
+		}
+		expect(body).toContain('Apply filters');
 		expect(body.match(/Reset filters/g)).toHaveLength(1);
 		expect(body).toContain('%, _, and \\ are treated literally.');
 		expect(body).toContain('track-filters__search');
@@ -297,6 +303,12 @@ describe('homepage visual structure', () => {
 
 		expect(body).toContain('Discover community audio');
 		expect(body).toContain('audio-waveform');
+		expect(body).toContain('href="/tracks"');
+		expect(body).toContain('href="/login"');
+		expect(body).toContain('href="/register"');
+		expect(body.match(/class="feature-card /g)).toHaveLength(5);
+		expect(body.match(/class="[^"]*\bfeature-icon\b[^"]*"/g)).toHaveLength(5);
+		expect(body).toContain('Private by design.');
 		expect(body).not.toContain('250K+');
 		expect(body).not.toContain('120K+');
 		expect(body).not.toContain('2M+');

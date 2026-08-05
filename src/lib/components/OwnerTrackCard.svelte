@@ -86,12 +86,12 @@
 		box-shadow: var(--shadow-card);
 		transition:
 			border-color 150ms ease,
-			transform 150ms ease;
+			box-shadow 150ms ease;
 	}
 
 	.owner-track-card:hover {
 		border-color: var(--accent-border);
-		transform: translateY(-1px);
+		box-shadow: var(--shadow-card-hover);
 	}
 
 	header {

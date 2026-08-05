@@ -19,6 +19,9 @@
 		loginHref?: string;
 	} = $props();
 	let playerTrack = $derived(toPublicPlayerTrack(track));
+	let genreTone = $derived(
+		(track.genre ?? 'none').split('').reduce((sum, character) => sum + character.charCodeAt(0), 0) % 4
+	);
 </script>
 
 <article class="track-card">
@@ -41,7 +44,9 @@
 		</p>
 	</header>
 
-	<p class="track-card__genre">{track.genre ?? 'No genre'}</p>
+	<p class={`track-card__genre track-card__genre--tone-${genreTone}`}>
+		{track.genre ?? 'No genre'}
+	</p>
 
 	<dl class="track-card__metadata">
 		<div>
@@ -91,21 +96,21 @@
 		align-items: center;
 		gap: 0.85rem 1rem;
 		min-width: 0;
-		padding: 0.65rem 0.85rem;
+		padding: 0.72rem 0.9rem;
 		border: 1px solid var(--border);
-		border-radius: 0.85rem;
+		border-radius: 0.95rem;
 		background: var(--card-background);
 		box-shadow: var(--shadow-card);
 		transition:
 			border-color 160ms ease,
 			background-color 160ms ease,
-			transform 160ms ease;
+			box-shadow 160ms ease;
 	}
 
 	.track-card:hover {
 		border-color: var(--accent-border);
 		background: var(--card-background-hover);
-		transform: translateY(-1px);
+		box-shadow: var(--shadow-card-hover);
 	}
 
 	.track-card__identity {
@@ -158,13 +163,28 @@
 		margin: 0;
 		padding: 0.3rem 0.55rem;
 		overflow: hidden;
-		color: var(--link);
-		border: 1px solid var(--border);
-		border-radius: 0.4rem;
-		background: var(--accent-soft);
+		color: var(--badge-pink-text);
+		border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+		border-radius: 999px;
+		background: var(--badge-pink-bg);
 		font-size: 0.72rem;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+	}
+
+	.track-card__genre--tone-1 {
+		color: var(--badge-plum-text);
+		background: var(--badge-plum-bg);
+	}
+
+	.track-card__genre--tone-2 {
+		color: var(--badge-burgundy-text);
+		background: var(--badge-burgundy-bg);
+	}
+
+	.track-card__genre--tone-3 {
+		color: var(--badge-lavender-text);
+		background: var(--badge-lavender-bg);
 	}
 
 	.track-card__metadata {

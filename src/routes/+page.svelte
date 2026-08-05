@@ -3,9 +3,6 @@
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
-	let heroHeading = $derived(
-		data.user ? `Welcome back, ${data.user.username}` : 'Discover community audio'
-	);
 </script>
 
 <svelte:head>
@@ -16,7 +13,7 @@
 	<div class="page-container hero__inner">
 		<div class="hero__copy">
 			<p class="eyebrow">Your audio, ready to share</p>
-			<h1>{heroHeading}<span class="hero__punctuation">.</span></h1>
+			<h1>Discover community audio<span class="hero__punctuation">.</span></h1>
 			<p class="lead">
 				Upload and organize your audio, browse public tracks, search titles, artists, and
 				descriptions, then play, seek, and download. Your own tracks stay easy to manage
@@ -43,7 +40,8 @@
 	</div>
 </section>
 
-<section class="features page-container" id="features" aria-labelledby="features-title">
+<section class="features" id="features" aria-labelledby="features-title">
+	<div class="page-container features__inner">
 	<div class="section-heading">
 		<p class="eyebrow">A complete audio workflow</p>
 		<h2 id="features-title">From private storage to public listening</h2>
@@ -54,39 +52,49 @@
 	</div>
 
 	<div class="card-grid">
-		<article>
-			<span class="card-number" aria-hidden="true">01</span>
+		<article class="feature-card feature-card--pink">
+			<span class="feature-icon" aria-hidden="true">
+				<svg viewBox="0 0 24 24"><path d="M12 16V5m0 0L8 9m4-4 4 4M5 15v3.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V15"></path></svg>
+			</span>
 			<h3>Upload and organize</h3>
 			<p>
 				Add MP3, WAV, or OGG audio with a title, BPM, musical key, genre, and description.
 				Your signed-in username supplies the artist attribution automatically.
 			</p>
 		</article>
-		<article>
-			<span class="card-number" aria-hidden="true">02</span>
+		<article class="feature-card feature-card--lavender">
+			<span class="feature-icon" aria-hidden="true">
+				<svg viewBox="0 0 24 24"><path d="M4 6.5h7V13H4zm9 0h7V13h-7zM4 15h7v3H4zm9 0h7v3h-7z"></path></svg>
+			</span>
 			<h3>Browse public tracks</h3>
 			<p>
 				Open a clear public catalog and detailed track pages with useful, safe metadata.
 			</p>
 		</article>
-		<article>
-			<span class="card-number" aria-hidden="true">03</span>
+		<article class="feature-card feature-card--raspberry">
+			<span class="feature-icon" aria-hidden="true">
+				<svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="5.5"></circle><path d="m15 15 4.5 4.5"></path></svg>
+			</span>
 			<h3>Search and filter</h3>
 			<p>
 				Search titles, artists, and descriptions, then refine results by BPM, key, genre,
 				and sort order.
 			</p>
 		</article>
-		<article>
-			<span class="card-number" aria-hidden="true">04</span>
+		<article class="feature-card feature-card--plum">
+			<span class="feature-icon" aria-hidden="true">
+				<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"></circle><path d="m10 8 6 4-6 4z"></path></svg>
+			</span>
 			<h3>Play and download</h3>
 			<p>
 				Listen with the persistent player, seek with byte-range streaming, or download a
 				safely named copy.
 			</p>
 		</article>
-		<article>
-			<span class="card-number" aria-hidden="true">05</span>
+		<article class="feature-card feature-card--burgundy">
+			<span class="feature-icon" aria-hidden="true">
+				<svg viewBox="0 0 24 24"><path d="M12 3.5 19 6v5.2c0 4.4-2.8 7.5-7 9.3-4.2-1.8-7-4.9-7-9.3V6z"></path><path d="m9 12 2 2 4-4"></path></svg>
+			</span>
 			<h3>Manage your tracks</h3>
 			<p>
 				Review public and private uploads, edit their metadata, and confirm owner-only
@@ -96,12 +104,15 @@
 	</div>
 
 	<aside class="library-note">
-		<span aria-hidden="true">i</span>
+		<span aria-hidden="true">
+			<svg viewBox="0 0 24 24"><path d="M12 3.5 19 6v5.2c0 4.4-2.8 7.5-7 9.3-4.2-1.8-7-4.9-7-9.3V6z"></path><path d="m9 12 2 2 4-4"></path></svg>
+		</span>
 		<p>
 			<strong>Private by design.</strong> Stored filenames, internal identifiers, ownership
 			keys, and filesystem paths stay on the server.
 		</p>
 	</aside>
+	</div>
 </section>
 
 <style>
@@ -109,11 +120,32 @@
 		position: relative;
 		display: grid;
 		align-items: center;
-		min-height: clamp(38rem, 76vh, 46rem);
-		padding-block: clamp(5rem, 9vw, 8rem);
+		min-height: clamp(36rem, 72vh, 44rem);
+		padding-block: clamp(4.75rem, 8vw, 7rem);
 		overflow: hidden;
 		color: var(--hero-text);
 		background: var(--hero-background);
+	}
+
+	.hero::before,
+	.hero::after {
+		position: absolute;
+		width: 0.38rem;
+		height: 0.38rem;
+		content: '';
+		border-radius: 999px;
+		background: var(--hero-dot);
+		box-shadow: 2.2rem 1.4rem 0 color-mix(in srgb, var(--accent-plum) 32%, transparent);
+	}
+
+	.hero::before {
+		top: 18%;
+		right: 9%;
+	}
+
+	.hero::after {
+		right: 43%;
+		bottom: 18%;
 	}
 
 	.hero__inner {
@@ -170,14 +202,12 @@
 		padding: 0.8rem 1.15rem;
 		color: var(--hero-text);
 		border: 1px solid var(--hero-control-border);
-		border-radius: 0.7rem;
+		border-radius: 999px;
 		background: var(--hero-control-bg);
 		font-size: 0.9rem;
 		font-weight: 700;
 		text-decoration: none;
-		transition:
-			transform 150ms ease,
-			background-color 150ms ease;
+		transition: background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
 	}
 
 	.hero__actions {
@@ -189,7 +219,7 @@
 	.hero__link--primary {
 		border-color: transparent;
 		color: var(--on-accent);
-		background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+		background: linear-gradient(135deg, var(--accent), var(--accent-burgundy));
 		box-shadow: var(--shadow-accent);
 	}
 
@@ -200,12 +230,13 @@
 	}
 
 	.hero__link:hover {
-		transform: translateY(-2px);
+		border-color: var(--accent-border);
 		background: var(--hero-control-hover);
 	}
 
 	.hero__link--primary:hover {
-		background: linear-gradient(135deg, var(--accent-strong), var(--accent-hover));
+		background: linear-gradient(135deg, var(--accent-hover), var(--accent-burgundy));
+		box-shadow: var(--shadow-accent-soft);
 	}
 
 	:global(.hero__waveform) {
@@ -214,8 +245,12 @@
 	}
 
 	.features {
-		padding-block: clamp(4rem, 8vw, 6.5rem);
+		background: var(--workflow-bg);
 		scroll-margin-top: 5rem;
+	}
+
+	.features__inner {
+		padding-block: clamp(4rem, 8vw, 6.5rem);
 	}
 
 	.section-heading {
@@ -238,30 +273,60 @@
 
 	.card-grid {
 		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+		grid-template-columns: repeat(5, minmax(0, 1fr));
 		gap: 1rem;
 		margin-top: 3rem;
 	}
 
-	article {
-		min-height: 15rem;
+	.feature-card {
+		min-height: 16rem;
 		padding: 1.5rem;
 		border: 1px solid var(--border);
 		border-radius: 1rem;
 		background: var(--surface);
 		box-shadow: var(--shadow-card);
+		transition: border-color 150ms ease, box-shadow 150ms ease;
 	}
 
-	.card-number {
+	.feature-card:hover {
+		border-color: var(--accent-border);
+		box-shadow: var(--shadow-card-hover);
+	}
+
+	.feature-icon {
 		display: inline-grid;
 		place-items: center;
-		width: 2.2rem;
-		height: 2.2rem;
+		width: 2.75rem;
+		height: 2.75rem;
 		color: var(--accent);
-		border-radius: 0.6rem;
-		background: var(--accent-soft);
-		font-size: 0.75rem;
-		font-weight: 800;
+		border-radius: 0.8rem;
+		background: var(--badge-pink-bg);
+	}
+
+	.feature-icon svg,
+	.library-note svg {
+		width: 1.3rem;
+		height: 1.3rem;
+		fill: none;
+		stroke: currentColor;
+		stroke-linecap: round;
+		stroke-linejoin: round;
+		stroke-width: 1.8;
+	}
+
+	.feature-card--lavender .feature-icon {
+		color: var(--badge-lavender-text);
+		background: var(--badge-lavender-bg);
+	}
+
+	.feature-card--plum .feature-icon {
+		color: var(--badge-plum-text);
+		background: var(--badge-plum-bg);
+	}
+
+	.feature-card--burgundy .feature-icon {
+		color: var(--badge-burgundy-text);
+		background: var(--badge-burgundy-bg);
 	}
 
 	h3 {
@@ -270,7 +335,7 @@
 		letter-spacing: -0.02em;
 	}
 
-	article p {
+	.feature-card p {
 		margin: 0;
 		color: var(--text-muted);
 		font-size: 0.95rem;
@@ -298,9 +363,6 @@
 		color: var(--on-accent);
 		border-radius: 999px;
 		background: var(--accent);
-		font-family: Georgia, serif;
-		font-size: 0.9rem;
-		font-weight: 700;
 	}
 
 	.library-note p {
@@ -313,18 +375,26 @@
 		color: var(--text);
 	}
 
+	@media (max-width: 75rem) {
+		.card-grid {
+			grid-template-columns: repeat(3, minmax(0, 1fr));
+		}
+	}
+
 	@media (max-width: 48rem) {
 		.hero {
 			min-height: auto;
 			padding-block: clamp(4.5rem, 14vw, 6.5rem);
 		}
 
-		.card-grid {
-			grid-template-columns: 1fr;
-		}
-
-		article {
+		.feature-card {
 			min-height: auto;
+		}
+	}
+
+	@media (max-width: 50rem) and (min-width: 32.01rem) {
+		.card-grid {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
 		}
 	}
 
@@ -356,6 +426,10 @@
 		.hero__actions,
 		.hero__link {
 			width: 100%;
+		}
+
+		.card-grid {
+			grid-template-columns: 1fr;
 		}
 
 		:global(.hero__waveform) {

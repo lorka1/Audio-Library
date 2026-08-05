@@ -174,7 +174,7 @@
 		background: var(--header-bg);
 		border-bottom: 1px solid var(--border);
 		box-shadow: var(--shadow-header);
-		backdrop-filter: blur(1rem);
+		backdrop-filter: blur(0.85rem);
 	}
 
 	.site-header__inner {
@@ -203,7 +203,7 @@
 		width: 2rem;
 		height: 2rem;
 		border-radius: 0.55rem;
-		background: linear-gradient(145deg, var(--accent-strong), var(--accent-active));
+		background: linear-gradient(145deg, var(--accent), var(--accent-burgundy));
 		box-shadow: var(--shadow-accent);
 	}
 
@@ -266,6 +266,14 @@
 	.nav-link[aria-current='page'],
 	.mobile-navigation a[aria-current='page'] {
 		color: var(--accent-strong);
+	}
+
+	.nav-link[aria-current='page'] {
+		background: transparent;
+		box-shadow: inset 0 -2px var(--accent);
+	}
+
+	.mobile-navigation a[aria-current='page'] {
 		background: var(--accent-soft);
 	}
 
@@ -274,7 +282,7 @@
 		min-width: 6rem;
 		justify-content: center;
 		color: var(--on-accent);
-		background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+		background: linear-gradient(135deg, var(--accent), var(--accent-burgundy));
 		box-shadow: var(--shadow-accent-soft);
 	}
 
@@ -283,7 +291,7 @@
 	.nav-link--primary[aria-current='page'],
 	.mobile-navigation .mobile-navigation__primary[aria-current='page'] {
 		color: var(--on-accent);
-		background: linear-gradient(135deg, var(--accent-strong), var(--accent-hover));
+		background: linear-gradient(135deg, var(--accent-hover), var(--accent-burgundy));
 	}
 
 	.nav-link:focus-visible,

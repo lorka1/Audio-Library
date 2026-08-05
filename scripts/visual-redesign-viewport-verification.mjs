@@ -324,6 +324,34 @@ async function activateAndWaitForPlayer(cdp) {
 	throw new Error('Timed out waiting for the loaded global-player state.');
 }
 
+async function openAndInspectPlaylistDialog(cdp) {
+	const deadline = Date.now() + PAGE_TIMEOUT_MS;
+	while (Date.now() < deadline) {
+		const state = await evaluate(cdp, `(() => {
+			const dialog = document.querySelector('.playlist-dialog');
+			const trigger = document.querySelector('.track-card .playlist-trigger');
+			if (!trigger) return { triggerFound: false, open: false };
+			if (!dialog?.open) trigger.click();
+			if (!dialog?.open) return { triggerFound: true, open: false };
+			const style = getComputedStyle(dialog);
+			const result = {
+				triggerFound: true,
+				open: true,
+				background: style.backgroundColor,
+				color: style.color
+			};
+			dialog.close();
+			return result;
+		})()`);
+		if (!state.triggerFound) {
+			throw new Error('Add to playlist trigger was unavailable.');
+		}
+		if (state.open) return state;
+		await new Promise((resolveDelay) => setTimeout(resolveDelay, 100));
+	}
+	throw new Error('Timed out waiting for the Add to playlist dialog.');
+}
+
 async function commonPageState(cdp) {
 	await waitForFirstPaintTheme(cdp);
 	await waitForThemeUi(cdp);
@@ -372,6 +400,9 @@ async function commonPageState(cdp) {
 			bodyContrast: contrast(bodyStyle.color, bodyStyle.backgroundColor),
 			bodyColor: bodyStyle.color,
 			bodyBackground: bodyStyle.backgroundColor,
+			accent: rootStyle.getPropertyValue('--accent').trim().toLowerCase(),
+			pageBackgroundToken: rootStyle.getPropertyValue('--page-bg').trim().toLowerCase(),
+			cardBackgroundToken: rootStyle.getPropertyValue('--card-background').trim().toLowerCase(),
 			headerLeft: headerRect?.left ?? null,
 			headerRight: headerRect?.right ?? null,
 			fakeStatistics: ['250K+ Tracks', '120K+ Creators', '2M+ Downloads', '190+ Countries']
@@ -402,6 +433,10 @@ function assertCommonPageState(state, width, theme) {
 	assert.ok(state.bodyContrast >= 4.5, `Insufficient body contrast: ${state.bodyContrast}.`);
 	assert.notEqual(state.bodyColor, 'rgba(0, 0, 0, 0)');
 	assert.notEqual(state.bodyBackground, 'rgba(0, 0, 0, 0)');
+	assert.equal(state.accent, theme === 'dark' ? '#d81f61' : '#d4145a');
+	assert.equal(state.pageBackgroundToken, theme === 'dark' ? '#120a0f' : '#fff9fb');
+	assert.equal(state.cardBackgroundToken.includes('#070b18'), false);
+	assert.equal(state.cardBackgroundToken.includes('#10182e'), false);
 	assert.ok(Math.abs(state.headerLeft) <= 0.5);
 	assert.ok(Math.abs(state.headerRight - state.clientWidth) <= 0.5);
 	assert.equal(state.fakeStatistics, false);
@@ -739,14 +774,31 @@ try {
 			await navigate(cdp, `${baseUrl}/`, '.hero');
 			await saveThemeAndReload(cdp, theme, '.hero');
 			assertCommonPageState(await commonPageState(cdp), width, theme);
-		const homeState = await evaluate(cdp, `(() => ({
-			heading: document.querySelector('.hero h1')?.textContent.trim(),
-			waveformHidden: document.querySelector('.audio-waveform')?.getAttribute('aria-hidden'),
-			loggedOutPlaylists: [...document.querySelectorAll('a[href="/playlists"]')].length
-		}))()`);
+		const homeState = await evaluate(cdp, `(() => {
+			const cards = [...document.querySelectorAll('.feature-card')];
+			return {
+				heading: document.querySelector('.hero h1')?.textContent.trim(),
+				waveformHidden: document.querySelector('.audio-waveform')?.getAttribute('aria-hidden'),
+				loggedOutPlaylists: [...document.querySelectorAll('a[href="/playlists"]')].length,
+				browseCtas: document.querySelectorAll('.hero__actions a[href="/tracks"]').length,
+				loginCtas: document.querySelectorAll('.hero__actions a[href="/login"]').length,
+				registerCtas: document.querySelectorAll('.hero__actions a[href="/register"]').length,
+				workflowCards: cards.length,
+				workflowIcons: cards.filter((card) => card.querySelector('.feature-icon svg')).length,
+				workflowClipped: cards.some((card) => card.scrollWidth > card.clientWidth + 1),
+				privacyNote: Boolean(document.querySelector('.library-note'))
+			};
+		})()`);
 		assert.ok(homeState.heading.includes('Discover community audio'));
 		assert.equal(homeState.waveformHidden, 'true');
 		assert.equal(homeState.loggedOutPlaylists, 0);
+		assert.equal(homeState.browseCtas, 1);
+		assert.equal(homeState.loginCtas, 1);
+		assert.equal(homeState.registerCtas, 1);
+		assert.equal(homeState.workflowCards, 5);
+		assert.equal(homeState.workflowIcons, 5);
+		assert.equal(homeState.workflowClipped, false);
+		assert.equal(homeState.privacyNote, true);
 		await verifyVisibleFocus(cdp);
 		await cdp.command('Emulation.setEmulatedMedia', {
 			features: [{ name: 'prefers-reduced-motion', value: 'reduce' }]
@@ -777,7 +829,15 @@ try {
 		const browseState = await evaluate(cdp, `(() => {
 			const cards = [...document.querySelectorAll('.track-card')];
 			const rects = cards.map((card) => card.getBoundingClientRect());
+			const filter = document.querySelector('.track-filters');
+			const filterStyle = getComputedStyle(filter);
 			return {
+				heading: document.querySelector('.tracks-hero h1')?.textContent.trim(),
+				heroWaveform: Boolean(document.querySelector('.tracks-hero .audio-waveform')),
+				filterBackground: filterStyle.backgroundColor,
+				filterBorder: filterStyle.borderTopColor,
+				filterNames: [...filter.querySelectorAll('input[name], select[name]')].map((control) => control.name).sort(),
+				applyVisible: document.querySelector('.track-filters__actions .primary-button')?.getBoundingClientRect().width > 0,
 				cardCount: cards.length,
 				coveredRows: cards.filter((card) => card.querySelector('.track-cover img')).length,
 				fallbackRows: cards.filter((card) => card.querySelector('.track-cover__fallback')).length,
@@ -789,6 +849,12 @@ try {
 				})
 			};
 		})()`);
+		assert.ok(browseState.heading.includes('Find the perfect track'));
+		assert.equal(browseState.heroWaveform, false);
+		assert.notEqual(browseState.filterBackground, 'rgba(0, 0, 0, 0)');
+		assert.notEqual(browseState.filterBorder, 'rgba(0, 0, 0, 0)');
+		assert.deepEqual(browseState.filterNames, ['bpmMax', 'bpmMin', 'genre', 'musicalKey', 'q', 'sort']);
+		assert.equal(browseState.applyVisible, true);
 		assert.equal(browseState.cardCount, 2);
 		assert.equal(browseState.coveredRows, 1);
 		assert.equal(browseState.fallbackRows, 1);
@@ -816,19 +882,7 @@ try {
 		assert.ok(authNavigation >= 2);
 
 		await navigate(cdp, `${baseUrl}/tracks`, '.track-card');
-		const dialogState = await evaluate(cdp, `(() => {
-			const trigger = document.querySelector('.track-card .playlist-trigger');
-			trigger?.click();
-			const dialog = document.querySelector('.playlist-dialog');
-			const style = dialog ? getComputedStyle(dialog) : null;
-			const state = {
-				open: Boolean(dialog?.open),
-				background: style?.backgroundColor ?? 'rgba(0, 0, 0, 0)',
-				color: style?.color ?? 'rgba(0, 0, 0, 0)'
-			};
-			dialog?.close();
-			return state;
-		})()`);
+		const dialogState = await openAndInspectPlaylistDialog(cdp);
 		assert.equal(dialogState.open, true);
 		assert.notEqual(dialogState.background, 'rgba(0, 0, 0, 0)');
 		assert.notEqual(dialogState.color, 'rgba(0, 0, 0, 0)');

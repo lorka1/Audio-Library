@@ -104,6 +104,12 @@ describe('persistent theme state', () => {
 		expect(css).toContain('--dialog-bg:');
 		expect(css).toContain('--input-bg:');
 		expect(css).toContain('--waveform-primary:');
+		expect(css).toContain('--accent-burgundy:');
+		expect(css).toContain('--accent-plum:');
+		expect(css).toContain('--surface-pink:');
+		expect(css).toContain('--surface-lavender:');
+		expect(css).not.toContain('#070b18');
+		expect(css).not.toContain('#6847f5');
 		expect(css).toContain('@media (prefers-reduced-motion: reduce)');
 	});
 

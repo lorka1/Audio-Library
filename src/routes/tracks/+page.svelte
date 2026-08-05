@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { AudioWaveform, TrackCard, TrackFilters } from '$lib';
+	import { TrackCard, TrackFilters } from '$lib';
 	import { formatTrackResultCount } from '$lib/tracks-query';
 	import type { PageProps } from './$types';
 
@@ -20,12 +20,11 @@
 			<div class="tracks-heading">
 				<p class="auth-eyebrow">Your audio, ready to share</p>
 				<h1>Find the perfect track<span>.</span></h1>
-				<p>
-					Search the community-powered library by title, artist, or description, then
-					refine public tracks by BPM, musical key, genre, and sort order.
-				</p>
 			</div>
-			<AudioWaveform variant="compact" class="tracks-hero__waveform" />
+			<p class="tracks-intro">
+				Search the community-powered library by title, artist, or description, then
+				refine public tracks by BPM, musical key, genre, and sort order.
+			</p>
 		</div>
 	</header>
 
@@ -93,17 +92,29 @@
 
 	.tracks-hero {
 		position: relative;
-		min-height: 20rem;
-		padding-block: clamp(3.5rem, 7vw, 5.75rem) 7rem;
+		min-height: 18rem;
+		padding-block: clamp(3.75rem, 7vw, 5rem) 7rem;
 		overflow: hidden;
 		background: var(--hero-background);
 	}
 
+	.tracks-hero::after {
+		position: absolute;
+		top: 24%;
+		right: 8%;
+		width: 0.38rem;
+		height: 0.38rem;
+		content: '';
+		border-radius: 999px;
+		background: var(--hero-dot);
+		box-shadow: 2.25rem 1.4rem 0 color-mix(in srgb, var(--accent-plum) 28%, transparent);
+	}
+
 	.tracks-hero__inner {
 		display: grid;
-		grid-template-columns: minmax(0, 0.95fr) minmax(24rem, 1.05fr);
-		align-items: center;
-		gap: 2rem;
+		grid-template-columns: minmax(0, 1.25fr) minmax(18rem, 0.75fr);
+		align-items: end;
+		gap: clamp(2rem, 6vw, 6rem);
 	}
 
 	.tracks-heading {
@@ -126,17 +137,14 @@
 		color: var(--accent-strong);
 	}
 
-	.tracks-heading > p:last-child {
+	.tracks-intro {
+		position: relative;
+		z-index: 1;
 		max-width: 39rem;
-		margin: 1rem 0 0;
+		margin: 0 0 0.35rem;
 		color: var(--hero-muted);
 		font-size: clamp(0.98rem, 1.5vw, 1.12rem);
 		line-height: 1.65;
-	}
-
-	:global(.tracks-hero__waveform) {
-		width: min(43rem, 47vw);
-		margin-right: -7rem;
 	}
 
 	.tracks-content {
@@ -207,15 +215,11 @@
 	@media (max-width: 62rem) {
 		.tracks-hero__inner {
 			grid-template-columns: minmax(0, 1fr);
+			gap: 1.25rem;
 		}
 
-		:global(.tracks-hero__waveform) {
-			position: absolute;
-			right: -13rem;
-			bottom: -7rem;
-			width: 42rem;
+		.tracks-intro {
 			margin: 0;
-			opacity: 0.34;
 		}
 	}
 

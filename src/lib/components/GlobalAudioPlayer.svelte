@@ -285,14 +285,14 @@
 	.global-player__toggle {
 		color: var(--on-accent);
 		border: 2px solid var(--accent-strong);
-		background: linear-gradient(145deg, var(--accent-strong), var(--accent-active));
+		background: linear-gradient(145deg, var(--accent), var(--accent-burgundy));
 		box-shadow:
 			0 0 0 0.25rem color-mix(in srgb, var(--accent) 18%, transparent),
 			var(--shadow-accent);
 	}
 
 	.global-player__toggle:hover {
-		background: linear-gradient(145deg, var(--accent-hover), var(--accent));
+		background: linear-gradient(145deg, var(--accent-hover), var(--accent-burgundy));
 	}
 
 	button svg {
