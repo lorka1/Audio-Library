@@ -334,4 +334,34 @@
 			display: none;
 		}
 	}
+
+	@media (max-width: 24rem) {
+		.track-card {
+			grid-template-columns: 3.5rem minmax(0, 1fr);
+		}
+
+		.track-card > :global(.track-cover) {
+			grid-column: 1;
+			grid-row: 1 / span 3;
+		}
+
+		.track-card > :global(button) {
+			grid-column: 1;
+			grid-row: 4;
+		}
+
+		.track-card__identity,
+		.track-card__genre,
+		.track-card__metadata {
+			grid-column: 2;
+		}
+
+		.track-card__actions {
+			grid-column: 2;
+			grid-row: 4;
+			flex-direction: row;
+			flex-wrap: wrap;
+			justify-content: flex-start;
+		}
+	}
 </style>

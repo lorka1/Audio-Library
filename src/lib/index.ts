@@ -2,6 +2,7 @@ export { default as SiteHeader } from './components/SiteHeader.svelte';
 export { default as AudioWaveform } from './components/AudioWaveform.svelte';
 export { default as TrackCover } from './components/TrackCover.svelte';
 export { default as CoverImageField } from './components/CoverImageField.svelte';
+export { default as FilePicker } from './components/FilePicker.svelte';
 export { default as TrackCard } from './components/TrackCard.svelte';
 export { default as OwnerTrackCard } from './components/OwnerTrackCard.svelte';
 export { default as GlobalAudioPlayer } from './components/GlobalAudioPlayer.svelte';

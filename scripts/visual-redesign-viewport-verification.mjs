@@ -31,7 +31,10 @@ const VIEWPORTS = [
 	[1440, 900],
 	[1024, 768],
 	[768, 1024],
-	[390, 844]
+	[390, 844],
+	[375, 667],
+	[360, 800],
+	[320, 568]
 ];
 const TEMP_PREFIX = 'audio-library-visual-viewport-';
 const STARTUP_TIMEOUT_MS = 60_000;
@@ -521,6 +524,117 @@ async function verifyFilterLayout(cdp, width) {
 	}
 }
 
+async function verifyNarrowBrowseLayout(cdp, width) {
+	if (width > 390) return;
+	const state = await evaluate(cdp, `(() => {
+		const contained = (element, container) => {
+			const rect = element.getBoundingClientRect();
+			const bounds = container.getBoundingClientRect();
+			return rect.left >= bounds.left - 1 && rect.right <= bounds.right + 1;
+		};
+		const hero = document.querySelector('.tracks-hero');
+		const heading = document.querySelector('.tracks-heading');
+		const intro = document.querySelector('.tracks-intro');
+		const filters = document.querySelector('.track-filters');
+		const controls = [...filters.querySelectorAll('input, select, button, a')];
+		const cards = [...document.querySelectorAll('.track-card')];
+		return {
+			documentFits: document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+			heroFits: hero.scrollWidth <= hero.clientWidth + 1,
+			heroStacked: intro.getBoundingClientRect().top >= heading.getBoundingClientRect().bottom - 1,
+			filtersFit: filters.scrollWidth <= filters.clientWidth + 1,
+			controlsFit: controls.every((control) => contained(control, filters)),
+			cardsFit: cards.every((card) => card.scrollWidth <= card.clientWidth + 1),
+			cardContentFits: cards.every((card) => {
+				const parts = [...card.querySelectorAll('.track-card__identity, .track-card__genre, .track-card__metadata, .track-card__actions')];
+				return parts.every((part) => contained(part, card));
+			}),
+			identitySafe: cards.every((card) => {
+				const identity = card.querySelector('.track-card__identity');
+				return identity.scrollWidth <= identity.clientWidth + 1;
+			})
+		};
+	})()`);
+	assert.equal(state.documentFits, true);
+	assert.equal(state.heroFits, true);
+	assert.equal(state.heroStacked, true);
+	assert.equal(state.filtersFit, true);
+	assert.equal(state.controlsFit, true);
+	assert.equal(state.cardsFit, true);
+	assert.equal(state.cardContentFits, true);
+	assert.equal(state.identitySafe, true);
+}
+
+async function setFileInputFiles(cdp, selector, files) {
+	const { root } = await cdp.command('DOM.getDocument');
+	const { nodeId } = await cdp.command('DOM.querySelector', {
+		nodeId: root.nodeId,
+		selector
+	});
+	assert.ok(nodeId, `File input ${selector} was unavailable.`);
+	await cdp.command('DOM.setFileInputFiles', { files, nodeId });
+	await evaluate(
+		cdp,
+		`document.querySelector(${JSON.stringify(selector)})?.dispatchEvent(new Event('change', { bubbles: true }))`
+	);
+}
+
+async function verifyUploadFilePicker(cdp, baseUrl, width, theme, uploadFixturePath, uploadFilename) {
+	await navigate(cdp, `${baseUrl}/upload`, '#audioFile');
+	assertCommonPageState(await commonPageState(cdp), width, theme);
+	await setFileInputFiles(cdp, '#audioFile', [uploadFixturePath]);
+	const state = await evaluate(cdp, `(() => {
+		const input = document.querySelector('#audioFile');
+		const formFile = new FormData(input.form).get('audioFile');
+		const filename = document.querySelector('#audioFile-filename');
+		const button = document.querySelector('label.file-picker__button[for="audioFile"]');
+		const coverInput = document.querySelector('#coverImage');
+		return {
+			documentFits: document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+			formFits: input.form.scrollWidth <= input.form.clientWidth + 1,
+			inputType: input.type,
+			inputName: input.name,
+			inputAcceptsAudio: input.accept.includes('audio/mpeg') && input.accept.includes('.ogg'),
+			required: input.required,
+			buttonText: button?.textContent.trim(),
+			buttonFor: button?.htmlFor,
+			filename: filename?.textContent.trim(),
+			filenameTitle: filename?.getAttribute('title'),
+			filenameStyle: {
+				overflow: getComputedStyle(filename).overflow,
+				textOverflow: getComputedStyle(filename).textOverflow,
+				whiteSpace: getComputedStyle(filename).whiteSpace
+			},
+			selectedName: input.files?.[0]?.name,
+			formName: formFile instanceof File ? formFile.name : null,
+			formSize: formFile instanceof File ? formFile.size : null,
+			selectedSize: input.files?.[0]?.size,
+			coverUsesPicker: Boolean(coverInput?.classList.contains('file-picker__input')),
+			coverVisibleLabel: document.querySelector('label.file-picker__button[for="coverImage"]')?.textContent.trim()
+		};
+	})()`);
+	assert.equal(state.documentFits, true);
+	assert.equal(state.formFits, true);
+	assert.equal(state.inputType, 'file');
+	assert.equal(state.inputName, 'audioFile');
+	assert.equal(state.inputAcceptsAudio, true);
+	assert.equal(state.required, true);
+	assert.equal(state.buttonText, 'Choose audio file');
+	assert.equal(state.buttonFor, 'audioFile');
+	assert.equal(state.filename, uploadFilename);
+	assert.equal(state.filenameTitle, uploadFilename);
+	assert.deepEqual(state.filenameStyle, {
+		overflow: 'hidden',
+		textOverflow: 'ellipsis',
+		whiteSpace: 'nowrap'
+	});
+	assert.equal(state.selectedName, uploadFilename);
+	assert.equal(state.formName, uploadFilename);
+	assert.equal(state.formSize, state.selectedSize);
+	assert.equal(state.coverUsesPicker, true);
+	assert.equal(state.coverVisibleLabel, 'Choose image');
+}
+
 async function setAuthenticatedCookie(cdp, name, value, baseUrl) {
 	const cookie = await cdp.command('Network.setCookie', {
 		name,
@@ -540,6 +654,8 @@ let initialTestDatabases;
 let realFingerprint;
 let realCounter;
 let temporaryRoot;
+let uploadFixturePath;
+let uploadFixtureFilename;
 let app;
 let browser;
 let browserDiagnostics = '';
@@ -576,6 +692,8 @@ try {
 	const coverRoot = join(audioRoot, 'covers');
 	const playlistImageRoot = join(temporaryRoot, 'playlist-images');
 	const browserProfile = join(temporaryRoot, 'browser-profile');
+	uploadFixtureFilename = 'synthetic-audio-file-with-a-very-long-name-for-narrow-phone-layout-verification.mp3';
+	uploadFixturePath = join(temporaryRoot, uploadFixtureFilename);
 	await mkdir(coverRoot, { recursive: true });
 	await mkdir(playlistImageRoot);
 	const audioStorageKeys = [`${randomUUID()}.mp3`, `${randomUUID()}.mp3`, `${randomUUID()}.mp3`];
@@ -584,7 +702,8 @@ try {
 	await Promise.all([
 		...audioStorageKeys.map((storageKey) => writeFile(join(audioRoot, storageKey), SYNTHETIC_AUDIO)),
 		writeFile(join(coverRoot, coverStorageKey), SYNTHETIC_PNG),
-		writeFile(join(playlistImageRoot, playlistImageStorageKey), SYNTHETIC_PNG)
+		writeFile(join(playlistImageRoot, playlistImageStorageKey), SYNTHETIC_PNG),
+		writeFile(uploadFixturePath, SYNTHETIC_AUDIO)
 	]);
 
 	const collections = getMongoCollections(client.db(databaseName));
@@ -861,6 +980,7 @@ try {
 		assert.equal(browseState.overflow, false);
 		assert.equal(browseState.overlap, false);
 		assert.equal(browseState.longIdentitySafe, true);
+		await verifyNarrowBrowseLayout(cdp, width);
 
 		await navigate(cdp, `${baseUrl}/tracks/1`, '.track-detail');
 		assertCommonPageState(await commonPageState(cdp), width, theme);
@@ -918,6 +1038,7 @@ try {
 		assert.notEqual(playerState.color, 'rgba(0, 0, 0, 0)');
 		assert.notEqual(playerState.backgroundImage, 'none');
 		assert.ok(playerState.shellPaddingBottom >= playerState.height - 2);
+		await verifyUploadFilePicker(cdp, baseUrl, width, theme, uploadFixturePath, uploadFixtureFilename);
 
 		await navigate(cdp, `${baseUrl}/my-tracks`, '.owner-track-grid');
 		assertCommonPageState(await commonPageState(cdp), width, theme);

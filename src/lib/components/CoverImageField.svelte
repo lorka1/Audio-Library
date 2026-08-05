@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onDestroy, untrack } from 'svelte';
+	import FilePicker from './FilePicker.svelte';
 	import TrackCover from './TrackCover.svelte';
 
 	let {
@@ -32,13 +33,11 @@
 
 	const helpId = $derived(`${id}-help`);
 	const errorId = $derived(`${id}-error`);
-	const statusId = $derived(`${id}-status`);
 	const reselectionId = $derived(`${id}-reselection`);
 	const describedBy = $derived(
 		[
 			helpId,
 			error ? errorId : null,
-			selectedFilename ? statusId : null,
 			needsReselection ? reselectionId : null
 		]
 			.filter(Boolean)
@@ -85,26 +84,20 @@
 		<label for={id}>
 			Cover image <span class="optional-label">(optional)</span>
 		</label>
-		<input
-			class="file-input"
+		<FilePicker
 			{id}
 			name="coverImage"
-			type="file"
 			accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
-			aria-invalid={error ? 'true' : undefined}
-			aria-describedby={describedBy}
+			buttonLabel="Choose image"
+			defaultFilename="No image selected"
+			ariaInvalid={error ? 'true' : undefined}
+			ariaDescribedBy={describedBy}
 			onchange={handleFileChange}
 		/>
 		<p class="field-help" id={helpId}>
 			JPEG, PNG, or WebP. Maximum file size: {maxSizeMb} MB. The server verifies the file
 			type and image signature.
 		</p>
-
-		{#if selectedFilename}
-			<p class="cover-image-field__status" id={statusId} aria-live="polite">
-				Selected: <strong>{selectedFilename}</strong>
-			</p>
-		{/if}
 
 		{#if error}
 			<p class="field-error" id={errorId}>{error}</p>
@@ -161,13 +154,6 @@
 	.cover-image-field__control > label:first-child {
 		display: inline-block;
 		margin-bottom: 0.45rem;
-	}
-
-	.cover-image-field__status {
-		margin: 0.5rem 0 0;
-		color: var(--text-muted);
-		font-size: 0.84rem;
-		overflow-wrap: anywhere;
 	}
 
 	.cover-image-field__remove {

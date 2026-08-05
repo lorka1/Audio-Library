@@ -1,5 +1,6 @@
 <script lang="ts">
 	import CoverImageField from '$lib/components/CoverImageField.svelte';
+	import FilePicker from '$lib/components/FilePicker.svelte';
 	import { MUSIC_GENRES, MUSICAL_KEYS } from '$lib/constants/music';
 	import type { PageProps } from './$types';
 
@@ -50,15 +51,15 @@
 			>
 				<div class="form-field form-field--full">
 					<label for="audioFile">Audio file</label>
-					<input
-						class="file-input"
+					<FilePicker
 						id="audioFile"
 						name="audioFile"
-						type="file"
 						accept="audio/mpeg,audio/wav,audio/x-wav,audio/wave,audio/vnd.wave,audio/ogg,.mp3,.wav,.ogg"
 						required
-						aria-invalid={form?.errors.audioFile ? 'true' : undefined}
-						aria-describedby={form?.errors.audioFile
+						buttonLabel="Choose audio file"
+						defaultFilename="No audio file selected"
+						ariaInvalid={form?.errors.audioFile ? 'true' : undefined}
+						ariaDescribedBy={form?.errors.audioFile
 							? form.needsAudioFileReselection
 								? 'audio-file-help audio-file-error audio-file-reselection'
 								: 'audio-file-help audio-file-error'
