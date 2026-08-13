@@ -421,7 +421,7 @@
 
 	@media (max-width: 43.75rem) {
 		.global-player {
-			min-height: calc(var(--player-height) + 2.75rem);
+			min-height: calc(var(--player-height) + 1.75rem);
 			padding-block: 0.65rem calc(0.65rem + env(safe-area-inset-bottom));
 		}
 
