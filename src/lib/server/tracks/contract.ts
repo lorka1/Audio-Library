@@ -27,10 +27,7 @@ export interface CreateTrackInput {
 }
 
 export interface CreateTrackOptions {
-	/**
-	 * Reserved for isolated repository checks. Normal creation lets the
-	 * repository choose a never-reused public ID.
-	 */
+	/** Only isolated repository checks set this; normal creation allocates a never-reused ID. */
 	publicId?: number;
 	visibility?: TrackVisibility;
 }
@@ -60,10 +57,7 @@ export interface OwnerTrackStorage {
 }
 
 export interface UpdateOwnerTrackMetadataInput extends ValidatedTrackMetadata {
-	/**
-	 * Omitted retains the current cover, null removes it, and a value replaces
-	 * it. Storage orchestration remains outside the repository.
-	 */
+	/** Omitted preserves the cover; null removes it; a value replaces it. Storage stays external. */
 	coverImage?: StoredCoverImage | null;
 	updatedAt: Date;
 }

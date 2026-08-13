@@ -114,7 +114,6 @@ async function waitForApplication(baseUrl, child) {
 			await response.body?.cancel();
 			if (response.status === 200) return;
 		} catch {
-			// Retry within the bounded startup window.
 		}
 		await new Promise((resolveDelay) => setTimeout(resolveDelay, 200));
 	}
@@ -132,7 +131,6 @@ async function waitForBrowser(debugPort, child) {
 			const page = pages.find(({ type }) => type === 'page');
 			if (page?.webSocketDebuggerUrl) return page.webSocketDebuggerUrl;
 		} catch {
-			// Retry within the bounded browser startup window.
 		}
 		await new Promise((resolveDelay) => setTimeout(resolveDelay, 100));
 	}

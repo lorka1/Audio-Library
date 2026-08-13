@@ -293,7 +293,6 @@ async function waitForLiveness(baseUrl, state) {
 			const payload = await response.json();
 			if (response.status === 200 && payload.status === 'ok') return;
 		} catch {
-			// Retry until the bounded deadline.
 		}
 		await new Promise((resolveDelay) => setTimeout(resolveDelay, 250));
 	}
@@ -328,7 +327,6 @@ async function waitForReadyApplication(baseUrl, state) {
 				applicationBody.length > 0
 			) return;
 		} catch {
-			// Retry until the bounded deadline.
 		}
 		await new Promise((resolveDelay) => setTimeout(resolveDelay, 250));
 	}

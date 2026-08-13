@@ -123,11 +123,7 @@ export interface MongoIndexEnsureResult {
 	counters: [];
 }
 
-/**
- * MongoDB TTL cleanup is asynchronous. The future MongoDB session repository
- * must continue checking expiresAt and rejecting expired sessions before the
- * TTL monitor physically removes their documents.
- */
+/** TTL cleanup is asynchronous, so repositories must reject sessions that have already expired. */
 export async function ensureMongoIndexes(
 	collections: MongoCollections,
 	options: EnsureMongoIndexesOptions = {}

@@ -1,16 +1,10 @@
 import type { TrackVisibility } from '$lib/types';
 
-/**
- * Server-only database documents. These must be mapped through the existing
- * public, owner-safe, account-safe, or navigation-safe projections before
- * being returned to Svelte pages.
- */
+/** Server-only documents must pass through an audience-safe projection before reaching a page. */
 export interface UserDocument {
-	/** Existing internal user UUID. */
 	_id: string;
-	/** Trimmed username stored by the current registration flow. */
 	username: string;
-	/** Trimmed, lowercase email stored by the current registration flow. */
+	/** Normalized to trimmed lowercase. */
 	email: string;
 	passwordHash: string;
 	createdAt: Date;
@@ -18,7 +12,6 @@ export interface UserDocument {
 }
 
 export interface SessionDocument {
-	/** Existing internal session UUID. */
 	_id: string;
 	tokenHash: string;
 	userId: string;
@@ -33,7 +26,6 @@ export interface TrackCoverImageDocument {
 }
 
 export interface TrackDocument {
-	/** Existing internal track UUID. */
 	_id: string;
 	publicId: number;
 	ownerId: string;
@@ -49,10 +41,7 @@ export interface TrackDocument {
 	mimeType: string;
 	fileSizeBytes: number;
 	durationMs: number | null;
-	/**
-	 * Older MongoDB documents legitimately omit this field. New writes use
-	 * either validated private-storage metadata or null.
-	 */
+	/** Legacy documents may omit this; new writes use validated private-storage metadata or null. */
 	coverImage?: TrackCoverImageDocument | null;
 	visibility: TrackVisibility;
 	createdAt: Date;
@@ -60,7 +49,6 @@ export interface TrackDocument {
 }
 
 export interface PlaylistDocument {
-	/** Server-only playlist UUID. */
 	_id: string;
 	/** Opaque identifier used in owner-scoped playlist URLs. */
 	publicId: string;
@@ -74,7 +62,6 @@ export interface PlaylistDocument {
 }
 
 export interface PlaylistItemDocument {
-	/** Server-only playlist-item UUID. */
 	_id: string;
 	playlistId: string;
 	trackId: string;

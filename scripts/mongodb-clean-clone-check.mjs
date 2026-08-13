@@ -154,7 +154,6 @@ async function waitForServer(baseUrl, child) {
 				(await application.text()).length > 0
 			) return;
 		} catch {
-			// Retry until the bounded deadline.
 		}
 		await new Promise((resolveDelay) => setTimeout(resolveDelay, 250));
 	}

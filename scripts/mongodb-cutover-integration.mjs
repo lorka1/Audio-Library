@@ -189,7 +189,6 @@ async function waitForStartup(baseUrl, child, readServerFailure = () => null) {
 			await response.body?.cancel();
 			if (response.status === 200) return;
 		} catch {
-			// The bounded startup loop retries until the deadline.
 		}
 		await new Promise((resolveDelay) => setTimeout(resolveDelay, 250));
 	}
