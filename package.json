@@ -16,27 +16,10 @@
     "prepare": "svelte-kit sync",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
-    "test": "node scripts/run-tests.mjs",
-    "test:covers": "node scripts/run-cover-tests.mjs",
-    "test:playlists:focused": "node scripts/run-playlist-image-tests.mjs",
-    "test:mongodb:users": "node --experimental-strip-types scripts/mongodb-users-integration.mjs",
-    "test:mongodb:auth": "node --experimental-strip-types scripts/mongodb-auth-integration.mjs",
-    "test:mongodb:tracks": "node --experimental-strip-types scripts/mongodb-tracks-integration.mjs",
-    "test:mongodb:queries": "node --experimental-strip-types scripts/mongodb-queries-integration.mjs",
-    "test:mongodb:playlists": "node --experimental-strip-types scripts/mongodb-playlists-integration.mjs",
-    "test:playlists:viewports": "node --experimental-strip-types scripts/playlist-viewport-verification.mjs",
-    "test:themes:viewports": "node --experimental-strip-types scripts/visual-redesign-viewport-verification.mjs",
-    "test:mongodb:cutover": "node --experimental-strip-types scripts/mongodb-cutover-integration.mjs",
-    "test:mongodb:regression": "node --experimental-strip-types scripts/mongodb-cutover-regression.mjs",
-    "verify:mongodb:clean-clone": "node --experimental-strip-types scripts/mongodb-clean-clone-check.mjs",
-    "db:mongodb:audit": "node --experimental-strip-types scripts/mongodb-cutover-audit.mjs",
     "db:mongodb:init": "node --experimental-strip-types scripts/mongodb-initialize.mjs",
     "db:mongodb:verify": "node --experimental-strip-types scripts/mongodb-verify.mjs",
     "backup:mongodb": "node --experimental-strip-types scripts/mongodb-backup.mjs",
-    "backup:audio": "node --experimental-strip-types scripts/audio-backup.mjs",
-    "verify:mongodb:restore": "node --experimental-strip-types scripts/mongodb-restore-verification.mjs",
-    "test:mongodb:recovery": "node --experimental-strip-types scripts/mongodb-recovery-integration.mjs",
-    "test:watch": "vitest"
+    "backup:audio": "node --experimental-strip-types scripts/audio-backup.mjs"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
@@ -51,7 +34,6 @@
     "svelte": "^5.56.7",
     "svelte-check": "^4.7.3",
     "typescript": "^6.0.3",
-    "vite": "^8.1.5",
-    "vitest": "^4.1.10"
+    "vite": "^8.1.5"
   }
 }

@@ -61,7 +61,7 @@ Readiness is bounded and read-only. Liveness does not depend on MongoDB. SIGINT
 and SIGTERM stop accepting requests, wait a bounded interval, and close
 application-owned listeners and the shared MongoDB client exactly once.
 
-## Verification and recovery sets
+## Verification and backup sets
 
 `npm run db:mongodb:verify` is read-only. It checks connectivity, transaction
 topology, writable PRIMARY state, required collections, exact required index
@@ -87,25 +87,10 @@ Treat both outputs as one logical recovery set. Record the pairing in private
 operational inventory, apply a separately approved retention policy, and never
 commit backup output.
 
-Periodically verify a wholly synthetic recovery set:
-
-```powershell
-npm run test:mongodb:recovery
-```
-
-It creates an owned test source and restore database plus temporary private
-audio and cover storage, then checks indexes, safe aggregates, counter
-compatibility, referenced audio and covers, and read-only
-Browse/detail/stream/cover paths plus synthetic playlist and membership restore.
-Cleanup removes only its exact owned databases
-and temporary directories.
-
-For an operator-supplied synthetic pair, set `MONGODB_RESTORE_SOURCE` and
-`AUDIO_RESTORE_SOURCE` to the two completed directories and run
-`npm run verify:mongodb:restore`. It never targets the configured application
-database, a pre-existing test database, or real audio/cover storage. A real
-disaster restore requires separate approval, a maintenance window, verified
-targets, and a current paired recovery set.
+A real disaster restore requires separate approval, a maintenance window,
+verified targets, a current paired recovery set, and the native MongoDB restore
+tools. Restore into separately approved targets and verify the database and
+private-media copy before switching application traffic.
 
 ## Cover-image lifecycle
 

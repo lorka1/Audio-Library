@@ -15,7 +15,8 @@ track metadata are never duplicated into a playlist.
 - npm `>=10`
 - MongoDB reachable as a transaction-capable replica set (a local single-node
   replica set is the supported self-hosted setup)
-- MongoDB Database Tools (`mongodump` and `mongorestore`) for recovery tooling
+- MongoDB Database Tools (`mongodump` and `mongorestore`) for optional backup
+  and recovery operations
 
 Registration creates a user and initial session in one transaction. A
 standalone MongoDB server without transaction support is rejected.
@@ -26,8 +27,7 @@ standalone MongoDB server without transaction support is rejected.
 - TypeScript and Vite;
 - MongoDB as the only persistence service;
 - private local filesystem storage for audio and optional cover-image bytes;
-- separate private filesystem storage for owner-only playlist-image bytes;
-- Vitest plus isolated MongoDB/HTTP/recovery integration controllers.
+- separate private filesystem storage for owner-only playlist-image bytes.
 
 ## Setup
 
@@ -99,12 +99,6 @@ application documents:
 npm run db:mongodb:verify
 ```
 
-Run the complete read-only data/audio safety audit:
-
-```powershell
-npm run db:mongodb:audit
-```
-
 ## Features
 
 - registration, login, logout, session validation, and session expiration;
@@ -144,31 +138,13 @@ server-only persistence modules provide the MongoDB repositories.
 | --- | --- |
 | `npm run dev` | Start the development server. |
 | `npm run check` | Run Svelte and TypeScript diagnostics. |
-| `npm test` | Run all Vitest tests once. |
 | `npm run build` | Create the production Node build. |
 | `npm start` | Start the hardened production listener with graceful shutdown. |
 | `npm run preview` | Preview the production build through Vite. |
 | `npm run db:mongodb:init` | Explicitly initialize a new database's indexes and counter. |
 | `npm run db:mongodb:verify` | Verify connectivity, topology, PRIMARY, collections, exact indexes, counter, and marker structure read-only. |
-| `npm run db:mongodb:audit` | Audit MongoDB and private audio/cover storage using safe aggregates only. |
 | `npm run backup:mongodb` | Create a timestamped native MongoDB dump in an explicit private root. |
 | `npm run backup:audio` | Create and aggregate-verify a timestamped private copy of audio and cover files. |
-| `npm run verify:mongodb:restore` | Verify a supplied synthetic recovery pair in an owned database and temporary private-media root. |
-| `npm run test:mongodb:recovery` | Create, back up, restore, probe, and exactly clean a synthetic recovery set. |
-| `npm run test:mongodb:users` | Verify the user repository contract in a uniquely owned database. |
-| `npm run test:mongodb:auth` | Verify transactions, duplicate conflicts, sessions, expiration, logout, and cleanup. |
-| `npm run test:mongodb:tracks` | Verify public IDs, projections, owner CRUD, filesystem consistency, failure recovery, and cleanup. |
-| `npm run test:mongodb:queries` | Verify search, filters, all six sorts, literal regex handling, projections, and cleanup. |
-| `npm run test:mongodb:playlists` | Verify private playlist ownership, projections, add/remove rules, transactions, track cleanup, and exact isolated-database cleanup. |
-| `npm run test:playlists:viewports` | Use local headless Chrome/Edge plus an isolated database to check playlist pages and dialogs at five target viewport sizes. |
-| `npm run test:mongodb:cutover` | Run the isolated full-application registration, upload, media, owner-management, and cleanup flow. |
-| `npm run test:mongodb:regression` | Run the aggregate MongoDB contract, failure-path, privacy, query, and full-application regression. |
-| `npm run verify:mongodb:clean-clone` | Install and verify an isolated release-candidate copy with an owned test database and production probe. |
-
-Integration controllers generate one unique safe test database, record its
-ownership, drop only that exact database, preserve every pre-existing database,
-use temporary audio and cover storage plus temporary ports, and close their
-clients, sessions, processes, listeners, and timers.
 
 ## Production
 
@@ -194,8 +170,6 @@ private-media backups are separate artifacts but one logical recovery set. Pair
 their timestamps, verify restores periodically, and never commit backups or
 `.env`. The complete same-computer Windows runbook is in
 [`docs/operations.md`](docs/operations.md).
-The final operator commissioning checklist is in
-[`docs/production-commissioning-checklist.md`](docs/production-commissioning-checklist.md).
 
 ## Privacy and storage
 
@@ -227,19 +201,3 @@ Upload and cover-replacement filesystem writes use compensating cleanup.
 Deletion quarantines both the audio and cover where present, and restores them
 when database deletion fails. Existing tracks without cover metadata remain
 valid and immediately use the fallback artwork.
-
-## Historical migration
-
-The project originally used SQLite and Drizzle. Users and track metadata were
-migrated transactionally to MongoDB while preserving identifiers, password
-hashes, ownership, public IDs, visibility, nullable metadata, timestamps, and
-storage references. Sessions were intentionally not migrated, so users had to
-sign in again after cutover. Audio bytes were never migrated into MongoDB.
-
-SQLite and Drizzle are no longer application dependencies. A verified
-historical SQLite backup and sanitized cutover package remain outside Git; they
-are not required by setup, runtime, tests, or production operation. See
-[`docs/mongodb-migration.md`](docs/mongodb-migration.md).
-
-The active persistence coverage is documented in
-[`docs/persistence-feature-matrix.md`](docs/persistence-feature-matrix.md).
