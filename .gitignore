@@ -1,19 +1,19 @@
-# Dependencies
+# dependencies
 node_modules/
 
-# SvelteKit and build output
+# build output from SvelteKit
 .svelte-kit/
 build/
 .vercel/
 .netlify/
 .wrangler/
 
-# Local environment files
+# local environment files
 .env
 .env.*
 !.env.example
 
-# Runtime data
+# runtime data
 storage/audio/*
 !storage/audio/.gitkeep
 *.db
@@ -22,7 +22,7 @@ storage/audio/*
 *.sqlite
 *.sqlite3
 
-# Logs and local tooling
+# logs and local tooling
 .backups/
 backups/
 npm-debug.log*
@@ -33,11 +33,11 @@ pnpm-debug.log*
 .DS_Store
 Thumbs.db
 
-# Editors
+# editors
 .idea/
 .vscode/*
 !.vscode/extensions.json
 
-# Extra files
+# extra files
 AGENTS.md
 PROJECT_REQUIREMENTS.md

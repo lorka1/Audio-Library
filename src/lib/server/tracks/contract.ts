@@ -27,7 +27,7 @@ export interface CreateTrackInput {
 }
 
 export interface CreateTrackOptions {
-	/** Only isolated repository checks set this; normal creation allocates a never-reused ID. */
+	/** only isolated repository checks set this; normal creation allocates an ID that is never reused */
 	publicId?: number;
 	visibility?: TrackVisibility;
 }
@@ -57,7 +57,7 @@ export interface OwnerTrackStorage {
 }
 
 export interface UpdateOwnerTrackMetadataInput extends ValidatedTrackMetadata {
-	/** Omitted preserves the cover; null removes it; a value replaces it. Storage stays external. */
+	/** omitted preserves the cover; null removes it; a value replaces it; storage stays external */
 	coverImage?: StoredCoverImage | null;
 	updatedAt: Date;
 }

@@ -19,7 +19,7 @@
 				? page.url.pathname === href || page.url.pathname.startsWith(`${href}/`)
 				: page.url.pathname === href;
 		} catch {
-			// Component-only SSR tests do not provide SvelteKit's request context.
+			// component-only SSR tests do not provide SvelteKit's request context
 			return false;
 		}
 	}

@@ -75,7 +75,7 @@ export function toggleTheme(
 	try {
 		storage?.setItem(THEME_STORAGE_KEY, next);
 	} catch {
-		// A blocked preference store must not prevent an in-page theme change.
+		// a blocked preference store must not prevent an in-page theme change
 	}
 	return next;
 }

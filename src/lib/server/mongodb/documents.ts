@@ -1,10 +1,10 @@
 import type { TrackVisibility } from '$lib/types';
 
-/** Server-only documents must pass through an audience-safe projection before reaching a page. */
+/** server-only documents need an audience-safe projection before reaching a page */
 export interface UserDocument {
 	_id: string;
 	username: string;
-	/** Normalized to trimmed lowercase. */
+	/** normalized to trimmed lowercase */
 	email: string;
 	passwordHash: string;
 	createdAt: Date;
@@ -30,7 +30,7 @@ export interface TrackDocument {
 	publicId: number;
 	ownerId: string;
 	title: string;
-	/** Legacy client-supplied attribution. New writes omit it and reads ignore it. */
+	/** legacy client-supplied attribution; new writes omit it and reads ignore it */
 	artist?: string;
 	bpm: number | null;
 	musicalKey: string | null;
@@ -41,7 +41,7 @@ export interface TrackDocument {
 	mimeType: string;
 	fileSizeBytes: number;
 	durationMs: number | null;
-	/** Legacy documents may omit this; new writes use validated private-storage metadata or null. */
+	/** legacy documents may omit this; new writes use validated private-storage metadata or null */
 	coverImage?: TrackCoverImageDocument | null;
 	visibility: TrackVisibility;
 	createdAt: Date;
@@ -50,12 +50,12 @@ export interface TrackDocument {
 
 export interface PlaylistDocument {
 	_id: string;
-	/** Opaque identifier used in owner-scoped playlist URLs. */
+	/** opaque identifier used in owner-scoped playlist URLs */
 	publicId: string;
 	ownerId: string;
 	name: string;
 	description: string | null;
-	/** Older playlists legitimately omit this optional private-image metadata. */
+	/** older playlists may omit this optional private-image metadata */
 	image?: TrackCoverImageDocument | null;
 	createdAt: Date;
 	updatedAt: Date;
