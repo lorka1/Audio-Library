@@ -38,6 +38,9 @@
 				<h1>{data.playlist.name}</h1>
 				<p>{data.playlist.description ?? 'No description provided.'}</p>
 				<span>{data.playlist.trackCount} {data.playlist.trackCount === 1 ? 'track' : 'tracks'} · Updated <time datetime={data.playlist.updatedAt}>{formatDate(data.playlist.updatedAt)}</time></span>
+				<div class="playlist-detail-actions">
+					<a class="secondary-button" href="/tracks">Add tracks</a>
+				</div>
 			</div>
 		</header>
 
@@ -114,6 +117,7 @@
 	.playlist-detail-heading h1 { max-width: 22ch; margin: 0; font-size: clamp(2.35rem, 7vw, 4.5rem); line-height: 1; letter-spacing: -0.05em; overflow-wrap: anywhere; }
 	.playlist-detail-heading p:not(.auth-eyebrow) { margin: 0.8rem 0 0; color: var(--text-muted); line-height: 1.6; white-space: pre-wrap; }
 	.playlist-detail-heading span { display: block; margin-top: 0.75rem; color: var(--text-subtle); font-size: 0.8rem; }
+	.playlist-detail-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1rem; }
 	.playlist-unavailable { margin-bottom: 1rem; padding: 0.8rem 1rem; color: var(--warning); border: 1px solid var(--warning-border); border-radius: 0.7rem; background: var(--warning-bg); }
 	.playlist-detail-layout { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(18rem, 0.7fr); gap: 1.5rem; align-items: start; }
 	.playlist-tracks, .playlist-settings { min-width: 0; padding: clamp(1.1rem, 3vw, 1.75rem); border: 1px solid var(--border); border-radius: 1rem; background: var(--card-background); }

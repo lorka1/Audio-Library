@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { enhance } from '$app/forms';
 	import { formatDate } from '$lib/formatting';
 	import { PlaylistArtwork, PlaylistImageField } from '$lib';
 	import type { PlaylistFormErrors } from '$lib/server/playlists/validation';
@@ -38,7 +39,7 @@
 				{#if createErrors.general}
 					<div class="form-message form-message--error" role="alert">{createErrors.general}</div>
 				{/if}
-				<form class="form-stack" method="POST" action="?/create" enctype="multipart/form-data">
+				<form class="form-stack" method="POST" action="?/create" enctype="multipart/form-data" use:enhance>
 					<div class="form-field">
 						<label for="playlist-name">Name</label>
 						<input
