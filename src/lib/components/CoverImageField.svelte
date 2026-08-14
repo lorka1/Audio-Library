@@ -89,7 +89,7 @@
 			name="coverImage"
 			accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
 			buttonLabel="Choose image"
-			defaultFilename="No image selected"
+			emptyLabel="No image selected"
 			ariaInvalid={error ? 'true' : undefined}
 			ariaDescribedBy={describedBy}
 			onchange={handleFileChange}

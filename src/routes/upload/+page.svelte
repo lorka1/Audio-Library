@@ -57,7 +57,7 @@
 						accept="audio/mpeg,audio/wav,audio/x-wav,audio/wave,audio/vnd.wave,audio/ogg,.mp3,.wav,.ogg"
 						required
 						buttonLabel="Choose audio file"
-						defaultFilename="No audio file selected"
+						emptyLabel="No audio file selected"
 						ariaInvalid={form?.errors.audioFile ? 'true' : undefined}
 						ariaDescribedBy={form?.errors.audioFile
 							? form.needsAudioFileReselection

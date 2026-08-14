@@ -180,6 +180,8 @@
 	.global-player {
 		position: fixed;
 		z-index: 30;
+		display: grid;
+		align-content: center;
 		right: 0;
 		bottom: 0;
 		left: 0;
@@ -198,8 +200,8 @@
 	.global-player__inner {
 		display: grid;
 		grid-template-columns:
-			minmax(15rem, 0.9fr) minmax(23rem, 1.7fr)
-			minmax(10rem, 0.55fr);
+			minmax(13rem, 1fr) minmax(23rem, 2fr)
+			minmax(13rem, 1fr);
 		align-items: center;
 		gap: 0;
 		width: min(100%, var(--content-width));
@@ -212,7 +214,7 @@
 		align-items: center;
 		gap: 0.85rem;
 		min-width: 0;
-		padding-right: 1.35rem;
+		padding-right: clamp(1rem, 2.5vw, 2.25rem);
 	}
 
 	.global-player__track-copy {

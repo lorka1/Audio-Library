@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { page } from '$app/state';
 	import {
 		createAudioPlayerController,
 		GlobalAudioPlayer,
@@ -12,6 +13,15 @@
 	const player = createAudioPlayerController();
 	provideAudioPlayer(player);
 	let playerState = $derived($player);
+	let isAuthenticationRoute = $derived(
+		page.url.pathname === '/login' || page.url.pathname === '/register'
+	);
+
+	$effect(() => {
+		if (isAuthenticationRoute) {
+			player.clear();
+		}
+	});
 </script>
 
 <svelte:head>
@@ -21,7 +31,10 @@
 	/>
 </svelte:head>
 
-<div class:has-global-player={playerState.track !== null} class="site-shell">
+<div
+	class:has-global-player={!isAuthenticationRoute && playerState.track !== null}
+	class="site-shell"
+>
 	<a class="skip-link" href="#main-content">Skip to main content</a>
 	<SiteHeader user={data.user} />
 
@@ -36,5 +49,7 @@
 		</div>
 	</footer>
 
-	<GlobalAudioPlayer {player} />
+	{#if !isAuthenticationRoute}
+		<GlobalAudioPlayer {player} />
+	{/if}
 </div>
