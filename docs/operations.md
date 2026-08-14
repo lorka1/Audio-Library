@@ -25,8 +25,7 @@ MongoDB URI and database names, private media paths, audio, cover, and playlist-
 limits, request-body limit, cookie name and duration, and the production host,
 port, and HTTPS origin. The request-body limit must cover the larger of
 audio-plus-cover or playlist-image requests plus 1 MiB of multipart/form-data overhead. Startup
-rejects a smaller value instead of changing it silently. Backup commands
-additionally require explicit MongoDB and private-media backup roots.
+rejects a smaller value instead of changing it silently.
 
 Do not print or commit the URI or credentials. Give the application identity
 read/write permission only to its private media directory and application
@@ -49,10 +48,9 @@ external HTTPS origin.
 2. Start the local MongoDB Windows service and confirm the replica set has a
    writable PRIMARY.
 3. For a new database only, run `npm run db:mongodb:init`.
-4. Run `npm run db:mongodb:verify`.
-5. Build with `npm run build`.
-6. Start with `npm start`.
-7. Probe `/api/health/live` and `/api/health/ready`.
+4. Build with `npm run build`.
+5. Start with `npm start`.
+6. Probe `/api/health/live` and `/api/health/ready`.
 
 Startup fails before listening when configuration, private audio/cover storage,
 MongoDB topology, indexes (including `playlists` and `playlistItems`), or counter state is unsafe. Startup does not
@@ -61,31 +59,12 @@ Readiness is bounded and read-only. Liveness does not depend on MongoDB. SIGINT
 and SIGTERM stop accepting requests, wait a bounded interval, and close
 application-owned listeners and the shared MongoDB client exactly once.
 
-## Verification and backup sets
+## Backup responsibility
 
-`npm run db:mongodb:verify` is read-only. It checks connectivity, transaction
-topology, writable PRIMARY state, required collections, exact required index
-names/keys/options, the track counter, and a historical marker when present. It
-never initializes or repairs indexes.
-
-Create paired backups:
-
-```powershell
-npm run backup:mongodb
-npm run backup:audio
-```
-
-The first wraps `mongodump` and naturally captures users, sessions, tracks,
-playlists, playlist items, counters, and migration markers; the second recursively copies private audio and
-the `covers/` subdirectory plus the separate playlist-image root, then verifies file count, aggregate size, and
-aggregate content hash. Each creates a new timestamped destination, uses an
-`INCOMPLETE` marker until successful, and writes a sanitized manifest. Neither
-overwrites output or deletes old backups. The private-media copy includes every
-stored file, including an unreferenced audio file.
-
-Treat both outputs as one logical recovery set. Record the pairing in private
-operational inventory, apply a separately approved retention policy, and never
-commit backup output.
+MongoDB and private-media backups are deployment responsibilities outside this
+application repository. Treat the database and filesystem outputs as one
+logical recovery set, record their pairing in private operational inventory,
+apply a separately approved retention policy, and never commit backup output.
 
 A real disaster restore requires separate approval, a maintenance window,
 verified targets, a current paired recovery set, and the native MongoDB restore

@@ -15,8 +15,6 @@ track metadata are never duplicated into a playlist.
 - npm `>=10`
 - MongoDB reachable as a transaction-capable replica set (a local single-node
   replica set is the supported self-hosted setup)
-- MongoDB Database Tools (`mongodump` and `mongorestore`) for optional backup
-  and recovery operations
 
 Registration creates a user and initial session in one transaction. A
 standalone MongoDB server without transaction support is rejected.
@@ -58,8 +56,6 @@ Configure these values in the untracked `.env`:
 | `BODY_SIZE_LIMIT` | Adapter request limit. It must cover the larger of audio plus track cover, or playlist image, plus 1 MiB of multipart/form-data overhead. |
 | `SESSION_COOKIE_NAME` | HttpOnly session cookie name. |
 | `SESSION_DURATION_DAYS` | Session lifetime from 1 through 30 days. |
-| `MONGODB_BACKUP_ROOT` | Explicit private destination root used only by the MongoDB backup command. |
-| `AUDIO_BACKUP_ROOT` | Explicit private destination root used only by the audio backup command. |
 
 Production additionally supplies `HOST`, `PORT`, and an HTTPS `ORIGIN` through
 its private process environment. Production configuration is validated at
@@ -91,13 +87,6 @@ Index initialization is separate from read-only startup/readiness verification:
 - unique opaque playlist public IDs plus owner/update and owner/public-ID lookups;
 - unique playlist/track membership, deterministic insertion order, and
   track-deletion cleanup lookup.
-
-Check connectivity, database selection, and indexes without modifying
-application documents:
-
-```powershell
-npm run db:mongodb:verify
-```
 
 ## Features
 
@@ -142,9 +131,6 @@ server-only persistence modules provide the MongoDB repositories.
 | `npm start` | Start the hardened production listener with graceful shutdown. |
 | `npm run preview` | Preview the production build through Vite. |
 | `npm run db:mongodb:init` | Explicitly initialize a new database's indexes and counter. |
-| `npm run db:mongodb:verify` | Verify connectivity, topology, PRIMARY, collections, exact indexes, counter, and marker structure read-only. |
-| `npm run backup:mongodb` | Create a timestamped native MongoDB dump in an explicit private root. |
-| `npm run backup:audio` | Create and aggregate-verify a timestamped private copy of audio and cover files. |
 
 ## Production
 
@@ -166,9 +152,9 @@ the application-owned listener and shared MongoDB client once.
 
 Keep `AUDIO_STORAGE_PATH`, including its `covers/` subdirectory, on persistent
 private storage and never expose it through a static file server. MongoDB and
-private-media backups are separate artifacts but one logical recovery set. Pair
-their timestamps, verify restores periodically, and never commit backups or
-`.env`. The complete same-computer Windows runbook is in
+private-media backup and recovery are deployment responsibilities outside the
+application runtime. Never commit backup data or `.env`. The complete
+same-computer Windows runbook is in
 [`docs/operations.md`](docs/operations.md).
 
 ## Privacy and storage
