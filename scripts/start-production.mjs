@@ -23,10 +23,14 @@ const startupManager = new MongoClientManager(config.mongo);
 let server;
 let shutdownPromise;
 
-function safeLog(severity, category, code) {
-	const line = JSON.stringify({ timestamp: new Date().toISOString(), severity, category, code });
-	if (severity === 'error') console.error(line);
-	else console.log(line);
+function safeErrorLog(category, code) {
+	const line = JSON.stringify({
+		timestamp: new Date().toISOString(),
+		severity: 'error',
+		category,
+		code
+	});
+	console.error(line);
 }
 
 async function preflight() {
@@ -41,7 +45,6 @@ async function preflight() {
 function shutdownProductionServer(exitCode = 0) {
 	if (shutdownPromise) return shutdownPromise;
 	shutdownPromise = (async () => {
-		safeLog('info', 'shutdown', 'shutdown_started');
 		let forced = false;
 		const closeListener = server
 			? new Promise((resolveClose) => server.close(() => resolveClose()))
@@ -57,12 +60,11 @@ function shutdownProductionServer(exitCode = 0) {
 		await Promise.race([closeListener, timeout]);
 		clearTimeout(timer);
 		if (forced) {
-			safeLog('error', 'shutdown', 'shutdown_timeout');
+			safeErrorLog('shutdown', 'shutdown_timeout');
 			server?.closeAllConnections();
 		}
 		await closeMongoClient(forced);
 		process.exitCode = forced ? 1 : exitCode;
-		safeLog('info', 'shutdown', 'shutdown_complete');
 	})();
 	return shutdownPromise;
 }
@@ -78,7 +80,6 @@ async function main() {
 		server.once('error', rejectListen);
 		server.listen(port, host, resolveListen);
 	});
-	safeLog('info', 'configuration', 'production_listening');
 }
 
 installShutdownSignalHandlers(
@@ -90,6 +91,6 @@ installShutdownSignalHandlers(
 );
 
 main().catch(async () => {
-	safeLog('error', 'configuration', 'startup_failed');
+	safeErrorLog('configuration', 'startup_failed');
 	await shutdownProductionServer(1).catch(() => undefined);
 });

@@ -28,7 +28,6 @@ export function initializeApplication(): Promise<void> {
 		await preparePrivatePlaylistImageStorage(config.playlistImageStoragePath);
 		const { client, database } = await connectMongoDevelopment();
 		await verifyMongoOperationalState(client, database);
-		writeSafeLog({ severity: 'info', category: 'configuration', code: 'startup_ready' });
 	})();
 	state.promise = attempt.catch(async (error) => {
 		state.promise = undefined;

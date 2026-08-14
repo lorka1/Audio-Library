@@ -64,10 +64,6 @@ export const actions = {
 		} catch (error) {
 			const requestTooLarge = readHttpStatus(error) === 413;
 
-			if (!requestTooLarge) {
-				logTrackStorageError('Unable to parse an audio upload request.', error);
-			}
-
 			return fail(
 				requestTooLarge ? 413 : 400,
 				uploadFailureData(emptyUploadFormValues(), {

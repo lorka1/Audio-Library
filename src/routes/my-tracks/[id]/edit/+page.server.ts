@@ -68,8 +68,7 @@ export const actions = {
 
 		try {
 			formData = await event.request.formData();
-		} catch (formError) {
-			logTrackStorageError('Unable to parse a track metadata update.', formError);
+		} catch {
 			const errors: TrackMetadataErrors = {
 				general: GENERIC_METADATA_UPDATE_ERROR
 			};

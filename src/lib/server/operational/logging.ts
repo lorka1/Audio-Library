@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-export type LogSeverity = 'info' | 'warn' | 'error';
+export type LogSeverity = 'warn' | 'error';
 export type OperationCategory =
 	| 'configuration'
 	| 'mongodb'
@@ -18,7 +18,6 @@ export interface SafeLogEvent {
 	method?: string;
 	route?: string;
 	status?: number;
-	durationMs?: number;
 	errorType?: string;
 }
 
@@ -43,8 +42,7 @@ export function writeSafeLog(event: SafeLogEvent): void {
 		...event
 	});
 	if (event.severity === 'error') console.error(record);
-	else if (event.severity === 'warn') console.warn(record);
-	else console.info(record);
+	else console.warn(record);
 }
 
 export function createRequestId(): string {
