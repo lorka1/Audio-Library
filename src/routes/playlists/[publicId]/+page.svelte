@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { enhance } from '$app/forms';
 	import { PlaylistArtwork, PlaylistImageField, TrackCover, TrackPlayButton } from '$lib';
 	import { formatDate } from '$lib/formatting';
 	import { toPublicPlayerTrack } from '$lib/player/model';
@@ -96,7 +97,7 @@
 					<h3>Delete playlist</h3>
 					<p>This removes the playlist and its memberships. It does not delete any audio track.</p>
 					{#if form?.action === 'delete' && form.deleteError}<p class="field-error" role="alert">{form.deleteError}</p>{/if}
-					<form method="POST" action="?/delete">
+					<form method="POST" action="?/delete" use:enhance>
 						<label><input type="checkbox" name="confirmDelete" value="delete" required /> I understand this playlist will be deleted.</label>
 						<button class="danger-link-button" type="submit">Delete playlist</button>
 					</form>

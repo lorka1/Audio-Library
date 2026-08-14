@@ -66,7 +66,7 @@
 						</a>
 						{#if data.canManage}
 							<a class="secondary-button" href={`/my-tracks/${data.track.id}/edit`}>
-								Edit metadata
+								Edit track
 							</a>
 							<a class="danger-link-button" href={`/my-tracks/${data.track.id}/delete`}>
 								Delete track

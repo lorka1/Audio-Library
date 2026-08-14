@@ -66,7 +66,7 @@
 		{#if track.visibility === 'public'}
 			<TrackPlayButton track={playerTrack} />
 		{/if}
-		<a href={`/my-tracks/${track.publicId}/edit`}>Edit metadata</a>
+		<a href={`/my-tracks/${track.publicId}/edit`}>Edit track</a>
 		<a class="delete-link" href={`/my-tracks/${track.publicId}/delete`}>Delete</a>
 		{#if track.visibility === 'public'}
 			<a href={`/tracks/${track.publicId}`}>View public page</a>

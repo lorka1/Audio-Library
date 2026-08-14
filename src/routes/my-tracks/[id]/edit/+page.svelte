@@ -26,7 +26,7 @@
 
 <svelte:head>
 	<title>Edit {data.track.title} · Audio Library</title>
-	<meta name="description" content="Edit metadata for an audio track you own." />
+	<meta name="description" content="Edit a track you own." />
 </svelte:head>
 
 <section class="management-page">
