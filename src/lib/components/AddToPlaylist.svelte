@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { enhance } from '$app/forms';
 	import type { PlaylistPickerEntry } from '$lib/types';
 	import PlaylistArtwork from './PlaylistArtwork.svelte';
 
@@ -56,7 +57,7 @@
 					<li>
 						<PlaylistArtwork imageUrl={playlist.imageUrl ?? null} name={playlist.name} variant="picker" />
 						<span class="playlist-dialog__name" title={playlist.name}>{playlist.name}</span>
-						<form method="POST" action={playlist.containsTrack ? '?/removeFromPlaylist' : '?/addToPlaylist'}>
+						<form method="POST" action={playlist.containsTrack ? '?/removeFromPlaylist' : '?/addToPlaylist'} use:enhance>
 							<input type="hidden" name="trackPublicId" value={trackId} />
 							<input type="hidden" name="playlistPublicId" value={playlist.publicId} />
 							<button type="submit" class:remove={playlist.containsTrack}>

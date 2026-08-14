@@ -65,7 +65,7 @@
 								{#if entry.visibility === 'public'}
 									<TrackPlayButton track={toPublicPlayerTrack({ id: entry.id, title: entry.title, artist: entry.artist, coverImageUrl: entry.coverImageUrl })} variant="icon" />
 								{/if}
-								<form method="POST" action="?/removeFromPlaylist">
+								<form method="POST" action="?/removeFromPlaylist" use:enhance>
 									<input type="hidden" name="trackPublicId" value={entry.id} />
 									<input type="hidden" name="playlistPublicId" value={data.playlist.publicId} />
 									<button type="submit" aria-label={`Remove ${entry.title} from ${data.playlist.name}`}>Remove</button>
