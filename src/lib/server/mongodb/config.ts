@@ -114,8 +114,3 @@ export function readMongoConfig(
 ): MongoConfig {
 	return parseMongoConfig(environment);
 }
-
-export function redactMongoUri(uri: string): string {
-	const scheme = uri.match(MONGODB_URI_PATTERN)?.[0]?.toLowerCase();
-	return scheme ? `${scheme}<redacted>` : '<redacted MongoDB URI>';
-}

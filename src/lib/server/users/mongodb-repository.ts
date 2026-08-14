@@ -4,14 +4,14 @@ import {
 	type FindOptions
 } from 'mongodb';
 import type { UserDocument } from '../mongodb/documents.ts';
-import type { UserRepository } from './contract.ts';
-import { assertNormalizedCreateUserInput } from './contract.ts';
 import {
+	assertNormalizedCreateUserInput,
 	DuplicateUserError,
 	type AuthenticationUser,
 	type SafeAccountUser,
-	type SafeUser
-} from './types.ts';
+	type SafeUser,
+	type UserRepository
+} from './contract.ts';
 
 export const MONGODB_USER_OPERATION_TIMEOUT_MS = 5_000;
 

@@ -145,8 +145,6 @@ export function readTrackMetadataFormValues(
 	};
 }
 
-export const readUploadFormValues = readTrackMetadataFormValues;
-
 export function validateTitle(value: string): FieldValidation<string> {
 	const title = value.trim();
 

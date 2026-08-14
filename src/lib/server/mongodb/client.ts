@@ -4,10 +4,7 @@ import {
 	type MongoClientOptions
 } from 'mongodb';
 import type { MongoConfig, MongoEnvironment } from './config.ts';
-import {
-	assertMongoTestDatabaseName,
-	readMongoConfig
-} from './config.ts';
+import { readMongoConfig } from './config.ts';
 import { safeErrorFields, writeSafeLog } from '../operational/logging.ts';
 
 export type MongoClientFactory = (
@@ -159,21 +156,6 @@ export async function connectMongoDevelopment(
 	return {
 		client,
 		database
-	};
-}
-
-export async function connectMongoTest(
-	environment: MongoEnvironment = process.env
-): Promise<MongoConnection> {
-	const config = readMongoConfig(environment);
-	assertMongoTestDatabaseName(
-		config.testDatabaseName,
-		config.databaseName
-	);
-	const client = await processMongoManager(config).connect();
-	return {
-		client,
-		database: client.db(config.testDatabaseName)
 	};
 }
 

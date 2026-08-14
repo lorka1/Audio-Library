@@ -1,16 +1,41 @@
 import type { CreateUserInput } from '../auth/types.ts';
 import type { ClientSession } from 'mongodb';
+import type { CurrentUser } from '../../types';
 import {
 	normalizeEmail,
 	validateEmail,
 	validateUsername
 } from '../auth/validation.ts';
-import type {
-	AuthenticationUser,
-	RegistrationConflicts,
-	SafeAccountUser,
-	SafeUser
-} from './types';
+
+export interface AuthenticationUser {
+	id: string;
+	passwordHash: string;
+}
+
+export interface RegistrationConflicts {
+	usernameTaken: boolean;
+	emailTaken: boolean;
+}
+
+export type DuplicateUserField = 'username' | 'email';
+
+export class DuplicateUserError extends Error {
+	readonly field: DuplicateUserField;
+
+	constructor(field: DuplicateUserField) {
+		super(`A user with that ${field} already exists.`);
+		this.name = 'DuplicateUserError';
+		this.field = field;
+	}
+}
+
+export type SafeUser = CurrentUser;
+
+export interface SafeAccountUser {
+	username: string;
+	email: string;
+	createdAt: Date;
+}
 
 export interface UserRepository {
 	createUser(

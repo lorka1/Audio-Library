@@ -43,7 +43,3 @@ export function initializeApplication(): Promise<void> {
 	});
 	return state.promise;
 }
-
-export function resetApplicationStartupForTests(): void {
-	state.promise = undefined;
-}

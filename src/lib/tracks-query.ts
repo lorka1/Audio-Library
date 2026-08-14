@@ -65,37 +65,6 @@ export function escapeRegexSearchTerm(value: string): string {
 	return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-export function buildCanonicalTrackQuery(filters: TrackSearchFilters): string {
-	const parameters = new URLSearchParams();
-
-	if (filters.q) {
-		parameters.set('q', filters.q);
-	}
-
-	if (filters.bpmMin !== undefined) {
-		parameters.set('bpmMin', String(filters.bpmMin));
-	}
-
-	if (filters.bpmMax !== undefined) {
-		parameters.set('bpmMax', String(filters.bpmMax));
-	}
-
-	if (filters.musicalKey) {
-		parameters.set('musicalKey', filters.musicalKey);
-	}
-
-	if (filters.genre) {
-		parameters.set('genre', filters.genre);
-	}
-
-	if (filters.sort !== DEFAULT_TRACK_SORT) {
-		parameters.set('sort', filters.sort);
-	}
-
-	const query = parameters.toString();
-	return query ? `?${query}` : '';
-}
-
 export function hasActiveTrackFilters(filters: TrackSearchFilters): boolean {
 	return Boolean(
 		filters.q ||

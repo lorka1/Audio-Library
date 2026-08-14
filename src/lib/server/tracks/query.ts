@@ -53,10 +53,6 @@ function parseBpm(value: string, label: 'Minimum' | 'Maximum'): ParsedBpm {
 	return { value: bpm, error: undefined };
 }
 
-export function escapeSqlLikeSearchTerm(value: string): string {
-	return value.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_');
-}
-
 export function parseTrackQuery(searchParams: URLSearchParams): ParsedTrackQuery {
 	const rawQuery = (searchParams.get('q') ?? '').trim();
 	const rawBpmMin = (searchParams.get('bpmMin') ?? '').trim();

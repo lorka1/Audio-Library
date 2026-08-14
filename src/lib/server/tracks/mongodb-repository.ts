@@ -32,8 +32,12 @@ import {
 	requireTrackOwnerId,
 	UNKNOWN_TRACK_UPLOADER
 } from './contract.ts';
-import { toOwnerTrack, type OwnerTrackRecord } from './owner-model.ts';
-import { toPublicTrack, type PublicTrackRecord } from './public-model.ts';
+import {
+	toOwnerTrack,
+	toPublicTrack,
+	type OwnerTrackRecord,
+	type PublicTrackRecord
+} from './projections.ts';
 import { cleanupPreservingPrimaryFailure } from '../operational/cleanup.ts';
 import { safeErrorFields, writeSafeLog } from '../operational/logging.ts';
 
@@ -182,30 +186,6 @@ function mapCoverForDelivery(document: TrackDocument): TrackCoverForDelivery | n
 				...coverImage
 			}
 		: null;
-}
-
-export async function initializeMongoPublicTrackIdCounter(
-	counters: Collection<CounterDocument>,
-	lastAllocatedPublicId = 0,
-	options: MongoTrackRepositoryOptions = {}
-): Promise<number> {
-	if (!Number.isSafeInteger(lastAllocatedPublicId) || lastAllocatedPublicId < 0) {
-		throw new Error('The initial public track ID counter must be a non-negative safe integer.');
-	}
-	const result = await counters.findOneAndUpdate(
-		{ _id: TRACK_PUBLIC_ID_COUNTER },
-		{ $max: { value: lastAllocatedPublicId } },
-		{
-			upsert: true,
-			returnDocument: 'after',
-			timeoutMS: options.timeoutMS ?? MONGODB_TRACK_OPERATION_TIMEOUT_MS,
-			projection: { _id: 0, value: 1 }
-		}
-	);
-	if (!result || !Number.isSafeInteger(result.value) || result.value < lastAllocatedPublicId) {
-		throw new Error('MongoDB did not initialize the public track ID counter safely.');
-	}
-	return result.value;
 }
 
 export function createMongoTrackRepository(
