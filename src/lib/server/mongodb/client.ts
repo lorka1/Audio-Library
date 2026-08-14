@@ -110,7 +110,6 @@ function configSignature(config: MongoConfig): string {
 	return JSON.stringify([
 		config.uri,
 		config.databaseName,
-		config.testDatabaseName,
 		config.serverSelectionTimeoutMs,
 		config.connectTimeoutMs,
 		config.socketTimeoutMs

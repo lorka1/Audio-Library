@@ -22,10 +22,7 @@ import {
 	assertPositivePublicTrackId,
 	UNKNOWN_TRACK_UPLOADER
 } from '../tracks/contract.ts';
-import type {
-	PlaylistInput,
-	PlaylistRepository
-} from './contract.ts';
+import type { PlaylistRepository } from './contract.ts';
 import { requirePlaylistOwnerId } from './contract.ts';
 import { isValidPlaylistPublicId } from './validation.ts';
 

@@ -47,7 +47,6 @@ Configure these values in the untracked `.env`:
 | --- | --- |
 | `MONGODB_URI` | Private connection string for the transaction-capable deployment; the local production URI includes `replicaSet=rs0`. Never commit credentials. |
 | `MONGODB_DB_NAME` | Application database name. |
-| `MONGODB_TEST_DB_NAME` | Base name for uniquely owned integration databases. It must start with `audio_library_test_` and differ from the application database. |
 | `AUDIO_STORAGE_PATH` | Private filesystem root for audio bytes. Optional cover images are stored in its private `covers/` subdirectory. |
 | `MAX_AUDIO_FILE_SIZE_MB` | Application upload limit. |
 | `COVER_IMAGE_MAX_SIZE_MB` | Optional cover-image upload limit. |

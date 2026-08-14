@@ -19,7 +19,6 @@ export const TRACK_TITLE_MAX_LENGTH = 120;
 export const TRACK_DESCRIPTION_MAX_LENGTH = 2000;
 export const ORIGINAL_FILENAME_MAX_LENGTH = 255;
 export const DEFAULT_COVER_IMAGE_MAX_SIZE_BYTES = 5 * 1024 * 1024;
-export { BPM_MAX, BPM_MIN };
 
 const musicalKeySet = new Set<string>(MUSICAL_KEYS);
 const musicGenreSet = new Set<string>(MUSIC_GENRES);

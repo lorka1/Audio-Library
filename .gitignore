@@ -14,8 +14,6 @@ build/
 !.env.example
 
 # Runtime data
-data/*
-!data/.gitkeep
 storage/audio/*
 !storage/audio/.gitkeep
 *.db

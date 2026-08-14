@@ -20,5 +20,4 @@ export interface SessionRepository {
 	): Promise<AuthState | null>;
 	deleteSessionByTokenHash(tokenHash: string): Promise<void>;
 	deleteSessionsForUser(userId: string): Promise<void>;
-	deleteExpiredSessions(now: Date): Promise<void>;
 }

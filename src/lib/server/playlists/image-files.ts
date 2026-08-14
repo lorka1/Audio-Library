@@ -6,10 +6,10 @@ import {
 	readStoredCoverImageFile,
 	restoreQuarantinedCoverImageFile,
 	saveCoverImageFile,
-	type CoverImageExtension,
 	type QuarantinedCoverImageFile,
 	type QuarantineStoredCoverImageResult
 } from '../tracks/cover-files';
+import type { CoverImageExtension } from '../tracks/media-formats';
 
 export type PlaylistImageExtension = CoverImageExtension;
 export type QuarantinedPlaylistImageFile = QuarantinedCoverImageFile;

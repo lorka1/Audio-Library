@@ -10,8 +10,6 @@ import {
 } from './session-token';
 import type { AuthSession, AuthState, PreparedSession } from './types';
 
-export { generateSessionToken, hashSessionToken } from './session-token';
-
 const cookieBaseOptions = {
 	httpOnly: true,
 	sameSite: 'lax' as const,
@@ -65,11 +63,6 @@ export async function invalidateSession(token: string): Promise<void> {
 	await persistence.sessions.deleteSessionByTokenHash(
 		hashSessionToken(token)
 	);
-}
-
-export async function deleteExpiredSessions(now = new Date()): Promise<void> {
-	const persistence = await getAuthPersistence();
-	await persistence.sessions.deleteExpiredSessions(now);
 }
 
 export function setSessionCookie(cookies: Cookies, token: string, expiresAt: Date): void {

@@ -93,12 +93,6 @@ export function createMongoSessionRepository(
 		},
 		async deleteSessionsForUser(userId) {
 			await sessions.deleteMany({ userId }, operationOptions);
-		},
-		async deleteExpiredSessions(now) {
-			await sessions.deleteMany(
-				{ expiresAt: { $lte: now } },
-				operationOptions
-			);
 		}
 	};
 }

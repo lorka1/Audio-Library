@@ -6,7 +6,6 @@ import {
 	quarantineStoredCoverImageFile,
 	restoreQuarantinedCoverImageFile,
 	saveCoverImageFile,
-	type CoverImageExtension,
 	type QuarantinedCoverImageFile,
 	type QuarantineStoredCoverImageResult
 } from './cover-files';
@@ -17,6 +16,7 @@ import {
 	type QuarantinedAudioFile,
 	type QuarantineStoredAudioFileResult
 } from './files';
+import type { CoverImageExtension } from './media-formats';
 import { logTrackStorageError } from './logging';
 import {
 	type OwnerTrackStorage,

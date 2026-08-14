@@ -8,7 +8,6 @@ import {
 	quarantineStoredPlaylistImageFile,
 	restoreQuarantinedPlaylistImageFile,
 	savePlaylistImageFile,
-	type QuarantinedPlaylistImageFile,
 	type QuarantineStoredPlaylistImageResult
 } from './image-files';
 import { getApplicationPlaylistRepository } from './persistence';

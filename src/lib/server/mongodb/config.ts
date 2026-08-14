@@ -1,4 +1,3 @@
-export const MONGODB_TEST_DATABASE_PREFIX = 'audio_library_test_';
 export const MONGODB_SERVER_SELECTION_TIMEOUT_MS = 8_000;
 export const MONGODB_CONNECT_TIMEOUT_MS = 8_000;
 export const MONGODB_SOCKET_TIMEOUT_MS = 15_000;
@@ -10,13 +9,11 @@ const PROTECTED_DATABASE_NAMES = new Set(['admin', 'config', 'local']);
 export interface MongoEnvironment {
 	MONGODB_URI?: string;
 	MONGODB_DB_NAME?: string;
-	MONGODB_TEST_DB_NAME?: string;
 }
 
 export interface MongoConfig {
 	uri: string;
 	databaseName: string;
-	testDatabaseName: string;
 	serverSelectionTimeoutMs: number;
 	connectTimeoutMs: number;
 	socketTimeoutMs: number;
@@ -67,42 +64,18 @@ function validateMongoUri(uri: string): void {
 	}
 }
 
-export function assertMongoTestDatabaseName(
-	testDatabaseName: string,
-	databaseName: string
-): void {
-	if (testDatabaseName === databaseName) {
-		throw new Error(
-			'MONGODB_TEST_DB_NAME must differ from MONGODB_DB_NAME.'
-		);
-	}
-
-	if (!testDatabaseName.startsWith(MONGODB_TEST_DATABASE_PREFIX)) {
-		throw new Error(
-			`MONGODB_TEST_DB_NAME must start with ${MONGODB_TEST_DATABASE_PREFIX}.`
-		);
-	}
-}
-
 export function parseMongoConfig(
 	environment: MongoEnvironment
 ): MongoConfig {
 	const uri = requireValue(environment, 'MONGODB_URI');
 	const databaseName = requireValue(environment, 'MONGODB_DB_NAME');
-	const testDatabaseName = requireValue(
-		environment,
-		'MONGODB_TEST_DB_NAME'
-	);
 
 	validateMongoUri(uri);
 	validateDatabaseName(databaseName, 'MONGODB_DB_NAME');
-	validateDatabaseName(testDatabaseName, 'MONGODB_TEST_DB_NAME');
-	assertMongoTestDatabaseName(testDatabaseName, databaseName);
 
 	return {
 		uri,
 		databaseName,
-		testDatabaseName,
 		serverSelectionTimeoutMs: MONGODB_SERVER_SELECTION_TIMEOUT_MS,
 		connectTimeoutMs: MONGODB_CONNECT_TIMEOUT_MS,
 		socketTimeoutMs: MONGODB_SOCKET_TIMEOUT_MS

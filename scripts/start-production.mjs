@@ -38,7 +38,7 @@ async function preflight() {
 	}
 }
 
-export function shutdownProductionServer(exitCode = 0) {
+function shutdownProductionServer(exitCode = 0) {
 	if (shutdownPromise) return shutdownPromise;
 	shutdownPromise = (async () => {
 		safeLog('info', 'shutdown', 'shutdown_started');

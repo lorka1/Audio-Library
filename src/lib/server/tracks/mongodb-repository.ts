@@ -12,7 +12,6 @@ import type {
 } from '../mongodb/documents.ts';
 import { TRACK_PUBLIC_ID_COUNTER } from '../mongodb/documents.ts';
 import type {
-	CreateTrackInput,
 	DuplicateTrackField,
 	OwnerTrackStorage,
 	StoredCoverImage,

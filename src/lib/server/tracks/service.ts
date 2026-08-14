@@ -3,14 +3,13 @@ import type { CreatedTrack, CreateTrackInput } from './contract';
 import {
 	coverImageFileHasValidContents,
 	deleteStoredCoverImageFile,
-	saveCoverImageFile,
-	type CoverImageExtension
+	saveCoverImageFile
 } from './cover-files';
 import {
 	deleteStoredAudioFile,
-	saveAudioFile,
-	type AudioExtension
+	saveAudioFile
 } from './files';
+import type { AudioExtension, CoverImageExtension } from './media-formats';
 import { logTrackStorageError } from './logging';
 import {
 	validateUploadFormData,

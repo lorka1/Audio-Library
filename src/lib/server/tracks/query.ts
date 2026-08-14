@@ -125,10 +125,3 @@ export function parseTrackQuery(searchParams: URLSearchParams): ParsedTrackQuery
 		isValid: Object.keys(errors).length === 0
 	};
 }
-
-export type {
-	ParsedTrackQuery,
-	TrackQueryErrors,
-	TrackSearchFilters,
-	TrackSort
-} from '$lib/tracks-query';

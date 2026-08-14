@@ -1,19 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { lstat, mkdir, open, realpath, rename, unlink } from 'node:fs/promises';
 import type { ReadStream } from 'node:fs';
-import { extname, isAbsolute, relative, resolve, sep } from 'node:path';
+import { isAbsolute, relative, resolve, sep } from 'node:path';
 import { Readable } from 'node:stream';
 import { getServerConfig } from '$lib/server/config';
 import { logTrackStorageError } from './logging';
 import {
-	AUDIO_FORMATS,
-	getValidatedAudioExtension,
-	isAllowedAudioFormat,
-	normalizeAudioExtension,
-	type AudioExtension
-} from './media-formats.ts';
-export {
-	AUDIO_FORMATS,
 	getValidatedAudioExtension,
 	isAllowedAudioFormat,
 	normalizeAudioExtension,
