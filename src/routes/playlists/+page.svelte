@@ -31,15 +31,32 @@
 		{#if data.deleted}
 			<div class="form-message form-message--success" role="status">Playlist deleted successfully.</div>
 		{/if}
+		{#if data.playlistNotice}
+			<div
+				class="form-message"
+				class:form-message--success={data.playlistNotice.kind === 'success'}
+				class:form-message--error={data.playlistNotice.kind === 'error'}
+				role={data.playlistNotice.kind === 'error' ? 'alert' : 'status'}
+			>
+				{data.playlistNotice.message}
+			</div>
+		{/if}
 
 		<div class="playlists-layout">
 			<section class="playlist-create" aria-labelledby="create-playlist-heading">
 				<h2 id="create-playlist-heading">Create playlist</h2>
-				<p>Playlist names can be reused. Every playlist is private in this phase.</p>
+				<p>
+					{data.addTrackPublicId
+						? 'The selected track will be added after this private playlist is created.'
+						: 'Playlist names can be reused. Every playlist is private in this phase.'}
+				</p>
 				{#if createErrors.general}
 					<div class="form-message form-message--error" role="alert">{createErrors.general}</div>
 				{/if}
 				<form class="form-stack" method="POST" action="?/create" enctype="multipart/form-data" use:enhance>
+					{#if data.addTrackPublicId}
+						<input type="hidden" name="trackPublicId" value={data.addTrackPublicId} />
+					{/if}
 					<div class="form-field">
 						<label for="playlist-name">Name</label>
 						<input

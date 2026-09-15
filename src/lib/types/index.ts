@@ -2,15 +2,25 @@ export const TRACK_VISIBILITIES = ['private', 'public'] as const;
 
 export type TrackVisibility = (typeof TRACK_VISIBILITIES)[number];
 
+export const USER_ROLES = ['user', 'admin'] as const;
+
+export type UserRole = (typeof USER_ROLES)[number];
+
+export function normalizeUserRole(value: unknown): UserRole {
+	return value === 'admin' ? 'admin' : 'user';
+}
+
 export interface CurrentUser {
 	id: string;
 	username: string;
 	email: string;
+	role: UserRole;
 	createdAt: Date;
 }
 
 export interface NavigationUser {
 	username: string;
+	role: UserRole;
 }
 
 export interface PublicTrack {

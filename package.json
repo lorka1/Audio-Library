@@ -11,12 +11,15 @@
   "scripts": {
     "dev": "vite dev",
     "build": "vite build",
+    "test": "node --experimental-strip-types --test tests/*.test.mjs",
     "start": "node --experimental-strip-types scripts/start-production.mjs",
     "preview": "vite preview",
     "prepare": "svelte-kit sync",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
-    "db:mongodb:init": "node --experimental-strip-types scripts/mongodb-initialize.mjs"
+    "db:mongodb:init": "node --experimental-strip-types scripts/mongodb-initialize.mjs",
+    "admin:grant": "node --experimental-strip-types scripts/admin-role.mjs grant",
+    "admin:revoke": "node --experimental-strip-types scripts/admin-role.mjs revoke"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

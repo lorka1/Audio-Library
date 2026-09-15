@@ -81,6 +81,13 @@
 						href="/playlists"
 						aria-current={isRouteActive('/playlists') ? 'page' : undefined}>Playlists</a
 					>
+					{#if user.role === 'admin'}
+						<a
+							class="nav-link"
+							href="/admin"
+							aria-current={isRouteActive('/admin') ? 'page' : undefined}>Admin</a
+						>
+					{/if}
 					<ProfileMenu {user} menuId="desktop-profile-menu" />
 				{:else}
 					<a
@@ -146,6 +153,13 @@
 					aria-current={isRouteActive('/playlists') ? 'page' : undefined}
 					onclick={() => closeMobileMenu()}>Playlists</a
 				>
+				{#if user.role === 'admin'}
+					<a
+						href="/admin"
+						aria-current={isRouteActive('/admin') ? 'page' : undefined}
+						onclick={() => closeMobileMenu()}>Admin</a
+					>
+				{/if}
 			{:else}
 				<a
 					href="/login"

@@ -4,6 +4,7 @@ import type {
 	UserDocument
 } from '../mongodb/documents.ts';
 import type { SessionRepository } from './contract.ts';
+import { normalizeUserRole } from '../../types/index.ts';
 
 export const MONGODB_SESSION_OPERATION_TIMEOUT_MS = 5_000;
 
@@ -67,6 +68,7 @@ export function createMongoSessionRepository(
 						_id: 1,
 						username: 1,
 						email: 1,
+						role: 1,
 						createdAt: 1
 					}
 				}
@@ -84,6 +86,7 @@ export function createMongoSessionRepository(
 					id: user._id,
 					username: user.username,
 					email: user.email,
+					role: normalizeUserRole(user.role),
 					createdAt: user.createdAt
 				}
 			};

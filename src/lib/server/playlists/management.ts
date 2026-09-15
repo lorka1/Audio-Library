@@ -46,9 +46,18 @@ const defaultDependencies: PlaylistManagementDependencies = {
 };
 
 type FailureStatus = 400 | 404 | 500;
+type PlaylistMutationFailure = {
+	success: false;
+	status: FailureStatus;
+	values: PlaylistFormValues;
+	errors: PlaylistFormErrors;
+};
+export type PlaylistCreationResult =
+	| { success: true; playlist: PlaylistSummary }
+	| PlaylistMutationFailure;
 export type PlaylistMutationResult =
 	| { success: true }
-	| { success: false; status: FailureStatus; values: PlaylistFormValues; errors: PlaylistFormErrors };
+	| PlaylistMutationFailure;
 export type PlaylistDeletionResult =
 	| { success: true }
 	| { success: false; status: 404 | 500; message: string };
@@ -95,7 +104,7 @@ export async function createPlaylist(
 	formData: FormData,
 	maxImageSizeBytes: number,
 	dependencies: PlaylistManagementDependencies = defaultDependencies
-): Promise<PlaylistMutationResult> {
+): Promise<PlaylistCreationResult> {
 	const validation = validatePlaylistFormData(formData, maxImageSizeBytes);
 	if (!validation.success) return { success: false, status: 400, values: validation.values, errors: validation.errors };
 	const contentError = await validateContents(validation);
@@ -105,11 +114,11 @@ export async function createPlaylist(
 		if (validation.imageOperation.kind === 'replace') {
 			stored = await dependencies.saveImage(validation.imageOperation.image.file, validation.imageOperation.image.extension, maxImageSizeBytes);
 		}
-		await dependencies.create(ownerId, {
+		const playlist = await dependencies.create(ownerId, {
 			...validation.input,
 			image: stored ? { storageKey: stored.storedFilename, mimeType: stored.mimeType, byteSize: stored.fileSizeBytes } : null
 		});
-		return { success: true };
+		return { success: true, playlist };
 	} catch (error) {
 		if (stored) await removeNewImage(stored.storedFilename, dependencies);
 		log('playlist_create_failed', error);

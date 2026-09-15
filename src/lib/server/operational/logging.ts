@@ -52,6 +52,7 @@ export function createRequestId(): string {
 export function routeCategory(pathname: string): string {
 	if (pathname.startsWith('/api/health/')) return 'health';
 	if (pathname.startsWith('/api/tracks/')) return 'media';
+	if (pathname.startsWith('/admin')) return 'admin';
 	if (pathname.startsWith('/tracks')) return 'public_tracks';
 	if (pathname.startsWith('/my-tracks')) return 'owner_tracks';
 	if (pathname === '/upload') return 'upload';

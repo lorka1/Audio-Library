@@ -1,6 +1,9 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
-import { requireGuest } from '$lib/server/auth/guards';
+import {
+	requireGuest,
+	resolvePostLoginRedirect
+} from '$lib/server/auth/guards';
 import { logAuthError } from '$lib/server/auth/logging';
 import {
 	performDummyPasswordCheck,
@@ -54,6 +57,7 @@ export const actions = {
 		}
 
 		const values = { email: validation.data.email };
+		let postLoginRedirect = redirectTo;
 
 		try {
 			const user = await findAuthenticationUser(values.email);
@@ -80,6 +84,7 @@ export const actions = {
 
 			const { token, session } = await createSession(user.id);
 			setSessionCookie(event.cookies, token, session.expiresAt);
+			postLoginRedirect = resolvePostLoginRedirect(user.role, redirectTo);
 		} catch (error) {
 			logAuthError('Login failed.', error);
 			return fail(
@@ -88,6 +93,6 @@ export const actions = {
 			);
 		}
 
-		redirect(303, redirectTo);
+		redirect(303, postLoginRedirect);
 	}
 } satisfies Actions;

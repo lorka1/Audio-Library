@@ -71,7 +71,11 @@
 			<p class="playlist-dialog__empty">You do not have a playlist yet.</p>
 		{/if}
 
-		<a class="playlist-dialog__manage" href="/playlists">Create or manage playlists</a>
+		<a
+			class="playlist-dialog__manage"
+			href={`/playlists?trackPublicId=${encodeURIComponent(String(trackId))}`}
+			>Create a new playlist</a
+		>
 	</dialog>
 {/if}
 

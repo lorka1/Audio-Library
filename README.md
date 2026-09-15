@@ -46,7 +46,26 @@ npm run dev
 - audio downloads using the original filename
 - owner-only track editing and deletion
 - private playlists with add and remove controls
+- server-authorized administrator dashboard with read-only user management and track moderation
 - responsive light and dark interface
+
+## Administrator role
+
+All registrations create a normal `user` account. Administrator registration and web-based role editing are intentionally unavailable. Existing MongoDB user documents without a `role` field continue to work and are treated as normal users.
+
+Promote an existing account from a trusted server terminal:
+
+```powershell
+npm run admin:grant -- user@example.com
+```
+
+Demote the account again:
+
+```powershell
+npm run admin:revoke -- user@example.com
+```
+
+The command reads the existing MongoDB environment configuration, fails when the account is not found, and never handles or prints a password. Active sessions pick up the new role on their next request because session validation reloads the user from MongoDB.
 
 ## Technology
 
@@ -82,10 +101,13 @@ Do not commit `.env` or add credentials to tracked files.
 | --- | --- |
 | `npm run dev` | Start the development server |
 | `npm run check` | Run Svelte and TypeScript checks |
+| `npm run test` | Run the focused Node test suite |
 | `npm run build` | Create the production build |
 | `npm start` | Start the production Node server |
 | `npm run preview` | Preview the production build with Vite |
 | `npm run db:mongodb:init` | Initialize MongoDB indexes and counters |
+| `npm run admin:grant -- user@example.com` | Promote an existing account to administrator |
+| `npm run admin:revoke -- user@example.com` | Demote an administrator to a normal user |
 
 ## File storage
 
@@ -120,3 +142,5 @@ storage/              private local media files
 ```
 
 Playlists are currently private to their owner. Sharing, collaboration, manual reordering, and recommendations are outside the current project scope.
+
+The administrator pages are `/admin`, `/admin/users`, and `/admin/tracks`. Access and every moderation action are checked on the server. Administrator track deletion delegates to the same storage-aware deletion workflow used by owners, including audio and cover cleanup plus playlist-membership removal.

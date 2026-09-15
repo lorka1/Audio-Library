@@ -4,6 +4,7 @@ import {
 	type FindOptions
 } from 'mongodb';
 import type { UserDocument } from '../mongodb/documents.ts';
+import { normalizeUserRole } from '../../types/index.ts';
 import {
 	assertNormalizedCreateUserInput,
 	DuplicateUserError,
@@ -25,12 +26,14 @@ const safeUserProjection = {
 	_id: 1,
 	username: 1,
 	email: 1,
+	role: 1,
 	createdAt: 1
 } as const;
 
 const authenticationUserProjection = {
 	_id: 1,
-	passwordHash: 1
+	passwordHash: 1,
+	role: 1
 } as const;
 
 const accountUserProjection = {
@@ -45,6 +48,7 @@ function toSafeUser(document: UserDocument): SafeUser {
 		id: document._id,
 		username: document.username,
 		email: document.email,
+		role: normalizeUserRole(document.role),
 		createdAt: document.createdAt
 	};
 }
@@ -54,7 +58,8 @@ function toAuthenticationUser(
 ): AuthenticationUser {
 	return {
 		id: document._id,
-		passwordHash: document.passwordHash
+		passwordHash: document.passwordHash,
+		role: normalizeUserRole(document.role)
 	};
 }
 
@@ -116,6 +121,7 @@ export function createMongoUserRepository(
 				username: input.username,
 				email: input.email,
 				passwordHash: input.passwordHash,
+				role: 'user',
 				createdAt: now,
 				updatedAt: now
 			};

@@ -1,4 +1,4 @@
-import type { TrackVisibility } from '$lib/types';
+import type { TrackVisibility, UserRole } from '$lib/types';
 
 /** server-only documents need an audience-safe projection before reaching a page */
 export interface UserDocument {
@@ -7,6 +7,8 @@ export interface UserDocument {
 	/** normalized to trimmed lowercase */
 	email: string;
 	passwordHash: string;
+	/** legacy user documents may omit this; application reads default to user */
+	role?: UserRole;
 	createdAt: Date;
 	updatedAt: Date;
 }

@@ -1,6 +1,6 @@
 import type { CreateUserInput } from '../auth/types.ts';
 import type { ClientSession } from 'mongodb';
-import type { CurrentUser } from '../../types';
+import type { CurrentUser, UserRole } from '../../types';
 import {
 	normalizeEmail,
 	validateEmail,
@@ -10,6 +10,7 @@ import {
 export interface AuthenticationUser {
 	id: string;
 	passwordHash: string;
+	role: UserRole;
 }
 
 export interface RegistrationConflicts {
