@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { enhance } from '$app/forms';
 	import CoverImageField from '$lib/components/CoverImageField.svelte';
 	import FilePicker from '$lib/components/FilePicker.svelte';
 	import { MUSIC_GENRES, MUSICAL_KEYS } from '$lib/constants/music';
@@ -48,6 +49,7 @@
 				action="/upload"
 				enctype="multipart/form-data"
 				class="form-stack"
+				use:enhance
 			>
 				<div class="form-field form-field--full">
 					<label for="audioFile">Audio file</label>
