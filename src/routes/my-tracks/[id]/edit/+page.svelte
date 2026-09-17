@@ -39,7 +39,7 @@
 				<h1>Edit track</h1>
 				<p>
 					Update descriptive metadata and optional cover artwork. The audio file, ownership,
-					visibility, and track identifiers will not change.
+					and track identifiers will not change.
 				</p>
 			</header>
 
@@ -47,12 +47,6 @@
 				<p><strong>Artist:</strong> {data.track.artist}</p>
 				<p><strong>Audio file:</strong> {data.track.originalFilename}</p>
 				<p><strong>File size:</strong> {formatFileSize(data.track.fileSizeBytes)}</p>
-				<p>
-					<strong>Visibility:</strong>
-					<span class:private={data.track.visibility === 'private'}>
-						{data.track.visibility === 'public' ? 'Public' : 'Private'}
-					</span>
-				</p>
 			</div>
 
 			{#if form?.errors.general}
@@ -234,15 +228,6 @@
 		margin: 0;
 		font-size: 0.86rem;
 		overflow-wrap: anywhere;
-	}
-
-	.readonly-track-summary span {
-		color: var(--success);
-		font-weight: 800;
-	}
-
-	.readonly-track-summary span.private {
-		color: var(--warning);
 	}
 
 	.management-actions {

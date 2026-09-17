@@ -49,27 +49,6 @@ export const MONGODB_INDEX_DEFINITIONS = {
 		{
 			name: 'tracks_owner_created_at_idx',
 			key: { ownerId: 1, createdAt: -1, publicId: -1 }
-		},
-		{
-			name: 'tracks_public_created_at_idx',
-			key: { visibility: 1, createdAt: -1, publicId: -1 }
-		},
-		{
-			name: 'tracks_public_bpm_idx',
-			key: { visibility: 1, bpm: 1, createdAt: -1, publicId: -1 }
-		},
-		{
-			name: 'tracks_public_musical_key_idx',
-			key: {
-				visibility: 1,
-				musicalKey: 1,
-				createdAt: -1,
-				publicId: -1
-			}
-		},
-		{
-			name: 'tracks_public_genre_idx',
-			key: { visibility: 1, genre: 1, createdAt: -1, publicId: -1 }
 		}
 	],
 	playlists: [

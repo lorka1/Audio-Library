@@ -79,8 +79,8 @@ MIME type and extension, and stores bytes under the private
 `AUDIO_STORAGE_PATH/covers` directory using a generated filename. MongoDB
 stores metadata only.
 
-Public cover requests use the numeric route
-`GET /api/tracks/[id]/cover`; private tracks are not exposed publicly. Missing
+Track cover requests use the numeric route
+`GET /api/tracks/[id]/cover`; every track cover is available there. Missing
 or unavailable cover files use the local UI fallback and do not reveal storage
 details. Owner replacement writes the new cover before changing metadata and
 removes the old cover only after persistence succeeds. Removal and track

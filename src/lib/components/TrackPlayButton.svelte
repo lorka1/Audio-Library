@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { AudioPlayerController } from '$lib/player/controller';
-	import type { PublicPlayerTrack } from '$lib/player/model';
+	import type { PlayerTrack } from '$lib/player/model';
 	import { useAudioPlayer } from '$lib/player/context';
 
 	let {
@@ -8,7 +8,7 @@
 		player = useAudioPlayer(),
 		variant = 'compact'
 	}: {
-		track: PublicPlayerTrack;
+		track: PlayerTrack;
 		player?: AudioPlayerController;
 		variant?: 'compact' | 'detail' | 'icon';
 	} = $props();

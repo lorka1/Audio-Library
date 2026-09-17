@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { formatDate } from '$lib/formatting';
 	import type { AudioPlayerController } from '$lib/player/controller';
-	import { toPublicPlayerTrack } from '$lib/player/model';
-	import type { PlaylistPickerEntry, PublicTrack } from '$lib/types';
+	import { toPlayerTrack } from '$lib/player/model';
+	import type { PlaylistPickerEntry, TrackSummary } from '$lib/types';
 	import AddToPlaylist from './AddToPlaylist.svelte';
 	import TrackCover from './TrackCover.svelte';
 	import TrackPlayButton from './TrackPlayButton.svelte';
@@ -13,12 +13,12 @@
 		playlistChoices = null,
 		loginHref = `/login?redirectTo=${encodeURIComponent(`/tracks/${track.id}`)}`
 	}: {
-		track: PublicTrack;
+		track: TrackSummary;
 		player?: AudioPlayerController;
 		playlistChoices?: PlaylistPickerEntry[] | null;
 		loginHref?: string;
 	} = $props();
-	let playerTrack = $derived(toPublicPlayerTrack(track));
+	let playerTrack = $derived(toPlayerTrack(track));
 	let genreTone = $derived(
 		(track.genre ?? 'none').split('').reduce((sum, character) => sum + character.charCodeAt(0), 0) % 4
 	);

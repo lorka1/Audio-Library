@@ -21,7 +21,7 @@
 			<div>
 				<p class="auth-eyebrow">Owner-only collections</p>
 				<h1>My Playlists</h1>
-				<p>Create private collections of public tracks and your own private uploads.</p>
+				<p>Create private collections of tracks in the library.</p>
 			</div>
 		</header>
 

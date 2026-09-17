@@ -19,10 +19,7 @@
 			<div>
 				<p class="auth-eyebrow">Owner-only library</p>
 				<h1>My Tracks</h1>
-				<p>
-					Manage metadata or remove tracks you uploaded. Public and private tracks both
-					appear here.
-				</p>
+				<p>Manage metadata or remove tracks you uploaded.</p>
 			</div>
 			<a class="primary-button" href="/upload">Upload another track</a>
 		</header>

@@ -21,7 +21,7 @@ function unavailableResponse(status: 404 | 500): Response {
 	);
 }
 
-export const GET = (async ({ locals, params }) => {
+export const GET = (async ({ params }) => {
 	const id = parseTrackId(params.id);
 	if (id === null) return unavailableResponse(404);
 
@@ -29,7 +29,7 @@ export const GET = (async ({ locals, params }) => {
 	try {
 		coverImage = await (
 			await getApplicationTrackRepository()
-		).findTrackCoverForAccess(id, locals.user?.id);
+		).findTrackCover(id);
 	} catch (error) {
 		logTrackStorageError('Track cover image lookup failed.', error);
 		return unavailableResponse(500);

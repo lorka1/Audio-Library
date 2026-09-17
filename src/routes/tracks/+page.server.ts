@@ -30,7 +30,7 @@ export const load = (async ({ locals, url }) => {
 	try {
 		const tracks = await (
 				await getApplicationTrackRepository()
-			).listPublicTracks(parsedQuery.filters);
+			).listTracks(parsedQuery.filters);
 		return {
 			tracks,
 			playlistChoices: locals.user
@@ -44,8 +44,8 @@ export const load = (async ({ locals, url }) => {
 			hasActiveFilters: hasActiveTrackFilters(parsedQuery.filters)
 		};
 	} catch (loadError) {
-		logTrackStorageError('Unable to list public tracks.', loadError);
-		error(500, 'Public tracks are temporarily unavailable.');
+		logTrackStorageError('Unable to list tracks.', loadError);
+		error(500, 'Tracks are temporarily unavailable.');
 	}
 }) satisfies PageServerLoad;
 

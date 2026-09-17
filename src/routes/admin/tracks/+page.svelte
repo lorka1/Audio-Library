@@ -40,7 +40,7 @@
 		<header class="admin-heading">
 			<p class="auth-eyebrow">Administrator area</p>
 			<h1>Manage tracks</h1>
-			<p>Public and private uploads are shown here for administrator moderation.</p>
+			<p>All uploads are shown here for administrator moderation.</p>
 		</header>
 
 		{#if form?.message}
@@ -66,7 +66,6 @@
 							<th scope="col">Title</th>
 							<th scope="col">Artist</th>
 							<th scope="col">Owner</th>
-							<th scope="col">Visibility</th>
 							<th scope="col">Created</th>
 							<th scope="col">Actions</th>
 						</tr>
@@ -77,18 +76,11 @@
 								<td data-label="Title"><strong>{track.title}</strong></td>
 								<td data-label="Artist">{track.artist}</td>
 								<td data-label="Owner">{track.ownerUsername}</td>
-								<td data-label="Visibility">
-									<span class:private={track.visibility === 'private'} class="visibility-badge">
-										{track.visibility === 'public' ? 'Public' : 'Private'}
-									</span>
-								</td>
 								<td data-label="Created">
 									<time datetime={track.createdAt}>{formatDate(track.createdAt)}</time>
 								</td>
 								<td data-label="Actions" class="track-actions">
-									{#if track.visibility === 'public'}
-										<a href={`/tracks/${track.publicId}`}>View</a>
-									{/if}
+									<a href={`/tracks/${track.publicId}`}>View</a>
 									<form method="POST" action="?/delete" use:enhance={enhanceDeletion}>
 										<input type="hidden" name="trackId" value={track.publicId} />
 										<button
@@ -179,23 +171,6 @@
 
 	td {
 		overflow-wrap: anywhere;
-	}
-
-	.visibility-badge {
-		display: inline-flex;
-		padding: 0.3rem 0.55rem;
-		color: var(--success);
-		border: 1px solid var(--success-border);
-		border-radius: 999px;
-		background: var(--success-bg);
-		font-size: 0.72rem;
-		font-weight: 800;
-	}
-
-	.visibility-badge.private {
-		color: var(--warning);
-		border-color: var(--warning-border);
-		background: var(--warning-bg);
 	}
 
 	.track-actions {

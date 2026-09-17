@@ -1,6 +1,6 @@
-import type { PublicTrack } from '$lib/types';
+import type { TrackSummary } from '$lib/types';
 
-export interface PublicPlayerTrack {
+export interface PlayerTrack {
 	id: number;
 	title: string;
 	artist: string;
@@ -10,11 +10,11 @@ export interface PublicPlayerTrack {
 }
 
 export type PlayerTrackSource = Pick<
-	PublicTrack,
+	TrackSummary,
 	'id' | 'title' | 'artist' | 'coverImageUrl'
 >;
 
-export function toPublicPlayerTrack(track: PlayerTrackSource): PublicPlayerTrack {
+export function toPlayerTrack(track: PlayerTrackSource): PlayerTrack {
 	return {
 		id: track.id,
 		title: track.title,

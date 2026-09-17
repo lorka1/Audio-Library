@@ -52,14 +52,12 @@ interface PlaylistItemTrackRecord {
 	track?: Pick<
 		TrackDocument,
 		| 'publicId'
-		| 'ownerId'
 		| 'title'
 		| 'coverImage'
 		| 'bpm'
 		| 'musicalKey'
 		| 'genre'
 		| 'description'
-		| 'visibility'
 	> & { artist: string };
 }
 
@@ -112,7 +110,6 @@ function playlistTrack(record: PlaylistItemTrackRecord): PlaylistTrack | null {
 		musicalKey: record.track.musicalKey,
 		genre: record.track.genre,
 		description: record.track.description,
-		visibility: record.track.visibility,
 		addedAt: record.addedAt.toISOString()
 	};
 }
@@ -215,7 +212,7 @@ export function createMongoPlaylistRepository(
 		if (ids.length === 0) return output;
 		const [accessibleTracks, ownedPlaylists] = await Promise.all([
 			tracks.find(
-				{ publicId: { $in: ids }, $or: [{ visibility: 'public' }, { ownerId }] },
+				{ publicId: { $in: ids } },
 				{ ...operationOptions, projection: { _id: 1, publicId: 1 } }
 			).toArray(),
 			playlists.find(
@@ -303,15 +300,13 @@ export function createMongoPlaylistRepository(
 								$project: {
 									_id: 0,
 									publicId: 1,
-									ownerId: 1,
 									title: 1,
 									artist: 1,
 									coverImage: 1,
 									bpm: 1,
 									musicalKey: 1,
 									genre: 1,
-									description: 1,
-									visibility: 1
+									description: 1
 								}
 							}
 						]
@@ -320,8 +315,7 @@ export function createMongoPlaylistRepository(
 				{ $set: { track: { $first: '$track' } } },
 				{ $project: { _id: 0, addedAt: 1, track: 1 } }
 			], operationOptions).toArray();
-			const visibleTracks = records
-				.filter(({ track }) => track && (track.visibility === 'public' || track.ownerId === ownerId))
+			const availableTracks = records
 				.map(playlistTrack)
 				.filter((track): track is PlaylistTrack => track !== null);
 			return {
@@ -331,11 +325,11 @@ export function createMongoPlaylistRepository(
 				imageUrl: hasPlaylistImage(playlist.image)
 					? `/api/playlists/${playlist.publicId}/image`
 					: null,
-				trackCount: visibleTracks.length,
+				trackCount: availableTracks.length,
 				createdAt: playlist.createdAt.toISOString(),
 				updatedAt: playlist.updatedAt.toISOString(),
-				tracks: visibleTracks,
-				unavailableTrackCount: records.length - visibleTracks.length
+				tracks: availableTracks,
+				unavailableTrackCount: records.length - availableTracks.length
 			} satisfies OwnerPlaylist;
 		},
 
@@ -406,7 +400,7 @@ export function createMongoPlaylistRepository(
 					);
 					if (!playlist) return 'not-found' as const;
 					const track = await tracks.findOne(
-						{ publicId: trackPublicId, $or: [{ visibility: 'public' }, { ownerId }] },
+						{ publicId: trackPublicId },
 						{ ...operationOptions, session, projection: { _id: 1 } }
 					);
 					if (!track) return 'track-unavailable' as const;
@@ -436,7 +430,7 @@ export function createMongoPlaylistRepository(
 						{ ...operationOptions, projection: { _id: 1 } }
 					),
 					tracks.findOne(
-						{ publicId: trackPublicId, $or: [{ visibility: 'public' }, { ownerId }] },
+						{ publicId: trackPublicId },
 						{ ...operationOptions, projection: { _id: 1 } }
 					)
 				]);
@@ -462,7 +456,7 @@ export function createMongoPlaylistRepository(
 				);
 				if (!playlist) return 'not-found' as const;
 				const track = await tracks.findOne(
-					{ publicId: trackPublicId, $or: [{ visibility: 'public' }, { ownerId }] },
+					{ publicId: trackPublicId },
 					{ ...operationOptions, session, projection: { _id: 1 } }
 				);
 				if (!track) return 'not-present' as const;

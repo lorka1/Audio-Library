@@ -19,7 +19,7 @@ export const load = (async ({ locals, params, url }) => {
 
 	try {
 		const repository = await getApplicationTrackRepository();
-		const track = await repository.findPublicTrackByPublicId(id);
+		const track = await repository.findTrackByPublicId(id);
 
 		if (!track) {
 			error(404, 'Track not found.');
@@ -47,7 +47,7 @@ export const load = (async ({ locals, params, url }) => {
 			throw loadError;
 		}
 
-		logTrackStorageError('Unable to load a public track.', loadError);
+		logTrackStorageError('Unable to load a track.', loadError);
 		error(500, 'The track is temporarily unavailable.');
 	}
 }) satisfies PageServerLoad;

@@ -1,4 +1,4 @@
-import type { TrackVisibility, UserRole } from '$lib/types';
+import type { UserRole } from '$lib/types';
 
 /** server-only documents need an audience-safe projection before reaching a page */
 export interface UserDocument {
@@ -45,7 +45,6 @@ export interface TrackDocument {
 	durationMs: number | null;
 	/** legacy documents may omit this; new writes use validated private-storage metadata or null */
 	coverImage?: TrackCoverImageDocument | null;
-	visibility: TrackVisibility;
 	createdAt: Date;
 	updatedAt: Date;
 }

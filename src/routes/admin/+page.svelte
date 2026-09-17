@@ -6,8 +6,6 @@
 	const statistics = $derived([
 		{ label: 'Registered users', value: data.stats.totalUsers },
 		{ label: 'Audio tracks', value: data.stats.totalTracks },
-		{ label: 'Public tracks', value: data.stats.publicTracks },
-		{ label: 'Private tracks', value: data.stats.privateTracks },
 		{ label: 'Playlists', value: data.stats.totalPlaylists }
 	]);
 </script>
@@ -43,7 +41,7 @@
 			<a href="/admin/tracks">
 				<span>Moderation</span>
 				<strong>Manage tracks</strong>
-				<p>Review public and private tracks and remove content with complete cleanup.</p>
+				<p>Review all tracks and remove content with complete cleanup.</p>
 			</a>
 		</div>
 	</div>
@@ -78,7 +76,7 @@
 
 	.statistics-grid {
 		display: grid;
-		grid-template-columns: repeat(5, minmax(0, 1fr));
+		grid-template-columns: repeat(3, minmax(0, 1fr));
 		gap: 0.8rem;
 	}
 

@@ -1,6 +1,6 @@
 # Audio Library
 
-Audio Library is a full-stack SvelteKit application for uploading, organizing, and listening to audio tracks. Users can create an account, manage their own tracks, browse the public library, search and filter tracks, and create private playlists.
+Audio Library is a full-stack SvelteKit application for uploading, organizing, and listening to audio tracks. Users can create an account, manage their own tracks, browse every upload, search and filter tracks, and create private playlists.
 
 MongoDB stores application data, while audio files and images are kept in private filesystem storage and served through application routes.
 
@@ -38,7 +38,7 @@ npm run dev
 ## Features
 
 - account registration, login, logout, and cookie-based sessions
-- public and private audio tracks
+- audio tracks available to browse, play, and download
 - MP3, WAV, and OGG uploads
 - optional track covers and playlist artwork
 - track browsing, search, filters, and sorting
@@ -112,6 +112,8 @@ Do not commit `.env` or add credentials to tracked files.
 ## File storage
 
 Audio and image files are stored outside `static/` so they cannot be accessed directly. MongoDB contains their metadata, and the application provides routes for playback, downloads, and images.
+
+Existing track documents with a legacy `visibility` field continue to work without a database migration. The application ignores that field. Old visibility-based indexes can remain in MongoDB; they are no longer required by startup checks.
 
 Supported audio formats are MP3, WAV, and OGG. Track covers and playlist images support JPEG, PNG, and WebP.
 

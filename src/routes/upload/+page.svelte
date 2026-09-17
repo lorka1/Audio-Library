@@ -28,11 +28,11 @@
 	<div class="page-container upload-page__inner">
 		<div class="upload-card">
 			<header class="upload-card__header">
-				<p class="auth-eyebrow">Public audio upload</p>
+				<p class="auth-eyebrow">Audio upload</p>
 				<h1>Add a track to your library.</h1>
 				<p>
 					Choose an MP3, WAV, or OGG file and describe the track. The audio file is stored
-					privately, linked to your account, and published for public playback and download.
+					privately, linked to your account, and available for playback and download.
 					The artist is your signed-in username: <strong>{data.uploaderUsername}</strong>.
 				</p>
 			</header>

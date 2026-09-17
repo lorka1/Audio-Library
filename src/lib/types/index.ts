@@ -1,7 +1,3 @@
-export const TRACK_VISIBILITIES = ['private', 'public'] as const;
-
-export type TrackVisibility = (typeof TRACK_VISIBILITIES)[number];
-
 export const USER_ROLES = ['user', 'admin'] as const;
 
 export type UserRole = (typeof USER_ROLES)[number];
@@ -23,7 +19,7 @@ export interface NavigationUser {
 	role: UserRole;
 }
 
-export interface PublicTrack {
+export interface TrackSummary {
 	id: number;
 	title: string;
 	artist: string;
@@ -47,7 +43,6 @@ export interface OwnerTrack {
 	musicalKey: string | null;
 	genre: string | null;
 	description: string | null;
-	visibility: TrackVisibility;
 	fileSizeBytes: number;
 	mimeType: string;
 	originalFilename: string;
@@ -74,7 +69,6 @@ export interface PlaylistTrack {
 	musicalKey: string | null;
 	genre: string | null;
 	description: string | null;
-	visibility: TrackVisibility;
 	addedAt: string;
 }
 

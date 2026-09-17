@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { formatDate } from '$lib/formatting';
-	import { toPublicPlayerTrack } from '$lib/player/model';
+	import { toPlayerTrack } from '$lib/player/model';
 	import type { OwnerTrack, PlaylistPickerEntry } from '$lib/types';
 	import AddToPlaylist from './AddToPlaylist.svelte';
 	import TrackCover from './TrackCover.svelte';
@@ -11,7 +11,7 @@
 		playlistChoices = []
 	}: { track: OwnerTrack; playlistChoices?: PlaylistPickerEntry[] } = $props();
 	let playerTrack = $derived(
-		toPublicPlayerTrack({
+		toPlayerTrack({
 			id: track.publicId,
 			title: track.title,
 			artist: track.artist,
@@ -30,9 +30,6 @@
 		<div class="owner-track-card__identity">
 			<div class="owner-track-card__heading">
 				<p>{track.artist}</p>
-				<span class:private={track.visibility === 'private'}>
-					{track.visibility === 'public' ? 'Public' : 'Private'}
-				</span>
 			</div>
 			<h2>{track.title}</h2>
 			<p class="owner-track-card__date">
@@ -63,14 +60,10 @@
 			choices={playlistChoices}
 			loginHref="/login?redirectTo=%2Fmy-tracks"
 		/>
-		{#if track.visibility === 'public'}
-			<TrackPlayButton track={playerTrack} />
-		{/if}
+		<TrackPlayButton track={playerTrack} />
 		<a href={`/my-tracks/${track.publicId}/edit`}>Edit track</a>
 		<a class="delete-link" href={`/my-tracks/${track.publicId}/delete`}>Delete</a>
-		{#if track.visibility === 'public'}
-			<a href={`/tracks/${track.publicId}`}>View public page</a>
-		{/if}
+		<a href={`/tracks/${track.publicId}`}>View track</a>
 	</footer>
 </article>
 
@@ -121,23 +114,6 @@
 		letter-spacing: 0.08em;
 		text-transform: uppercase;
 		overflow-wrap: anywhere;
-	}
-
-	.owner-track-card__heading span {
-		flex: 0 0 auto;
-		padding: 0.28rem 0.55rem;
-		color: var(--success);
-		border: 1px solid var(--success-border);
-		border-radius: 999px;
-		background: var(--success-bg);
-		font-size: 0.72rem;
-		font-weight: 800;
-	}
-
-	.owner-track-card__heading span.private {
-		color: var(--warning);
-		border-color: var(--warning-border);
-		background: var(--warning-bg);
 	}
 
 	h2 {

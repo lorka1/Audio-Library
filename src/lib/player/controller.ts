@@ -1,10 +1,10 @@
 import { get, writable, type Readable } from 'svelte/store';
-import type { PublicPlayerTrack } from './model';
+import type { PlayerTrack } from './model';
 
 export type PlayerStatus = 'idle' | 'loading' | 'playing' | 'paused' | 'error';
 
 export interface AudioPlayerState {
-	track: PublicPlayerTrack | null;
+	track: PlayerTrack | null;
 	status: PlayerStatus;
 	wantsToPlay: boolean;
 	currentTime: number;
@@ -29,7 +29,7 @@ export class AudioPlayerController implements Readable<AudioPlayerState> {
 	readonly #state = writable<AudioPlayerState>(initialState);
 	readonly subscribe = this.#state.subscribe;
 
-	toggleTrack(track: PublicPlayerTrack): void {
+	toggleTrack(track: PlayerTrack): void {
 		const state = get(this.#state);
 
 		if (state.track?.id !== track.id) {

@@ -1,5 +1,5 @@
 import type { MusicGenre, MusicalKey } from '../../constants/music';
-import type { OwnerTrack, PublicTrack, TrackVisibility } from '../../types';
+import type { OwnerTrack, TrackSummary } from '../../types';
 import type { TrackSearchFilters } from '../../tracks-query';
 import type { ValidatedTrackMetadata } from './validation';
 
@@ -29,7 +29,6 @@ export interface CreateTrackInput {
 export interface CreateTrackOptions {
 	/** only isolated repository checks set this; normal creation allocates an ID that is never reused */
 	publicId?: number;
-	visibility?: TrackVisibility;
 }
 
 export interface CreatedTrack {
@@ -43,7 +42,6 @@ export interface TrackForStreaming {
 	storedFilename: string;
 	mimeType: string;
 	fileSizeBytes: number;
-	visibility: 'public';
 }
 
 export interface TrackForDownload extends TrackForStreaming {
@@ -81,14 +79,11 @@ export class DuplicateTrackError extends Error {
 export interface TrackRepository {
 	createTrack(input: CreateTrackInput, options?: CreateTrackOptions): Promise<CreatedTrack>;
 	allocatePublicTrackId(): Promise<number>;
-	findPublicTrackByPublicId(publicId: number): Promise<PublicTrack | null>;
-	listPublicTracks(query: TrackSearchFilters): Promise<PublicTrack[]>;
+	findTrackByPublicId(publicId: number): Promise<TrackSummary | null>;
+	listTracks(query: TrackSearchFilters): Promise<TrackSummary[]>;
 	findTrackForStreaming(publicId: number): Promise<TrackForStreaming | null>;
 	findTrackForDownload(publicId: number): Promise<TrackForDownload | null>;
-	findTrackCoverForAccess(
-		publicId: number,
-		requesterOwnerId?: string | null
-	): Promise<TrackCoverForDelivery | null>;
+	findTrackCover(publicId: number): Promise<TrackCoverForDelivery | null>;
 	listTracksForOwner(ownerId: string): Promise<OwnerTrack[]>;
 	findOwnerTrack(publicId: number, ownerId: string): Promise<OwnerTrack | null>;
 	updateOwnerTrackMetadata(

@@ -7,10 +7,10 @@
 </script>
 
 <svelte:head>
-	<title>Search public tracks · Audio Library</title>
+	<title>Search tracks · Audio Library</title>
 	<meta
 		name="description"
-		content="Search, filter, and sort public audio tracks shared by Audio Library members."
+		content="Search, filter, and sort audio tracks shared by Audio Library members."
 	/>
 </svelte:head>
 
@@ -23,7 +23,7 @@
 			</div>
 			<p class="tracks-intro">
 				Search the community-powered library by title, artist, or description, then
-				refine public tracks by BPM, musical key, genre, and sort order.
+				refine tracks by BPM, musical key, genre, and sort order.
 			</p>
 		</div>
 	</header>
@@ -70,8 +70,8 @@
 			<div class="tracks-empty">
 				<p>
 					{data.hasActiveFilters
-						? 'No public tracks match the selected search and filters.'
-						: 'No public tracks have been uploaded yet.'}
+						? 'No tracks match the selected search and filters.'
+						: 'No tracks have been uploaded yet.'}
 				</p>
 				{#if data.hasActiveFilters}
 					<a class="secondary-button tracks-empty__action" href="/tracks">Clear filters</a>

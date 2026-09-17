@@ -1,5 +1,5 @@
 import type { MongoCollections } from '../mongodb/collections';
-import { normalizeUserRole, type TrackVisibility } from '../../types/index.ts';
+import { normalizeUserRole } from '../../types/index.ts';
 import {
 	assertPositivePublicTrackId,
 	UNKNOWN_TRACK_UPLOADER
@@ -25,7 +25,6 @@ interface AdminTrackRecord {
 	title: string;
 	artist: string;
 	ownerUsername: string;
-	visibility: TrackVisibility;
 	createdAt: Date;
 }
 
@@ -45,7 +44,6 @@ function toAdminTrack(record: AdminTrackRecord): AdminTrackSummary {
 		title: record.title,
 		artist: record.artist,
 		ownerUsername: record.ownerUsername,
-		visibility: record.visibility,
 		createdAt: record.createdAt.toISOString()
 	};
 }
@@ -61,26 +59,16 @@ export function createMongoAdminRepository(
 
 	return {
 		async getDashboardStats() {
-			const [totalUsers, totalTracks, publicTracks, privateTracks, totalPlaylists] =
+			const [totalUsers, totalTracks, totalPlaylists] =
 				await Promise.all([
 					collections.users.countDocuments({}, operationOptions),
 					collections.tracks.countDocuments({}, operationOptions),
-					collections.tracks.countDocuments(
-						{ visibility: 'public' },
-						operationOptions
-					),
-					collections.tracks.countDocuments(
-						{ visibility: 'private' },
-						operationOptions
-					),
 					collections.playlists.countDocuments({}, operationOptions)
 				]);
 
 			return {
 				totalUsers,
 				totalTracks,
-				publicTracks,
-				privateTracks,
 				totalPlaylists
 			};
 		},
@@ -154,7 +142,6 @@ export function createMongoAdminRepository(
 								title: 1,
 								artist: '$ownerUsername',
 								ownerUsername: 1,
-								visibility: 1,
 								createdAt: 1
 							}
 						}

@@ -2,7 +2,7 @@
 	import { enhance } from '$app/forms';
 	import { PlaylistArtwork, PlaylistImageField, TrackCover, TrackPlayButton } from '$lib';
 	import { formatDate } from '$lib/formatting';
-	import { toPublicPlayerTrack } from '$lib/player/model';
+	import { toPlayerTrack } from '$lib/player/model';
 	import type { PlaylistFormErrors } from '$lib/server/playlists/validation';
 	import type { PageProps } from './$types';
 
@@ -60,11 +60,9 @@
 								<TrackCover coverImageUrl={entry.coverImageUrl} title={entry.title} variant="row" />
 								<div class="playlist-track__identity">
 									<strong title={entry.title}>{entry.title}</strong>
-									<span>{entry.artist} · {entry.visibility === 'public' ? 'Public' : 'Your private track'}</span>
+									<span>{entry.artist}</span>
 								</div>
-								{#if entry.visibility === 'public'}
-									<TrackPlayButton track={toPublicPlayerTrack({ id: entry.id, title: entry.title, artist: entry.artist, coverImageUrl: entry.coverImageUrl })} variant="icon" />
-								{/if}
+								<TrackPlayButton track={toPlayerTrack({ id: entry.id, title: entry.title, artist: entry.artist, coverImageUrl: entry.coverImageUrl })} variant="icon" />
 								<form method="POST" action="?/removeFromPlaylist" use:enhance>
 									<input type="hidden" name="trackPublicId" value={entry.id} />
 									<input type="hidden" name="playlistPublicId" value={data.playlist.publicId} />

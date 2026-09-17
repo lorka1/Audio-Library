@@ -1,11 +1,11 @@
 <script lang="ts">
 	import { AddToPlaylist, TrackCover, TrackPlayButton } from '$lib';
 	import { formatDate, formatFileSize } from '$lib/formatting';
-	import { toPublicPlayerTrack } from '$lib/player/model';
+	import { toPlayerTrack } from '$lib/player/model';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
-	let playerTrack = $derived(toPublicPlayerTrack(data.track));
+	let playerTrack = $derived(toPlayerTrack(data.track));
 </script>
 
 <svelte:head>
@@ -48,7 +48,7 @@
 
 				<div class="track-detail__intro">
 					<header class="track-detail__header">
-						<p class="auth-eyebrow">Public track</p>
+						<p class="auth-eyebrow">Audio track</p>
 						<h1>{data.track.title}</h1>
 						<p class="track-detail__artist">by {data.track.artist}</p>
 					</header>

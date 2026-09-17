@@ -33,15 +33,15 @@ import {
 } from './contract.ts';
 import {
 	toOwnerTrack,
-	toPublicTrack,
+	toTrackSummary,
 	type OwnerTrackRecord,
-	type PublicTrackRecord
+	type TrackSummaryRecord
 } from './projections.ts';
 import { cleanupPreservingPrimaryFailure } from '../operational/cleanup.ts';
 import { safeErrorFields, writeSafeLog } from '../operational/logging.ts';
 
 export const MONGODB_TRACK_OPERATION_TIMEOUT_MS = 5_000;
-export const MONGODB_BASIC_PUBLIC_TRACK_LIMIT = 200;
+export const MONGODB_OWNER_TRACK_LIMIT = 200;
 
 export interface MongoTrackRepositoryOptions {
 	timeoutMS?: number;
@@ -52,8 +52,6 @@ export interface MongoTrackRepositoryOptions {
 
 const TRACK_DELETE_TRANSACTION_TIMEOUT_MS = 8_000;
 
-interface PublicTrackAggregateRecord extends PublicTrackRecord {}
-
 const ownerAggregateProjection = {
 	_id: 0,
 	publicId: 1,
@@ -63,7 +61,6 @@ const ownerAggregateProjection = {
 	musicalKey: 1,
 	genre: 1,
 	description: 1,
-	visibility: 1,
 	fileSizeBytes: 1,
 	mimeType: 1,
 	originalFilename: 1,
@@ -77,8 +74,7 @@ const streamingProjection = {
 	publicId: 1,
 	storageKey: 1,
 	mimeType: 1,
-	fileSizeBytes: 1,
-	visibility: 1
+	fileSizeBytes: 1
 } as const;
 
 const downloadProjection = {
@@ -99,7 +95,7 @@ const coverDeliveryProjection = {
 	coverImage: 1
 } as const;
 
-const publicAggregateProjection = {
+const trackSummaryProjection = {
 	_id: 0,
 	publicId: 1,
 	title: 1,
@@ -126,22 +122,17 @@ function duplicateTrackField(error: unknown): DuplicateTrackField | null {
 	return null;
 }
 
-function mapStreaming(document: TrackDocument): TrackForStreaming | null {
-	if (document.visibility !== 'public') return null;
+function mapStreaming(document: TrackDocument): TrackForStreaming {
 	return {
 		id: document.publicId,
 		storedFilename: document.storageKey,
 		mimeType: document.mimeType,
-		fileSizeBytes: document.fileSizeBytes,
-		visibility: 'public'
+		fileSizeBytes: document.fileSizeBytes
 	};
 }
 
-function mapDownload(document: TrackDocument): TrackForDownload | null {
-	const stream = mapStreaming(document);
-	return stream
-		? { ...stream, originalFilename: document.originalFilename }
-		: null;
+function mapDownload(document: TrackDocument): TrackForDownload {
+	return { ...mapStreaming(document), originalFilename: document.originalFilename };
 }
 
 function mapStoredCoverImage(value: unknown): StoredCoverImage | null {
@@ -278,10 +269,10 @@ export function createMongoTrackRepository(
 		return counter.value;
 	}
 
-	function publicQueryMatch(
+	function trackQueryMatch(
 		query: TrackSearchFilters
 	): Record<string, unknown> {
-		const match: Record<string, unknown> = { visibility: 'public' };
+		const match: Record<string, unknown> = {};
 		if (query.bpmMin !== undefined || query.bpmMax !== undefined) {
 			match.bpm = {
 				...(query.bpmMin === undefined ? {} : { $gte: query.bpmMin }),
@@ -293,7 +284,7 @@ export function createMongoTrackRepository(
 		return match;
 	}
 
-	function publicQuerySort(query: TrackSearchFilters) {
+	function trackQuerySort(query: TrackSearchFilters) {
 		switch (query.sort) {
 			case 'oldest':
 				return { createdAt: 1, publicId: 1 } as const;
@@ -310,14 +301,14 @@ export function createMongoTrackRepository(
 		}
 	}
 
-	async function publicAggregate(
+	async function browseAggregate(
 		match: Record<string, unknown>,
 		query: TrackSearchFilters = { sort: 'newest' }
-	): Promise<PublicTrackAggregateRecord[]> {
+	): Promise<TrackSummaryRecord[]> {
 		return tracks
-			.aggregate<PublicTrackAggregateRecord>(
+			.aggregate<TrackSummaryRecord>(
 				[
-					{ $match: { ...match, visibility: 'public' } },
+					{ $match: match },
 					{
 						$lookup: {
 							from: users.collectionName,
@@ -348,8 +339,8 @@ export function createMongoTrackRepository(
 								}
 							}]
 						: []),
-					{ $sort: publicQuerySort(query) },
-					{ $project: publicAggregateProjection }
+					{ $sort: trackQuerySort(query) },
+					{ $project: trackSummaryProjection }
 				],
 				operationOptions
 			)
@@ -358,7 +349,7 @@ export function createMongoTrackRepository(
 
 	async function ownerAggregate(
 		match: Record<string, unknown>,
-		limit = MONGODB_BASIC_PUBLIC_TRACK_LIMIT
+		limit = MONGODB_OWNER_TRACK_LIMIT
 	): Promise<OwnerTrackRecord[]> {
 		return tracks.aggregate<OwnerTrackRecord>([
 			{ $match: match },
@@ -398,7 +389,6 @@ export function createMongoTrackRepository(
 				fileSizeBytes: input.fileSizeBytes,
 				durationMs: null,
 				coverImage: input.coverImage ?? null,
-				visibility: createOptions?.visibility ?? 'public',
 				createdAt: input.createdAt,
 				updatedAt: input.updatedAt
 			};
@@ -414,21 +404,21 @@ export function createMongoTrackRepository(
 
 		allocatePublicTrackId,
 
-		async findPublicTrackByPublicId(publicId) {
+		async findTrackByPublicId(publicId) {
 			assertPositivePublicTrackId(publicId);
-			const [record] = await publicAggregate({ publicId });
-			return record ? toPublicTrack(record) : null;
+			const [record] = await browseAggregate({ publicId });
+			return record ? toTrackSummary(record) : null;
 		},
 
-		async listPublicTracks(query) {
-			const records = await publicAggregate(publicQueryMatch(query), query);
-			return records.map(toPublicTrack);
+		async listTracks(query) {
+			const records = await browseAggregate(trackQueryMatch(query), query);
+			return records.map(toTrackSummary);
 		},
 
 		async findTrackForStreaming(publicId) {
 			assertPositivePublicTrackId(publicId);
 			const document = await tracks.findOne(
-				{ publicId, visibility: 'public' },
+				{ publicId },
 				findOptions(streamingProjection)
 			);
 			return document ? mapStreaming(document) : null;
@@ -437,27 +427,16 @@ export function createMongoTrackRepository(
 		async findTrackForDownload(publicId) {
 			assertPositivePublicTrackId(publicId);
 			const document = await tracks.findOne(
-				{ publicId, visibility: 'public' },
+				{ publicId },
 				findOptions(downloadProjection)
 			);
 			return document ? mapDownload(document) : null;
 		},
 
-		async findTrackCoverForAccess(publicId, requesterOwnerId) {
+		async findTrackCover(publicId) {
 			assertPositivePublicTrackId(publicId);
-			const normalizedOwnerId = requesterOwnerId?.trim();
 			const document = await tracks.findOne(
-				{
-					publicId,
-					...(normalizedOwnerId
-						? {
-								$or: [
-									{ visibility: 'public' },
-									{ ownerId: normalizedOwnerId }
-								]
-							}
-						: { visibility: 'public' })
-				},
+				{ publicId },
 				findOptions(coverDeliveryProjection)
 			);
 			return document ? mapCoverForDelivery(document) : null;

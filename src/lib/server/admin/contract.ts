@@ -1,10 +1,8 @@
-import type { TrackVisibility, UserRole } from '$lib/types';
+import type { UserRole } from '$lib/types';
 
 export interface AdminDashboardStats {
 	totalUsers: number;
 	totalTracks: number;
-	publicTracks: number;
-	privateTracks: number;
 	totalPlaylists: number;
 }
 
@@ -21,7 +19,6 @@ export interface AdminTrackSummary {
 	title: string;
 	artist: string;
 	ownerUsername: string;
-	visibility: TrackVisibility;
 	createdAt: string;
 }
 

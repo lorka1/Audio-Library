@@ -27,7 +27,7 @@
 <svelte:head>
 	<meta
 		name="description"
-		content="Upload and manage audio, discover public tracks, and listen or download securely."
+		content="Upload and manage audio, discover tracks, and listen or download securely."
 	/>
 </svelte:head>
 
@@ -45,7 +45,7 @@
 	<footer class="site-footer">
 		<div class="page-container site-footer__inner">
 			<p>Audio Library</p>
-			<p>Private storage · public discovery · owner controls</p>
+			<p>Secure storage · track discovery · owner controls</p>
 		</div>
 	</footer>
 

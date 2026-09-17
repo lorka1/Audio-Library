@@ -36,7 +36,7 @@ export const GET = (async ({ params, request }) => {
 			await getApplicationTrackRepository()
 		).findTrackForStreaming(id);
 	} catch (error) {
-		logTrackStorageError('Public audio stream lookup failed.', error);
+		logTrackStorageError('Audio stream lookup failed.', error);
 		return unavailableResponse(500);
 	}
 
@@ -102,7 +102,7 @@ export const GET = (async ({ params, request }) => {
 		});
 	} catch (error) {
 		await closeOpenedAudioFile(openedFile.file);
-		logTrackStorageError('Unable to create a public audio stream.', error);
+		logTrackStorageError('Unable to create an audio stream.', error);
 		return unavailableResponse(500);
 	}
 }) satisfies RequestHandler;

@@ -36,7 +36,7 @@ export const GET = (async ({ params }) => {
 			await getApplicationTrackRepository()
 		).findTrackForDownload(id);
 	} catch (error) {
-		logTrackStorageError('Public audio download lookup failed.', error);
+		logTrackStorageError('Audio download lookup failed.', error);
 		return unavailableResponse(500);
 	}
 
@@ -73,7 +73,7 @@ export const GET = (async ({ params }) => {
 		});
 	} catch (error) {
 		await closeOpenedAudioFile(openedFile.file);
-		logTrackStorageError('Unable to create a public audio download.', error);
+		logTrackStorageError('Unable to create an audio download.', error);
 		return unavailableResponse(500);
 	}
 }) satisfies RequestHandler;

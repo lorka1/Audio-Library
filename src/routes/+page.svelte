@@ -15,7 +15,7 @@
 			<p class="eyebrow">Your audio, ready to share</p>
 			<h1>Discover community audio<span class="hero__punctuation">.</span></h1>
 			<p class="lead">
-				Upload and organize your audio, browse public tracks, search titles, artists, and
+				Upload and organize your audio, browse all tracks, search titles, artists, and
 				descriptions, then play, seek, and download. Your own tracks stay easy to manage
 				from one secure library.
 			</p>
@@ -44,7 +44,7 @@
 	<div class="page-container features__inner">
 	<div class="section-heading">
 		<p class="eyebrow">A complete audio workflow</p>
-		<h2 id="features-title">From private storage to public listening</h2>
+		<h2 id="features-title">From upload to listening</h2>
 		<p>
 			Audio Library keeps upload, discovery, playback, download, and owner controls
 			straightforward on desktop and mobile.
@@ -66,9 +66,9 @@
 			<span class="feature-icon" aria-hidden="true">
 				<svg viewBox="0 0 24 24"><path d="M4 6.5h7V13H4zm9 0h7V13h-7zM4 15h7v3H4zm9 0h7v3h-7z"></path></svg>
 			</span>
-			<h3>Browse public tracks</h3>
+			<h3>Browse tracks</h3>
 			<p>
-				Open a clear public catalog and detailed track pages with useful, safe metadata.
+				Open the full catalog and detailed track pages with useful, safe metadata.
 			</p>
 		</article>
 		<article class="feature-card feature-card--raspberry">
@@ -97,7 +97,7 @@
 			</span>
 			<h3>Manage your tracks</h3>
 			<p>
-				Review public and private uploads, edit their metadata, and confirm owner-only
+				Review your uploads, edit their metadata, and confirm owner-only
 				deletion.
 			</p>
 		</article>

@@ -1,4 +1,4 @@
-import type { OwnerTrack, PublicTrack, TrackVisibility } from '../../types';
+import type { OwnerTrack, TrackSummary } from '../../types';
 import type { StoredCoverImage } from './contract';
 
 export interface OwnerTrackRecord {
@@ -10,7 +10,6 @@ export interface OwnerTrackRecord {
 	musicalKey: string | null;
 	genre: string | null;
 	description: string | null;
-	visibility: TrackVisibility;
 	fileSizeBytes: number;
 	mimeType: string;
 	originalFilename: string;
@@ -18,7 +17,7 @@ export interface OwnerTrackRecord {
 	updatedAt: Date;
 }
 
-export interface PublicTrackRecord {
+export interface TrackSummaryRecord {
 	publicId: number;
 	title: string;
 	artist: string;
@@ -55,7 +54,6 @@ export function toOwnerTrack(record: OwnerTrackRecord): OwnerTrack {
 		musicalKey: record.musicalKey,
 		genre: record.genre,
 		description: record.description,
-		visibility: record.visibility,
 		fileSizeBytes: record.fileSizeBytes,
 		mimeType: record.mimeType,
 		originalFilename: record.originalFilename,
@@ -64,7 +62,7 @@ export function toOwnerTrack(record: OwnerTrackRecord): OwnerTrack {
 	};
 }
 
-export function toPublicTrack(record: PublicTrackRecord): PublicTrack {
+export function toTrackSummary(record: TrackSummaryRecord): TrackSummary {
 	return {
 		id: record.publicId,
 		title: record.title,
