@@ -1,10 +1,12 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { formatDate } from '$lib/formatting';
+	import { useAudioPlayer } from '$lib/player/context';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import type { PageProps } from './$types';
 
 	let { data, form }: PageProps = $props();
+	const player = useAudioPlayer();
 	let deletingTrackId = $state<number | null>(null);
 
 	const enhanceDeletion: SubmitFunction = ({ formData, submitter, cancel }) => {
@@ -19,8 +21,9 @@
 		}
 
 		deletingTrackId = publicId;
-		return async ({ update }) => {
+		return async ({ result, update }) => {
 			try {
+				if (result.type === 'success') player.clearIfTrackId(publicId);
 				await update();
 			} finally {
 				deletingTrackId = null;

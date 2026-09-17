@@ -26,6 +26,7 @@ export const load = (async (event) => {
 
 		return {
 			track: {
+				publicId,
 				title: track.title,
 				artist: track.artist
 			}

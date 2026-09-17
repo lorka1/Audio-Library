@@ -126,6 +126,10 @@ export class AudioPlayerController implements Readable<AudioPlayerState> {
 			requestVersion: state.requestVersion + 1
 		});
 	}
+
+	clearIfTrackId(trackId: number): void {
+		if (get(this.#state).track?.id === trackId) this.clear();
+	}
 }
 
 export function createAudioPlayerController(): AudioPlayerController {

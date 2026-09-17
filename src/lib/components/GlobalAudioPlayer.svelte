@@ -29,8 +29,14 @@
 		const track = state.track;
 		const requestVersion = state.requestVersion;
 
-		if (!audio || !track || requestVersion === handledRequestVersion) return;
+		if (!audio || requestVersion === handledRequestVersion) return;
 		handledRequestVersion = requestVersion;
+		if (!track) {
+			audio.pause();
+			audio.removeAttribute('src');
+			audio.load();
+			return;
+		}
 
 		if (state.wantsToPlay) {
 			if (state.duration > 0 && audio.currentTime >= state.duration) {

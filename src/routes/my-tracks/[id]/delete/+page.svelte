@@ -1,7 +1,19 @@
 <script lang="ts">
+	import { enhance } from '$app/forms';
+	import { useAudioPlayer } from '$lib/player/context';
+	import type { SubmitFunction } from '@sveltejs/kit';
 	import type { PageProps } from './$types';
 
 	let { data, form }: PageProps = $props();
+	const player = useAudioPlayer();
+	const enhanceDeletion: SubmitFunction = () => {
+		return async ({ result, update }) => {
+			if (result.type === 'redirect' && result.location === '/my-tracks?deleted=1') {
+				player.clearIfTrackId(data.track.publicId);
+			}
+			await update();
+		};
+	};
 </script>
 
 <svelte:head>
@@ -32,7 +44,7 @@
 				</div>
 			{/if}
 
-			<form method="POST" aria-describedby="delete-warning">
+			<form method="POST" aria-describedby="delete-warning" use:enhance={enhanceDeletion}>
 				<button class="danger-button" type="submit">Delete permanently</button>
 				<a class="secondary-button" href="/my-tracks">Cancel</a>
 			</form>
