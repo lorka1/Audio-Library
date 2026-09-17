@@ -1,16 +1,59 @@
 <script lang="ts">
+	import { onDestroy, untrack } from 'svelte';
 	import FilePicker from './FilePicker.svelte';
 	import PlaylistArtwork from './PlaylistArtwork.svelte';
 	let { id = 'playlist-image', maxSizeMb, currentImageUrl = null, error, removeRequested = false, allowRemoval = false, playlistName = 'Playlist' }:
 		{ id?: string; maxSizeMb: number; currentImageUrl?: string | null; error?: string; removeRequested?: boolean; allowRemoval?: boolean; playlistName?: string } = $props();
 
+	let previewUrl = $state<string | null>(null);
+	let selectedFilename = $state('');
+	let removalChecked = $state(untrack(() => removeRequested));
+
+	$effect(() => {
+		removalChecked = removeRequested;
+	});
+
 	const helpId = $derived(`${id}-help`);
 	const errorId = $derived(`${id}-error`);
 	const describedBy = $derived([helpId, error ? errorId : null].filter(Boolean).join(' '));
+	const displayedImageUrl = $derived(removalChecked ? null : (previewUrl ?? currentImageUrl));
+
+	function isPreviewableImage(file: File): boolean {
+		if (!file.name.trim() || file.name.length > 255 || file.name.includes('\0')) return false;
+		if (!Number.isSafeInteger(file.size) || file.size === 0 || file.size > Math.floor(maxSizeMb * 1024 * 1024)) return false;
+		const extension = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
+		const mimeType = file.type.trim().toLowerCase();
+		return (
+			((extension === '.jpg' || extension === '.jpeg') && mimeType === 'image/jpeg') ||
+			(extension === '.png' && mimeType === 'image/png') ||
+			(extension === '.webp' && mimeType === 'image/webp')
+		);
+	}
+
+	function revokePreview(): void {
+		if (previewUrl) {
+			URL.revokeObjectURL(previewUrl);
+			previewUrl = null;
+		}
+	}
+
+	function handleFileChange(event: Event): void {
+		revokePreview();
+		const file = (event.currentTarget as HTMLInputElement).files?.[0];
+		selectedFilename = file?.name ?? '';
+		if (file) removalChecked = false;
+		if (file && isPreviewableImage(file)) previewUrl = URL.createObjectURL(file);
+	}
+
+	function handleImageError(url: string): void {
+		if (url === previewUrl) revokePreview();
+	}
+
+	onDestroy(revokePreview);
 </script>
 
 <div class="playlist-image-field">
-	<PlaylistArtwork imageUrl={removeRequested ? null : currentImageUrl} name={playlistName} variant="card" decorative={false} />
+	<PlaylistArtwork imageUrl={displayedImageUrl} name={playlistName} variant="card" decorative={false} onImageError={handleImageError} />
 	<div class="playlist-image-field__control">
 		<label class="playlist-image-field__label" for={id}>Playlist image <span class="optional-label">Optional</span></label>
 		<FilePicker
@@ -21,11 +64,12 @@
 			emptyLabel="No image chosen"
 			ariaInvalid={error ? 'true' : undefined}
 			ariaDescribedBy={describedBy}
+			onchange={handleFileChange}
 		/>
 		<p class="field-help" id={helpId}>JPEG, PNG, or WebP, up to {maxSizeMb} MB. Image contents are verified by the server.</p>
 		{#if error}<p class="field-error" id={errorId}>{error}</p>{/if}
 		{#if allowRemoval && currentImageUrl}
-			<label class="remove-image"><input name="removeImage" type="checkbox" value="true" checked={removeRequested} /> Remove the current playlist image</label>
+			<label class="remove-image"><input name="removeImage" type="checkbox" value="true" bind:checked={removalChecked} disabled={Boolean(selectedFilename)} /> Remove the current playlist image</label>
 		{/if}
 	</div>
 </div>

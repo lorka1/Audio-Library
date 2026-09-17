@@ -3,20 +3,28 @@
 		imageUrl,
 		name,
 		variant = 'card',
-		decorative = true
+		decorative = true,
+		onImageError
 	}: {
 		imageUrl: string | null;
 		name: string;
 		variant?: 'card' | 'detail' | 'picker';
 		decorative?: boolean;
+		onImageError?: (url: string) => void;
 	} = $props();
 	let failedUrl = $state<string | null>(null);
 	let showImage = $derived(Boolean(imageUrl && failedUrl !== imageUrl));
+
+	function handleImageError(): void {
+		if (!imageUrl) return;
+		failedUrl = imageUrl;
+		onImageError?.(imageUrl);
+	}
 </script>
 
 <span class={`playlist-artwork playlist-artwork--${variant}`}>
 	{#if showImage}
-		<img src={imageUrl!} alt={decorative ? '' : `Artwork for ${name}`} loading={variant === 'detail' ? 'eager' : 'lazy'} decoding="async" onerror={() => (failedUrl = imageUrl)} />
+		<img src={imageUrl!} alt={decorative ? '' : `Artwork for ${name}`} loading={variant === 'detail' ? 'eager' : 'lazy'} decoding="async" onerror={handleImageError} />
 	{:else}
 		<span class="playlist-artwork__fallback" aria-hidden="true">
 			<svg viewBox="0 0 100 100" role="presentation" focusable="false">
