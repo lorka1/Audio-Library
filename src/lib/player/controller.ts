@@ -118,6 +118,26 @@ export class AudioPlayerController implements Readable<AudioPlayerState> {
 		this.#state.update((state) => ({ ...state, volume: safeVolume }));
 	}
 
+	updateTrackMetadata(
+		trackId: number,
+		metadata: Partial<Pick<PlayerTrack, 'title' | 'artist' | 'coverImageUrl'>>
+	): void {
+		this.#state.update((state) => {
+			if (state.track?.id !== trackId) return state;
+
+			const track = { ...state.track, ...metadata };
+			if (
+				track.title === state.track.title &&
+				track.artist === state.track.artist &&
+				track.coverImageUrl === state.track.coverImageUrl
+			) {
+				return state;
+			}
+
+			return { ...state, track };
+		});
+	}
+
 	clear(): void {
 		const state = get(this.#state);
 		this.#state.set({

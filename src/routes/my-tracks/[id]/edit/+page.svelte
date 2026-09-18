@@ -3,9 +3,33 @@
 	import CoverImageField from '$lib/components/CoverImageField.svelte';
 	import { MUSIC_GENRES, MUSICAL_KEYS } from '$lib/constants/music';
 	import { formatFileSize } from '$lib/formatting';
+	import { useAudioPlayer } from '$lib/player/context';
+	import type { SubmitFunction } from '@sveltejs/kit';
 	import type { PageProps } from './$types';
 
 	let { data, form }: PageProps = $props();
+	const player = useAudioPlayer();
+	const enhanceEdit: SubmitFunction = ({ formData }) => {
+		return async ({ result, update }) => {
+			if (result.type === 'redirect' && result.location === '/my-tracks?updated=1') {
+				const coverImage = formData.get('coverImage');
+				const hasNewCoverImage = coverImage instanceof File && coverImage.size > 0;
+				const removeCoverImage = formData.get('removeCoverImage') === '1';
+				const title = formData.get('title');
+
+				player.updateTrackMetadata(data.track.publicId, {
+					title: typeof title === 'string' ? title.trim() : data.track.title,
+					artist: data.track.artist,
+					...(hasNewCoverImage
+						? { coverImageUrl: `/api/tracks/${data.track.publicId}/cover?v=${Date.now()}` }
+						: removeCoverImage
+							? { coverImageUrl: null }
+							: {})
+				});
+			}
+			await update();
+		};
+	};
 
 	const values = $derived(
 		form?.values ?? {
@@ -56,7 +80,7 @@
 				</div>
 			{/if}
 
-			<form method="POST" enctype="multipart/form-data" class="form-stack" use:enhance>
+			<form method="POST" enctype="multipart/form-data" class="form-stack" use:enhance={enhanceEdit}>
 				<CoverImageField
 					maxSizeMb={data.maxCoverImageSizeMb}
 					currentCoverImageUrl={data.track.coverImageUrl}
