@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { enhance } from '$app/forms';
 	import CoverImageField from '$lib/components/CoverImageField.svelte';
 	import { MUSIC_GENRES, MUSICAL_KEYS } from '$lib/constants/music';
 	import { formatFileSize } from '$lib/formatting';
@@ -55,7 +56,7 @@
 				</div>
 			{/if}
 
-			<form method="POST" enctype="multipart/form-data" class="form-stack">
+			<form method="POST" enctype="multipart/form-data" class="form-stack" use:enhance>
 				<CoverImageField
 					maxSizeMb={data.maxCoverImageSizeMb}
 					currentCoverImageUrl={data.track.coverImageUrl}
