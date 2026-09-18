@@ -36,7 +36,7 @@
 			<a href="/admin/users">
 				<span>Accounts</span>
 				<strong>Manage users</strong>
-				<p>View safe account details, roles, registration dates, and upload totals.</p>
+				<p>Review account details and remove users with their uploads and playlists.</p>
 			</a>
 			<a href="/admin/tracks">
 				<span>Moderation</span>

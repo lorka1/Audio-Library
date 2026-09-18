@@ -150,6 +150,11 @@ export class AudioPlayerController implements Readable<AudioPlayerState> {
 	clearIfTrackId(trackId: number): void {
 		if (get(this.#state).track?.id === trackId) this.clear();
 	}
+
+	clearIfTrackIds(trackIds: readonly number[]): void {
+		const currentId = get(this.#state).track?.id;
+		if (currentId !== undefined && trackIds.includes(currentId)) this.clearIfTrackId(currentId);
+	}
 }
 
 export function createAudioPlayerController(): AudioPlayerController {

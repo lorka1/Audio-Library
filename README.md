@@ -46,7 +46,7 @@ npm run dev
 - audio downloads using the original filename
 - owner-only track editing and deletion
 - private playlists with add and remove controls
-- server-authorized administrator dashboard with read-only user management and track moderation
+- server-authorized administrator dashboard with user deletion and track moderation
 - responsive light and dark interface
 
 ## Administrator role

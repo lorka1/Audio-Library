@@ -7,8 +7,8 @@ let repositoryPromise: Promise<AdminRepository> | undefined;
 
 export async function getApplicationAdminRepository(): Promise<AdminRepository> {
 	if (!repositoryPromise) {
-		const attempt = connectMongoDevelopment().then(({ database }) =>
-			createMongoAdminRepository(getMongoCollections(database))
+		const attempt = connectMongoDevelopment().then(({ client, database }) =>
+			createMongoAdminRepository(getMongoCollections(database), { client })
 		);
 		let cached: Promise<AdminRepository>;
 		cached = attempt.catch((error) => {

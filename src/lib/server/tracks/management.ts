@@ -16,6 +16,7 @@ import {
 	type QuarantinedAudioFile,
 	type QuarantineStoredAudioFileResult
 } from './files';
+import { prepareTrackDeletionMedia } from './deletion-media';
 import type { CoverImageExtension } from './media-formats';
 import { logTrackStorageError } from './logging';
 import {
@@ -126,17 +127,6 @@ function deleteFailure(
 	message = status === 404 ? 'Track not found.' : GENERIC_TRACK_DELETE_ERROR
 ): Extract<DeleteTrackResult, { success: false }> {
 	return { success: false, status, message };
-}
-
-async function restoreAfterDeleteFailure(
-	file: QuarantinedAudioFile,
-	dependencies: TrackManagementDependencies
-): Promise<void> {
-	try {
-		await dependencies.restoreQuarantinedFile(file);
-	} catch (error) {
-		logTrackStorageError('Unable to restore quarantined audio after deletion failure.', error);
-	}
 }
 
 async function restoreCoverAfterDeleteFailure(
@@ -328,52 +318,6 @@ export async function updateTrackMetadata(
 	return { success: true };
 }
 
-async function restoreDeletionQuarantines(
-	audio: QuarantineStoredAudioFileResult,
-	cover: QuarantineStoredCoverImageResult | null,
-	dependencies: TrackManagementDependencies
-): Promise<void> {
-	if (cover?.success && cover.state === 'quarantined') {
-		await restoreCoverAfterDeleteFailure(cover.file, dependencies);
-	}
-	if (audio.success && audio.state === 'quarantined') {
-		await restoreAfterDeleteFailure(audio.file, dependencies);
-	}
-}
-
-async function finalizeDeletionQuarantines(
-	audio: QuarantineStoredAudioFileResult,
-	cover: QuarantineStoredCoverImageResult | null,
-	dependencies: TrackManagementDependencies
-): Promise<boolean> {
-	let success = true;
-
-	if (audio.success && audio.state === 'quarantined') {
-		try {
-			await dependencies.deleteQuarantinedFile(audio.file);
-		} catch (error) {
-			success = false;
-			await restoreAfterDeleteFailure(audio.file, dependencies);
-			logTrackStorageError('Unable to permanently remove quarantined audio.', error);
-		}
-	}
-
-	if (cover?.success && cover.state === 'quarantined') {
-		try {
-			await dependencies.deleteQuarantinedCoverFile(cover.file);
-		} catch (error) {
-			success = false;
-			await restoreCoverAfterDeleteFailure(cover.file, dependencies);
-			logTrackStorageError(
-				'Unable to permanently remove a quarantined cover image.',
-				error
-			);
-		}
-	}
-
-	return success;
-}
-
 export async function deleteTrack(
 	input: DeleteTrackInput,
 	dependencies: TrackManagementDependencies = defaultDependencies
@@ -391,56 +335,23 @@ export async function deleteTrack(
 		return deleteFailure(404);
 	}
 
-	let quarantine: QuarantineStoredAudioFileResult;
-
-	try {
-		quarantine = await dependencies.quarantineFile(trackFile.storedFilename);
-	} catch (error) {
-		logTrackStorageError('Unable to prepare stored audio for deletion.', error);
-		return deleteFailure(500);
-	}
-
-	if (!quarantine.success) {
-		return deleteFailure(500);
-	}
-
-	let coverQuarantine: QuarantineStoredCoverImageResult | null = null;
-	if (trackFile.coverImage) {
-		try {
-			coverQuarantine = await dependencies.quarantineCoverFile(
-				trackFile.coverImage.storageKey
-			);
-		} catch (error) {
-			await restoreDeletionQuarantines(quarantine, null, dependencies);
-			logTrackStorageError('Unable to prepare a stored cover image for deletion.', error);
-			return deleteFailure(500);
-		}
-
-		if (!coverQuarantine.success) {
-			await restoreDeletionQuarantines(quarantine, null, dependencies);
-			return deleteFailure(500);
-		}
-	}
+	const media = await prepareTrackDeletionMedia(trackFile, dependencies);
+	if (!media) return deleteFailure(500);
 
 	let deleted: boolean;
 
 	try {
 		deleted = await dependencies.deleteRecord(input.publicId, input.ownerId);
 	} catch (error) {
-		await restoreDeletionQuarantines(
-			quarantine,
-			coverQuarantine,
-			dependencies
-		);
+		await media.restore();
 		logTrackStorageError('Owner-scoped track database deletion failed.', error);
 		return deleteFailure(500);
 	}
 
-	const finalized = await finalizeDeletionQuarantines(
-		quarantine,
-		coverQuarantine,
-		dependencies
-	);
-	if (!finalized) return deleteFailure(500);
-	return deleted ? { success: true } : deleteFailure(404);
+	if (!deleted) {
+		await media.restore();
+		return deleteFailure(404);
+	}
+	await media.finalize();
+	return { success: true };
 }

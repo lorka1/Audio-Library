@@ -102,6 +102,21 @@ track transactionally removes its membership rows alongside track metadata;
 the existing audio/cover quarantine is restored if that database transaction
 fails. Removing playlist membership alone never deletes the track.
 
+## Administrator user deletion
+
+The Users page first moves a target account's audio, track covers, and playlist
+images into private quarantine. One MongoDB transaction then removes its
+tracks, playlist memberships (including references in other users' playlists),
+owned playlists, sessions, and account. A failed transaction triggers restoration
+of the quarantined files. After a committed transaction, the quarantined files are
+removed. The administrator's own account cannot be deleted through this page.
+
+If the page reports that media cleanup needs attention, the account deletion
+committed but at least one quarantined file could not be removed. Inspect the
+server error logs and the private storage roots for `.delete-*.tmp` files.
+Reconcile them with the database and a paired backup before manually removing
+anything; a file from an earlier failed rollback may still be needed.
+
 ## Firewall, monitoring, and logs
 
 Expose HTTPS through the reverse proxy and keep MongoDB private. Monitor

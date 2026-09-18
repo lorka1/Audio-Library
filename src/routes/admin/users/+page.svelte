@@ -1,13 +1,42 @@
 <script lang="ts">
+	import { enhance } from '$app/forms';
 	import { formatDate } from '$lib/formatting';
+	import { useAudioPlayer } from '$lib/player/context';
+	import type { SubmitFunction } from '@sveltejs/kit';
 	import type { PageProps } from './$types';
 
-	let { data }: PageProps = $props();
+	let { data, form }: PageProps = $props();
+	const player = useAudioPlayer();
+	let deletingUserId = $state<string | null>(null);
+
+	const enhanceDeletion: SubmitFunction = ({ formData, cancel }) => {
+		const userId = formData.get('userId');
+		if (typeof userId !== 'string') {
+			cancel();
+			return;
+		}
+		deletingUserId = userId;
+		return async ({ result, update }) => {
+			try {
+				if (result.type === 'success') {
+					const deletedTrackIds = result.data?.deletedTrackIds;
+					if (Array.isArray(deletedTrackIds)) {
+						player.clearIfTrackIds(
+							deletedTrackIds.filter((id): id is number => typeof id === 'number' && Number.isSafeInteger(id))
+						);
+					}
+				}
+				await update();
+			} finally {
+				deletingUserId = null;
+			}
+		};
+	};
 </script>
 
 <svelte:head>
 	<title>Manage Users · Admin · Audio Library</title>
-	<meta name="description" content="Read-only administrator account list." />
+	<meta name="description" content="Administrator account management." />
 </svelte:head>
 
 <section class="admin-page">
@@ -16,8 +45,19 @@
 		<header class="admin-heading">
 			<p class="auth-eyebrow">Administrator area</p>
 			<h1>Manage users</h1>
-			<p>This account list is read-only and contains no password or session data.</p>
+			<p>Manage accounts and review their roles and uploads.</p>
 		</header>
+
+		{#if form?.message}
+			<div
+				class="form-message"
+				class:form-message--success={form.success}
+				class:form-message--error={!form.success}
+				role={form.success ? 'status' : 'alert'}
+			>
+				{form.message}
+			</div>
+		{/if}
 
 		<p class="result-count">
 			{data.users.length} {data.users.length === 1 ? 'registered user' : 'registered users'}
@@ -33,10 +73,11 @@
 							<th scope="col">Role</th>
 							<th scope="col">Registered</th>
 							<th scope="col">Tracks</th>
+							<th scope="col">Actions</th>
 						</tr>
 					</thead>
 					<tbody>
-						{#each data.users as user (`${user.email}-${user.username}`)}
+						{#each data.users as user (user.id)}
 							<tr class:administrator={user.role === 'admin'}>
 								<td data-label="Username"><strong>{user.username}</strong></td>
 								<td data-label="Email">{user.email}</td>
@@ -49,6 +90,22 @@
 									<time datetime={user.createdAt}>{formatDate(user.createdAt)}</time>
 								</td>
 								<td data-label="Tracks">{user.uploadedTrackCount}</td>
+								<td data-label="Actions" class="user-actions">
+									{#if user.id === data.currentAdminId}
+										<span class="self-delete-note">Current account — cannot delete</span>
+									{:else}
+										<details class="delete-confirmation">
+											<summary>Delete</summary>
+											<p>Delete {user.username} and all their tracks and playlists?</p>
+											<form method="POST" action="?/delete" use:enhance={enhanceDeletion}>
+												<input type="hidden" name="userId" value={user.id} />
+												<button type="submit" disabled={deletingUserId !== null}>
+													{deletingUserId === user.id ? 'Deleting…' : 'Confirm delete'}
+												</button>
+											</form>
+										</details>
+									{/if}
+								</td>
 							</tr>
 						{/each}
 					</tbody>
@@ -144,6 +201,54 @@
 		color: var(--accent-strong);
 		border-color: var(--accent-border);
 		background: var(--accent-soft);
+	}
+
+	.delete-confirmation summary,
+	.user-actions button {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		min-height: 2.4rem;
+		padding: 0.5rem 0.7rem;
+		color: var(--error);
+		border: 1px solid var(--error-border);
+		border-radius: 0.5rem;
+		background: transparent;
+		font-size: 0.8rem;
+		font-weight: 750;
+		cursor: pointer;
+	}
+
+	.delete-confirmation summary {
+		list-style: none;
+	}
+
+	.delete-confirmation summary::-webkit-details-marker {
+		display: none;
+	}
+
+	.delete-confirmation p {
+		max-width: 12rem;
+		margin: 0.6rem 0;
+		color: var(--text-muted);
+		font-size: 0.8rem;
+		line-height: 1.4;
+	}
+
+	.delete-confirmation summary:hover,
+	.user-actions button:hover:not(:disabled) {
+		background: var(--error-bg);
+	}
+
+	.user-actions button:disabled {
+		color: var(--disabled-text);
+		border-color: var(--border);
+		cursor: wait;
+	}
+
+	.self-delete-note {
+		color: var(--text-muted);
+		font-size: 0.8rem;
 	}
 
 	@media (max-width: 44rem) {
